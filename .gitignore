@@ -1,0 +1,58 @@
+# ── dependencies ────────────────────────────────────────────────────
+node_modules/
+.pnp
+.pnp.js
+
+# ── build output ────────────────────────────────────────────────────
+dist/
+build/
+out/
+.next/
+.turbo/
+.vite/
+*.tsbuildinfo
+
+# ── runtime / env ───────────────────────────────────────────────────
+.env
+.env.local
+.env.*.local
+*.local
+
+# ── logs ────────────────────────────────────────────────────────────
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.pm2/
+
+# ── uploads + test artefacts (per-app data, not source) ─────────────
+hirestream/uploads/
+agentryx-verify/uploads/
+*.cookie
+coverage/
+
+# ── editor / OS ─────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+.vscode/
+.idea/
+
+# ── agent memory (per-machine session state, not for the repo) ──────
+.claude/
+
+# ── credentials (must never be committed) ───────────────────────────
+PMD-Final wrapup/keys.md
+**/keys.md
+**/credentials.json
+**/secrets.json
+*.pem
+*.key
+id_rsa
+id_ed25519
+
+# ── tmp ─────────────────────────────────────────────────────────────
+.tmp/
+tmp/

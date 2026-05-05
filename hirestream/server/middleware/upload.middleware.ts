@@ -1,0 +1,120 @@
+import multer from "multer";
+import path from "path";
+import crypto from "crypto";
+import fs from "fs";
+import type { Request, Response, NextFunction } from "express";
+import { env } from "../config/env.config";
+
+// Upload root. Subdirs are the namespace — nothing ever lands in the bare root
+// so we can't collide with another app's files even if a future misconfig shares
+// a parent directory. Every writer (document upload, photo upload, future) is
+// responsible for passing a `kind` that resolves to a subdir under this root.
+const UPLOAD_DIR = path.resolve(process.cwd(), "uploads");
+// HS namespace: everything HireStream writes lives under uploads/hs/…
+// Candidate documents and candidate photos each get their own leaf so the two
+// asset classes are disjoint on disk (docs auth-protected, photos public).
+export const HS_DOCS_DIR = path.join(UPLOAD_DIR, "hs", "candidates", "docs");
+export const HS_PHOTOS_DIR = path.join(UPLOAD_DIR, "hs", "candidates", "photos");
+for (const d of [UPLOAD_DIR, HS_DOCS_DIR, HS_PHOTOS_DIR]) {
+  if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true });
+}
+
+const ALLOWED_MIMES: Record<string, string> = {
+  "application/pdf": ".pdf",
+  "image/jpeg": ".jpg",
+  "image/png": ".png",
+};
+
+const MAX_SIZE = (env.MAX_FILE_SIZE_MB || 5) * 1024 * 1024; // Default 5MB
+
+// Default storage writes to HS_DOCS_DIR. Profile-photo uploads move the file
+// to HS_PHOTOS_DIR after the magic-byte check passes (see candidate-self-service.routes).
+const storage = multer.diskStorage({
+  destination: (_req, _file, cb) => {
+    cb(null, HS_DOCS_DIR);
+  },
+  filename: (_req, file, cb) => {
+    // Generate unique filename: timestamp-randomhex.ext
+    const ext = ALLOWED_MIMES[file.mimetype] || path.extname(file.originalname);
+    const uniqueName = `${Date.now()}-${crypto.randomBytes(8).toString("hex")}${ext}`;
+    cb(null, uniqueName);
+  },
+});
+
+function fileFilter(_req: any, file: Express.Multer.File, cb: multer.FileFilterCallback) {
+  if (ALLOWED_MIMES[file.mimetype]) {
+    cb(null, true);
+  } else {
+    cb(new Error(`File type not allowed. Accepted: PDF, JPG, PNG`));
+  }
+}
+
+export const upload = multer({
+  storage,
+  fileFilter,
+  limits: { fileSize: MAX_SIZE },
+});
+
+// ── Magic-byte signature verification ───────────────────────────────────
+// Defence against extension spoofing — verify file content matches declared MIME.
+// Run AFTER multer in route handler chain. Deletes file and returns 400 on mismatch.
+const MAGIC_BYTES: Record<string, { sig: number[]; offset?: number }[]> = {
+  "application/pdf": [{ sig: [0x25, 0x50, 0x44, 0x46] }], // "%PDF"
+  "image/jpeg": [
+    { sig: [0xff, 0xd8, 0xff, 0xe0] }, // JFIF
+    { sig: [0xff, 0xd8, 0xff, 0xe1] }, // EXIF
+    { sig: [0xff, 0xd8, 0xff, 0xdb] },
+    { sig: [0xff, 0xd8, 0xff, 0xee] },
+  ],
+  "image/png": [{ sig: [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a] }],
+};
+
+function verifyMagicBytes(filePath: string, mimeType: string): boolean {
+  const expected = MAGIC_BYTES[mimeType];
+  if (!expected) return false;
+  try {
+    const fd = fs.openSync(filePath, "r");
+    const headerSize = 12;
+    const buf = Buffer.alloc(headerSize);
+    fs.readSync(fd, buf, 0, headerSize, 0);
+    fs.closeSync(fd);
+
+    return expected.some(({ sig, offset = 0 }) => {
+      for (let i = 0; i < sig.length; i++) {
+        if (buf[offset + i] !== sig[i]) return false;
+      }
+      return true;
+    });
+  } catch {
+    return false;
+  }
+}
+
+export function verifyUploadedFile(req: Request, res: Response, next: NextFunction) {
+  const file = req.file;
+  if (!file) return next();
+
+  // HTIS XLSX-row ("File Upload — Empty file") — multer happily wrote a
+  // zero-byte file to disk. Reject before the magic-byte check (which would
+  // otherwise flag it as "spoofed" with a confusing message) and clean up.
+  if (file.size === 0) {
+    fs.unlink(file.path, () => {});
+    return res.status(400).json({
+      success: false,
+      error: { code: 400, message: "File is empty. Please choose a non-empty file to upload." },
+    });
+  }
+
+  const valid = verifyMagicBytes(file.path, file.mimetype);
+  if (!valid) {
+    // Delete the spoofed file from disk
+    fs.unlink(file.path, () => {});
+    return res.status(400).json({
+      success: false,
+      error: { code: 400, message: "File content does not match declared type. Possible spoofed extension." },
+    });
+  }
+  next();
+}
+
+export { UPLOAD_DIR };

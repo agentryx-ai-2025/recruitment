@@ -1,0 +1,1035 @@
+import { useState } from "react";
+import { useLocation, Link } from "wouter";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { Input } from "@/components/ui/input";
+import { JobCreationForm } from "@/components/employer/job-creation-form";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/use-auth";
+import { useQuery } from "@tanstack/react-query";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  Briefcase, UserCheck, Handshake, Clock, Plus, Users, Search,
+  Calendar, Loader2, Building, Eye, Edit, MapPin, FileText,
+  ChevronRight, User, Star, AlertCircle, Bell, LayoutDashboard,
+  Activity, ArrowRight, CheckCircle, TrendingUp, Globe, Download, Heart,
+  Copy, Trash2, PauseCircle, PlayCircle,
+} from "lucide-react";
+
+async function fetchJson(url: string) {
+  const res = await fetch(url);
+  if (!res.ok) return { data: null };
+  return res.json();
+}
+
+const fadeUp = {
+  initial: { opacity: 0, y: 12 },
+  animate: { opacity: 1, y: 0, transition: { duration: 0.3, ease: "easeOut" } },
+};
+
+const stagger = {
+  animate: { transition: { staggerChildren: 0.05 } },
+};
+
+const scaleIn = {
+  initial: { opacity: 0, scale: 0.97 },
+  animate: { opacity: 1, scale: 1, transition: { duration: 0.25 } },
+  exit: { opacity: 0, scale: 0.97, transition: { duration: 0.15 } },
+};
+
+function InitialsAvatar({ name, size = "w-10 h-10" }: { name: string; size?: string }) {
+  const initials = name.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2);
+  const gradients = ["from-blue-500 to-blue-600", "from-emerald-500 to-emerald-600", "from-purple-500 to-purple-600", "from-orange-500 to-orange-600", "from-rose-500 to-rose-600"];
+  const idx = name.split("").reduce((a, c) => a + c.charCodeAt(0), 0) % gradients.length;
+  return (
+    <div className={`${size} bg-gradient-to-br ${gradients[idx]} rounded-xl flex items-center justify-center text-white font-bold text-sm flex-shrink-0`}>
+      {initials || <Building className="w-4 h-4" />}
+    </div>
+  );
+}
+
+export default function EmployerDashboard() {
+  const { toast } = useToast();
+  const { user } = useAuth();
+  const [activeView, setActiveView] = useState("overview");
+  // Job list filter — settable by stat-card clicks (sidebar Quick Stats) so
+  // "Closed", "Active", "All Posts" etc. open the My Jobs view already narrowed.
+  // "all" = no filter. Persisted at dashboard level so switching tabs preserves it.
+  const [jobStatusFilter, setJobStatusFilter] = useState<"all" | "active" | "closed" | "draft">("all");
+
+  const { data: jobsRes, isLoading: jobsLoading } = useQuery({
+    queryKey: ["/api/v1/jobs", "employer-all", "mine"],
+    queryFn: () => fetchJson("/api/v1/jobs?status=all&mine=true&limit=100"),
+  });
+  const { data: notifsRes } = useQuery({
+    queryKey: ["/api/v1/notifications"],
+    queryFn: () => fetchJson("/api/v1/notifications?limit=10"),
+  });
+
+  const allJobs = jobsRes?.data || [];
+  const myJobs = allJobs.filter((j: any) => j.employerId === user?.id || j.agentId === user?.id);
+  const activeJobs = myJobs.filter((j: any) => j.status === "active");
+  const closedJobs = myJobs.filter((j: any) => j.status !== "active");
+  const notifications = notifsRes?.data || [];
+
+  if (jobsLoading) {
+    return (
+      <div className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 xl:px-8 2xl:px-12 py-8 space-y-6">
+        <Skeleton className="h-32 w-full rounded-xl" />
+        <div className="grid grid-cols-4 gap-3">{[1,2,3,4].map(i => <Skeleton key={i} className="h-20 rounded-xl" />)}</div>
+      </div>
+    );
+  }
+
+  const navItems = [
+    { key: "overview",   label: "Dashboard",  icon: LayoutDashboard, count: null },
+    { key: "jobs",       label: "My Jobs",    icon: Briefcase,       count: myJobs.length },
+    { key: "active",     label: "Active",     icon: CheckCircle,     count: activeJobs.length },
+    { key: "placements", label: "Offers & Placements", icon: Handshake, count: null },
+    { key: "reports",    label: "Reports",    icon: TrendingUp,      count: null },
+    { key: "activity",   label: "Activity",   icon: Activity,        count: notifications.length },
+  ];
+
+  return (
+    <div className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 xl:px-8 2xl:px-12 py-5">
+      {/* Mobile Nav */}
+      <div className="lg:hidden mb-4">
+        <div className="flex gap-1 overflow-x-auto bg-white rounded-xl border border-slate-200 p-1">
+          {navItems.map(item => (
+            <button key={item.key} onClick={() => setActiveView(item.key)}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs whitespace-nowrap font-medium transition-all ${
+                activeView === item.key ? "bg-blue-50 text-blue-700" : "text-slate-500"
+              }`}>
+              <item.icon className="w-3.5 h-3.5" /> {item.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="lg:grid lg:grid-cols-[minmax(220px,280px)_1fr] lg:gap-6 xl:gap-7">
+        {/* ── SIDEBAR ── */}
+        <aside className="hidden lg:flex lg:flex-col gap-4 sticky top-20 self-start max-h-[calc(100vh-6rem)] overflow-y-auto pb-4">
+          {/* Employer Card */}
+          <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
+            <div className="flex items-center gap-3 mb-3">
+              <InitialsAvatar name={user?.username || "E"} />
+              <div className="min-w-0 flex-1">
+                <p className="font-bold text-slate-900 text-sm leading-snug truncate">{user?.username || "Employer"}</p>
+                <p className="text-xs text-slate-500 truncate">{user?.email}</p>
+              </div>
+            </div>
+            <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200 text-xs w-full justify-center py-1 mb-3">
+              Employer Account
+            </Badge>
+            <JobCreationForm />
+          </div>
+
+          {/* Navigation */}
+          <nav className="bg-white rounded-xl border border-slate-200 p-1.5 shadow-sm">
+            {navItems.map(item => (
+              <button
+                key={item.key}
+                onClick={() => setActiveView(item.key)}
+                className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-all ${
+                  activeView === item.key
+                    ? "bg-blue-50 text-blue-700 font-semibold"
+                    : "text-slate-600 hover:bg-slate-50"
+                }`}
+              >
+                <item.icon className="w-4 h-4 flex-shrink-0" />
+                <span className="flex-1 text-left truncate">{item.label}</span>
+                {item.count !== null && item.count > 0 && (
+                  <span className={`text-[11px] font-semibold tabular-nums ${
+                    activeView === item.key ? "text-blue-600" : "text-slate-400"
+                  }`}>{item.count}</span>
+                )}
+              </button>
+            ))}
+          </nav>
+
+          {/* Quick Stats */}
+          <div className="bg-white rounded-xl border border-slate-200 p-3 shadow-sm">
+            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2 px-1">Quick Stats</p>
+            <div className="space-y-0.5">
+              <MiniStat label="Active Jobs" value={activeJobs.length} icon={Briefcase} color="text-emerald-600" bg="bg-emerald-50" onClick={() => setActiveView("active")} />
+              <MiniStat label="Total Posts" value={myJobs.length} icon={UserCheck} color="text-blue-600" bg="bg-blue-50" onClick={() => setActiveView("jobs")} />
+              <MiniStat label="Closed" value={closedJobs.length} icon={Clock} color="text-slate-600" bg="bg-slate-50" onClick={() => { setJobStatusFilter("closed"); setActiveView("jobs"); }} />
+              <MiniStat label="Updates" value={notifications.length} icon={Bell} color="text-orange-600" bg="bg-orange-50" onClick={() => setActiveView("activity")} />
+            </div>
+          </div>
+
+          {/* Portal Info */}
+          <div className="bg-white rounded-xl border border-slate-200 p-3 shadow-sm">
+            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2 px-1">Portal Info</p>
+            <div className="space-y-1.5 px-1 text-xs">
+              <div className="flex justify-between">
+                <span className="text-slate-500">Status</span>
+                <span className="font-semibold text-emerald-600">● Active</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">Role</span>
+                <span className="font-semibold text-slate-700">Employer</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">Jobs</span>
+                <span className="font-semibold text-slate-700">{myJobs.length}</span>
+              </div>
+            </div>
+          </div>
+        </aside>
+
+        {/* ── MAIN CONTENT ── */}
+        <main className="min-w-0">
+          <AnimatePresence mode="wait">
+            <motion.div key={activeView} variants={scaleIn} initial="initial" animate="animate" exit="exit">
+              {activeView === "overview" && (
+                <OverviewContent
+                  myJobs={myJobs} activeJobs={activeJobs} closedJobs={closedJobs}
+                  notifications={notifications} setActiveView={setActiveView}
+                />
+              )}
+              {activeView === "jobs" && <JobsContent jobs={myJobs} title="All Job Postings" statusFilter={jobStatusFilter} setStatusFilter={setJobStatusFilter} />}
+              {activeView === "active" && <JobsContent jobs={activeJobs} title="Active Job Postings" statusFilter="active" setStatusFilter={setJobStatusFilter} lockStatus />}
+              {activeView === "placements" && <EmployerPlacements />}
+              {activeView === "reports" && <EmployerReports />}
+              {activeView === "activity" && <ActivityContent notifications={notifications} />}
+            </motion.div>
+          </AnimatePresence>
+        </main>
+      </div>
+    </div>
+  );
+}
+
+// ── Mini Stat ──
+function MiniStat({ label, value, icon: Icon, color, bg, onClick }: { label: string; value: number | string; icon: React.ElementType; color: string; bg: string; onClick?: () => void }) {
+  return (
+    <button onClick={onClick}
+      className="w-full flex items-center gap-2.5 px-2 py-1.5 rounded-lg hover:bg-slate-50 transition-colors cursor-pointer text-left">
+      <div className={`w-7 h-7 rounded-md ${bg} ${color} flex items-center justify-center flex-shrink-0`}>
+        <Icon className="w-3.5 h-3.5" />
+      </div>
+      <span className="text-xs text-slate-600 flex-1 truncate">{label}</span>
+      <span className={`text-sm font-bold tabular-nums ${color}`}>{value}</span>
+    </button>
+  );
+}
+
+// ── Stat Card ──
+function StatCard({ icon: Icon, color, lightBg, value, label, subtitle, onClick }: {
+  icon: React.ElementType; color: string; lightBg: string; value: number | string; label: string; subtitle: string; onClick?: () => void;
+}) {
+  return (
+    <motion.div
+      variants={fadeUp}
+      whileHover={{ y: -2 }}
+      className={`bg-white rounded-xl border border-slate-200 p-4 transition-all shadow-sm hover:shadow-md ${onClick ? "cursor-pointer" : ""}`}
+      onClick={onClick}
+    >
+      <div className="flex items-center gap-3">
+        <div className={`${lightBg} ${color} p-2 rounded-lg flex-shrink-0`}>
+          <Icon className="w-5 h-5" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-baseline gap-1.5">
+            <p className="text-2xl font-bold text-slate-900 tabular-nums leading-none">{value}</p>
+            <p className="text-xs font-medium text-slate-500 truncate">{label}</p>
+          </div>
+          <p className="text-[11px] text-slate-400 mt-0.5 truncate">{subtitle}</p>
+        </div>
+        {onClick && <ArrowRight className="w-4 h-4 text-slate-300 flex-shrink-0" />}
+      </div>
+    </motion.div>
+  );
+}
+
+// ── Overview ──
+function OverviewContent({ myJobs, activeJobs, closedJobs, notifications, setActiveView }: any) {
+  return (
+    <motion.div variants={stagger} initial="initial" animate="animate" className="space-y-5">
+      {/* Hero: Awaiting your decision — the employer's primary metric */}
+      <AwaitingDecisionHero setActiveView={setActiveView} />
+
+      <motion.div variants={fadeUp} className="grid grid-cols-2 xl:grid-cols-4 gap-3">
+        <StatCard icon={Briefcase} color="text-blue-600" lightBg="bg-blue-50" value={activeJobs.length} label="Open requisitions" subtitle={`${myJobs.length} total posted`} onClick={() => setActiveView("jobs")} />
+        <StatCard icon={UserCheck} color="text-emerald-600" lightBg="bg-emerald-50" value={myJobs.length} label="Total Posts" subtitle={`${closedJobs.length} closed`} onClick={() => setActiveView("jobs")} />
+        <StatCard icon={Bell} color="text-orange-600" lightBg="bg-orange-50" value={notifications.length} label="Updates" subtitle="New notifications" onClick={() => setActiveView("activity")} />
+        <StatCard icon={Handshake} color="text-purple-600" lightBg="bg-purple-50" value="—" label="Track Placements" subtitle="Offers + welfare status" onClick={() => setActiveView("placements")} />
+      </motion.div>
+
+      {/* Requisitions with progress bars */}
+      <RequisitionsProgress setActiveView={setActiveView} />
+
+      {/* Recent Jobs */}
+      <motion.div variants={fadeUp} className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+            <Briefcase className="w-4 h-4 text-blue-600" /> Recent Job Postings
+          </h3>
+          <Button variant="ghost" size="sm" className="text-xs text-blue-600 font-semibold" onClick={() => setActiveView("jobs")}>
+            View All <ArrowRight className="w-3.5 h-3.5 ml-1" />
+          </Button>
+        </div>
+        {myJobs.length === 0 ? (
+          <div className="text-center py-8 text-slate-400">
+            <Briefcase className="w-10 h-10 mx-auto mb-3 opacity-40" />
+            <p className="text-sm font-medium">No job postings yet</p>
+            <p className="text-xs mt-1">Click "Post Job" to create your first listing</p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {myJobs.slice(0, 5).map((job: any) => (
+              <CompactJobRow key={job.id} job={job} />
+            ))}
+          </div>
+        )}
+      </motion.div>
+
+      {/* Recent Activity */}
+      {notifications.length > 0 && (
+        <motion.div variants={fadeUp} className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+              <Bell className="w-4 h-4 text-orange-600" /> Recent Activity
+            </h3>
+            <Button variant="ghost" size="sm" className="text-xs text-blue-600 font-semibold" onClick={() => setActiveView("activity")}>
+              View All <ArrowRight className="w-3.5 h-3.5 ml-1" />
+            </Button>
+          </div>
+          <div className="space-y-2">
+            {notifications.slice(0, 3).map((n: any) => (
+              <div key={n.id} className={`p-3 rounded-xl ${n.read ? 'bg-slate-50' : 'bg-blue-50 border-l-4 border-blue-500'}`}>
+                <p className="text-sm font-semibold text-slate-900">{n.title}</p>
+                <p className="text-xs text-slate-500 mt-0.5">{n.message}</p>
+                <p className="text-[11px] text-slate-400 mt-1">{n.createdAt ? new Date(n.createdAt).toLocaleString('en-IN') : ''}</p>
+              </div>
+            ))}
+          </div>
+        </motion.div>
+      )}
+    </motion.div>
+  );
+}
+
+// ── Compact Job Row ──
+function CompactJobRow({ job }: { job: any }) {
+  return (
+    <Link href={`/employer/review/${job.id}`}
+      className="flex items-center justify-between p-3 rounded-lg border border-slate-100 hover:border-purple-300 hover:bg-purple-50/40 transition-colors group cursor-pointer">
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-semibold text-slate-900 truncate group-hover:text-blue-700">{job.title}</p>
+        <p className="text-xs text-slate-400 flex items-center gap-1">
+          <MapPin className="w-3 h-3" /> {job.location}, {job.country}
+          {job.salary && <span className="ml-1">· {job.salary}</span>}
+        </p>
+      </div>
+      <Badge className={`text-[11px] flex-shrink-0 ${job.status === "active" ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>{job.status}</Badge>
+    </Link>
+  );
+}
+
+// ── Jobs Content ──
+// `statusFilter` narrows the list client-side. When `lockStatus` is true, the
+// Active tab's filter is forced — the chip bar still shows so users know what
+// they're looking at but the All chip is hidden.
+function JobsContent({ jobs, title, statusFilter = "all", setStatusFilter, lockStatus = false }: {
+  jobs: any[]; title: string;
+  statusFilter?: "all" | "active" | "closed" | "draft";
+  setStatusFilter?: (v: "all" | "active" | "closed" | "draft") => void;
+  lockStatus?: boolean;
+}) {
+  type JobSort = "newest" | "oldest" | "deadline" | "priority";
+  const [search, setSearch] = useState("");
+  const [countryFilter, setCountryFilter] = useState<string>("all");
+  const [priorityFilter, setPriorityFilter] = useState<"all" | "standard" | "urgent" | "critical">("all");
+  const [sortBy, setSortBy] = useState<JobSort>("newest");
+  const countries = Array.from(new Set(jobs.map((j: any) => j.country).filter(Boolean))).sort();
+  const counts = {
+    all: jobs.length,
+    active: jobs.filter((j: any) => j.status === "active").length,
+    closed: jobs.filter((j: any) => j.status === "closed").length,
+    draft: jobs.filter((j: any) => j.status === "draft").length,
+  };
+  const priorityRank: Record<string, number> = { critical: 3, urgent: 2, standard: 1 };
+  const filtered = jobs.filter((j: any) => {
+    const matchStatus = statusFilter === "all" || j.status === statusFilter;
+    const matchCountry = countryFilter === "all" || j.country === countryFilter;
+    const matchPriority = priorityFilter === "all" || (j.priority || "standard") === priorityFilter;
+    const s = search.toLowerCase();
+    const matchSearch = !s ||
+      (j.title || "").toLowerCase().includes(s) ||
+      (j.company || "").toLowerCase().includes(s) ||
+      (j.location || "").toLowerCase().includes(s) ||
+      (j.skills || []).some((sk: string) => sk.toLowerCase().includes(s));
+    return matchStatus && matchCountry && matchPriority && matchSearch;
+  });
+  filtered.sort((a: any, b: any) => {
+    switch (sortBy) {
+      case "oldest":   return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+      case "deadline": {
+        const da = a.hiringDeadline ? new Date(a.hiringDeadline).getTime() : Infinity;
+        const db = b.hiringDeadline ? new Date(b.hiringDeadline).getTime() : Infinity;
+        return da - db;
+      }
+      case "priority": return (priorityRank[b.priority] ?? 1) - (priorityRank[a.priority] ?? 1);
+      case "newest":
+      default:         return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    }
+  });
+  const chips: Array<["all" | "active" | "closed" | "draft", string, string]> = [
+    ["all",    "All",    "bg-slate-100 text-slate-700"],
+    ["active", "Active", "bg-emerald-100 text-emerald-800"],
+    ["draft",  "Drafts", "bg-amber-100 text-amber-800"],
+    ["closed", "Closed", "bg-slate-200 text-slate-700"],
+  ];
+
+  return (
+    <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
+      <div className="flex items-center justify-between flex-wrap gap-3 mb-4">
+        <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+          <Briefcase className="w-4 h-4 text-blue-600" /> {title}
+          <span className="text-slate-400 text-xs font-normal">({filtered.length} of {jobs.length})</span>
+        </h3>
+      </div>
+
+      {/* Filter chips + search + country — leverages the existing list without
+          adding new nav elements. Chips are visible even in lock mode so users
+          know what slice they're viewing. */}
+      {!lockStatus && setStatusFilter && (
+        <div className="flex flex-wrap gap-1.5 mb-3">
+          {chips.map(([k, label, cls]) => (
+            <button key={k} onClick={() => setStatusFilter(k)}
+              aria-pressed={statusFilter === k}
+              className={`text-xs font-semibold px-2.5 py-1 rounded-md border transition ${
+                statusFilter === k ? `${cls} border-slate-500 shadow-sm` : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+              }`}>
+              {label} <span className="text-slate-500 tabular-nums ml-0.5">{counts[k]}</span>
+            </button>
+          ))}
+        </div>
+      )}
+      <div className="flex items-center gap-2 mb-2 flex-wrap">
+        <input type="text" placeholder="Search title, company, location, skill…" value={search} onChange={(e) => setSearch(e.target.value)}
+          className="flex-1 min-w-[200px] h-9 text-xs rounded-md border border-slate-200 px-3" />
+        <select value={sortBy} onChange={(e) => setSortBy(e.target.value as JobSort)}
+          className="h-9 text-xs rounded-md border border-slate-200 px-2 bg-white">
+          <option value="newest">Newest first</option>
+          <option value="oldest">Oldest first</option>
+          <option value="deadline">Deadline (soonest)</option>
+          <option value="priority">Priority (high→low)</option>
+        </select>
+        {countries.length > 1 && (
+          <select value={countryFilter} onChange={(e) => setCountryFilter(e.target.value)}
+            className="h-9 text-xs rounded-md border border-slate-200 px-2 bg-white">
+            <option value="all">All countries</option>
+            {countries.map((c: any) => <option key={c} value={c}>{c}</option>)}
+          </select>
+        )}
+      </div>
+      <div className="flex flex-wrap gap-1.5 mb-4">
+        {(["all", "critical", "urgent", "standard"] as const).map((p) => (
+          <button key={p} onClick={() => setPriorityFilter(p)}
+            aria-pressed={priorityFilter === p}
+            className={`text-[11px] font-semibold px-2 py-1 rounded-md border transition ${
+              priorityFilter === p
+                ? (p === "critical" ? "bg-red-100 text-red-800 border-red-400"
+                  : p === "urgent" ? "bg-amber-100 text-amber-800 border-amber-400"
+                  : p === "standard" ? "bg-slate-100 text-slate-700 border-slate-400"
+                  : "bg-blue-50 text-blue-700 border-blue-300")
+                : "bg-white text-slate-500 border-slate-200 hover:bg-slate-50"
+            }`}>
+            {p === "all" ? "All priorities" : p[0].toUpperCase() + p.slice(1)}
+          </button>
+        ))}
+        {(countryFilter !== "all" || priorityFilter !== "all" || sortBy !== "newest") && (
+          <button onClick={() => { setCountryFilter("all"); setPriorityFilter("all"); setSortBy("newest"); }}
+            className="text-[11px] text-slate-500 hover:text-slate-900 hover:underline">Clear</button>
+        )}
+      </div>
+
+      {filtered.length === 0 ? (
+        <div className="text-center py-12 text-slate-400">
+          <Briefcase className="w-10 h-10 mx-auto mb-3 opacity-40" />
+          <p className="text-sm font-medium">{jobs.length === 0 ? "No jobs yet" : "No jobs match the current filters"}</p>
+          {jobs.length === 0 && <p className="text-xs mt-1">Click "Post Job" to create your first listing</p>}
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {filtered.map((job: any) => <JobCard key={job.id} job={job} />)}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Rich Job Card ──
+function JobCard({ job }: { job: any }) {
+  const { toast } = useToast();
+  const qc = useQueryClient();
+  const [editOpen, setEditOpen] = useState(false);
+  const isDraft = job.status === "draft";
+  const isClosed = job.status === "closed";
+
+  const statusMut = useMutation({
+    mutationFn: async (nextStatus: "active" | "closed") => {
+      const r = await fetch(`/api/v1/jobs/${job.id}/status`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: nextStatus }),
+      });
+      if (!r.ok) throw new Error((await r.json())?.error?.message || "Failed");
+      return r.json();
+    },
+    onSuccess: (_, next) => {
+      qc.invalidateQueries({ queryKey: ["/api/v1/jobs"] });
+      qc.invalidateQueries({ queryKey: ["/api/v1/employer/requisitions"] });
+      toast({ title: next === "closed" ? "Requisition closed" : "Requisition reopened" });
+    },
+    onError: (e: any) => toast({ title: "Couldn't update", description: e.message, variant: "destructive" }),
+  });
+
+  const cloneMut = useMutation({
+    mutationFn: async () => {
+      const r = await fetch(`/api/v1/jobs/${job.id}/clone`, { method: "POST" });
+      if (!r.ok) throw new Error((await r.json())?.error?.message || "Failed");
+      return r.json();
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/v1/jobs"] });
+      qc.invalidateQueries({ queryKey: ["/api/v1/employer/requisitions"] });
+      toast({ title: "Cloned as new draft", description: "Edit and publish when ready." });
+    },
+    onError: (e: any) => toast({ title: "Couldn't clone", description: e.message, variant: "destructive" }),
+  });
+
+  const deleteMut = useMutation({
+    mutationFn: async () => {
+      const r = await fetch(`/api/v1/jobs/${job.id}`, { method: "DELETE" });
+      if (!r.ok) throw new Error((await r.json())?.error?.message || "Failed");
+      return r.json();
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/v1/jobs"] });
+      qc.invalidateQueries({ queryKey: ["/api/v1/employer/requisitions"] });
+      toast({ title: isDraft ? "Draft deleted" : "Requisition deleted" });
+    },
+    onError: (e: any) => toast({ title: "Couldn't delete", description: e.message, variant: "destructive" }),
+  });
+
+  return (
+    <>
+      <div className="border border-slate-200 rounded-xl p-4 hover:shadow-md hover:border-slate-300 transition-all">
+        <div className="flex justify-between items-start gap-3 mb-3">
+          <div className="min-w-0 flex-1">
+            <h4 className="font-semibold text-slate-900 text-sm flex items-center gap-2 flex-wrap">
+              {job.title}
+              {job.priority === "critical" && <Badge className="text-[10px] bg-red-100 text-red-700">critical</Badge>}
+              {job.priority === "urgent" && <Badge className="text-[10px] bg-amber-100 text-amber-700">urgent</Badge>}
+            </h4>
+            <div className="flex items-center gap-3 text-xs text-slate-500 mt-1 flex-wrap">
+              <span className="flex items-center gap-0.5"><MapPin className="w-3.5 h-3.5" />{[job.location, job.country].filter(Boolean).join(", ") || <span className="italic">no location yet</span>}</span>
+              {job.salary && <span>· {job.salary}</span>}
+              {job.targetHires > 1 && <span>· {job.targetHires} hires</span>}
+            </div>
+          </div>
+          <Badge className={`text-[11px] flex-shrink-0 ${
+            job.status === "active" ? "bg-emerald-100 text-emerald-700"
+            : isDraft ? "bg-amber-100 text-amber-700"
+            : isClosed ? "bg-slate-200 text-slate-700"
+            : "bg-slate-100 text-slate-500"
+          }`}>{job.status}</Badge>
+        </div>
+
+        {job.skills?.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 mb-3">
+            {job.skills.slice(0, 5).map((s: string) => <Badge key={s} variant="secondary" className="text-[11px]">{s}</Badge>)}
+            {job.experience > 0 && <Badge variant="outline" className="text-[11px]">{job.experience}+ yrs</Badge>}
+          </div>
+        )}
+
+        <div className="flex items-center gap-1.5 text-[11px] text-slate-400 mb-3 flex-wrap">
+          <Calendar className="w-3.5 h-3.5" />
+          Posted {job.createdAt ? new Date(job.createdAt).toLocaleDateString('en-IN') : 'recently'}
+          {job.hiringDeadline && <span>· deadline {new Date(job.hiringDeadline).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}</span>}
+          {job.stats && job.targetHires > 0 && (
+            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-purple-50 text-purple-700 font-medium">
+              <Users className="w-3 h-3" />
+              {(job.stats.placed || 0) + (job.stats.selected || 0)} / {job.targetHires} hired
+            </span>
+          )}
+          {job.stats?.awaitingDecision > 0 && (
+            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 font-medium">
+              {job.stats.awaitingDecision} awaiting you
+            </span>
+          )}
+        </div>
+
+        <div className="flex gap-2 flex-wrap">
+          {!isDraft && (
+            <Link href={`/employer/review/${job.id}`}>
+              <Button size="sm" className="rounded-lg bg-purple-600 text-white hover:bg-purple-700 text-xs">
+                <Eye className="w-3.5 h-3.5 mr-1" /> Review Candidates
+              </Button>
+            </Link>
+          )}
+          <Button size="sm" variant="outline" onClick={() => setEditOpen(true)}
+            className="rounded-lg text-xs">
+            <Edit className="w-3.5 h-3.5 mr-1" /> {isDraft ? "Continue" : "Edit"}
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => cloneMut.mutate()}
+            disabled={cloneMut.isPending} className="rounded-lg text-xs">
+            <Copy className="w-3.5 h-3.5 mr-1" /> Clone
+          </Button>
+          {job.status === "active" && (
+            <Button size="sm" variant="outline"
+              onClick={() => { if (confirm("Close this requisition? Derivative agent jobs will also auto-close. You can reopen later.")) statusMut.mutate("closed"); }}
+              disabled={statusMut.isPending}
+              className="rounded-lg text-xs border-slate-200 hover:border-amber-400 hover:text-amber-700">
+              <PauseCircle className="w-3.5 h-3.5 mr-1" /> Close
+            </Button>
+          )}
+          {isClosed && (
+            <Button size="sm" variant="outline" onClick={() => statusMut.mutate("active")}
+              disabled={statusMut.isPending}
+              className="rounded-lg text-xs border-emerald-200 text-emerald-700 hover:bg-emerald-50">
+              <PlayCircle className="w-3.5 h-3.5 mr-1" /> Reopen
+            </Button>
+          )}
+          {(isDraft || isClosed) && (
+            <Button size="sm" variant="outline"
+              onClick={() => { if (confirm(isDraft ? "Delete this draft?" : "Delete this closed requisition?")) deleteMut.mutate(); }}
+              disabled={deleteMut.isPending}
+              className="rounded-lg text-xs border-red-200 text-red-700 hover:bg-red-50">
+              <Trash2 className="w-3.5 h-3.5 mr-1" /> Delete
+            </Button>
+          )}
+        </div>
+      </div>
+      <JobCreationForm editJob={job} controlledOpen={editOpen} onOpenChange={setEditOpen}
+        trigger={<span style={{ display: "none" }} />} />
+    </>
+  );
+}
+
+// ── Activity Content ──
+function ActivityContent({ notifications }: { notifications: any[] }) {
+  return (
+    <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
+      <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2 mb-4">
+        <Bell className="w-4 h-4 text-orange-600" /> Recent Activity
+      </h3>
+      {notifications.length === 0 ? (
+        <div className="text-center py-12 text-slate-400">
+          <Bell className="w-10 h-10 mx-auto mb-3 opacity-40" />
+          <p className="text-sm">No recent activity</p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {notifications.map((n: any) => (
+            <div key={n.id} className={`p-3 rounded-xl ${n.read ? 'bg-slate-50' : 'bg-blue-50 border-l-4 border-blue-500'}`}>
+              <p className="text-sm font-medium text-slate-900">{n.title}</p>
+              <p className="text-xs text-slate-500 mt-0.5">{n.message}</p>
+              <p className="text-[11px] text-slate-400 mt-1">{n.createdAt ? new Date(n.createdAt).toLocaleString('en-IN') : ''}</p>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Employer Placements / Offers ─────────────────────────────────────
+function EmployerPlacements() {
+  const qc = useQueryClient();
+  const { toast } = useToast();
+  const [editing, setEditing] = useState<string | null>(null);
+  const [letterUrl, setLetterUrl] = useState("");
+
+  const { data: res, isLoading } = useQuery({
+    queryKey: ["/api/v1/agent/placements"],
+    queryFn: () => fetchJson("/api/v1/agent/placements"),
+  });
+  const rows: any[] = res?.data ?? [];
+
+  const uploadLetter = useMutation({
+    mutationFn: async ({ id, url }: { id: string; url: string }) => {
+      const r = await fetch(`/api/v1/agent/placements/${id}/appointment-letter`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ appointmentLetterUrl: url }),
+      });
+      if (!r.ok) throw new Error("Failed");
+      return r.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Appointment letter linked" });
+      setEditing(null); setLetterUrl("");
+      qc.invalidateQueries({ queryKey: ["/api/v1/agent/placements"] });
+    },
+  });
+
+  if (isLoading) return <div className="p-10 text-center"><Loader2 className="w-6 h-6 animate-spin text-blue-600 inline" /></div>;
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+          <Handshake className="w-5 h-5 text-orange-500" /> Offers & Placements ({rows.length})
+        </h3>
+      </div>
+
+      {rows.length === 0 ? (
+        <div className="bg-white rounded-xl border border-slate-200 p-12 text-center">
+          <Handshake className="w-12 h-12 mx-auto mb-3 text-slate-300" />
+          <p className="text-sm font-medium text-slate-600">No placements yet</p>
+          <p className="text-xs text-slate-400 mt-1">Once a candidate is selected, their placement appears here for offer tracking.</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {rows.map((r) => (
+            <div key={r.placement.id} className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
+              <div className="flex items-start justify-between flex-wrap gap-3">
+                <div className="flex items-start gap-3 min-w-0 flex-1">
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-700 text-white text-xs font-bold flex items-center justify-center shrink-0">
+                    {(r.candidate.fullName || "?").split(/\s+/).slice(0, 2).map((w: string) => w[0]).join("").toUpperCase()}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-bold text-slate-900 truncate">{r.candidate.fullName}</p>
+                    <p className="text-xs text-slate-500">For <Link href={`/agent/jobs/${r.job.id}`} className="text-blue-600 hover:underline">{r.job.title}</Link> · {r.job.company}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  {(() => {
+                    // Welfare-overdue reminder. Only applies when placement is
+                    // accepted/active AND start-date has passed the check-in
+                    // threshold but the status field is empty.
+                    const active = ["accepted", "active"].includes(r.placement.status);
+                    const start = r.placement.startDate ? new Date(r.placement.startDate).getTime() : null;
+                    if (!active || !start) return null;
+                    const days = Math.floor((Date.now() - start) / 86_400_000);
+                    const overdue: string[] = [];
+                    if (days >= 35 && !r.placement.welfare30Day) overdue.push("30-day");
+                    if (days >= 65 && !r.placement.welfare60Day) overdue.push("60-day");
+                    if (days >= 95 && !r.placement.welfare90Day) overdue.push("90-day");
+                    if (overdue.length === 0) return null;
+                    return (
+                      <Badge className="bg-amber-100 text-amber-800 border-amber-300 animate-pulse">
+                        ⚠ Welfare overdue: {overdue.join(", ")}
+                      </Badge>
+                    );
+                  })()}
+                  <Badge variant="outline" className={`capitalize ${r.placement.status === "accepted" ? "bg-emerald-50 text-emerald-700 border-emerald-200" : r.placement.status === "declined" ? "bg-red-50 text-red-700 border-red-200" : "bg-amber-50 text-amber-700 border-amber-200"}`}>
+                    {r.placement.status}
+                  </Badge>
+                </div>
+              </div>
+
+              <div className="grid sm:grid-cols-3 gap-3 mt-4 text-xs">
+                <div className="bg-slate-50 rounded-lg p-3 border border-slate-200">
+                  <p className="text-[10px] uppercase text-slate-500 font-semibold">Destination</p>
+                  <p className="text-sm font-bold text-slate-900 mt-0.5 flex items-center gap-1.5"><Globe className="w-3.5 h-3.5 text-blue-600" />{r.placement.country}</p>
+                </div>
+                <div className="bg-slate-50 rounded-lg p-3 border border-slate-200">
+                  <p className="text-[10px] uppercase text-slate-500 font-semibold">Salary</p>
+                  <p className="text-sm font-bold text-slate-900 mt-0.5">{r.placement.salary || "—"}</p>
+                </div>
+                <div className="bg-slate-50 rounded-lg p-3 border border-slate-200">
+                  <p className="text-[10px] uppercase text-slate-500 font-semibold">Start date</p>
+                  <p className="text-sm font-bold text-slate-900 mt-0.5">{r.placement.startDate ? new Date(r.placement.startDate).toLocaleDateString("en-IN") : "TBD"}</p>
+                </div>
+              </div>
+
+              {/* Appointment letter (FRS 3.5) */}
+              <div className="mt-4 p-3 bg-indigo-50/50 border border-indigo-200 rounded-lg">
+                <div className="flex items-center justify-between gap-3 flex-wrap">
+                  <div className="flex items-center gap-2">
+                    <FileText className="w-4 h-4 text-indigo-600" />
+                    <span className="text-sm font-semibold text-indigo-900">Appointment letter</span>
+                    {r.placement.appointmentLetterUrl
+                      ? <a href={r.placement.appointmentLetterUrl} target="_blank" rel="noreferrer" className="text-xs text-indigo-600 hover:underline font-medium">View current</a>
+                      : <Badge variant="outline" className="bg-white text-[10px]">Not uploaded</Badge>}
+                  </div>
+                  <div className="flex gap-2">
+                    <a href={`/api/v1/agent/placements/${r.placement.id}/offer-letter.pdf`}
+                      className="inline-flex items-center gap-1 text-xs font-medium px-3 py-1.5 rounded border border-indigo-200 bg-white hover:border-indigo-500 text-indigo-700">
+                      <Download className="w-3.5 h-3.5" /> Download template PDF
+                    </a>
+                    <Button size="sm" variant="outline" onClick={() => { setEditing(r.placement.id); setLetterUrl(r.placement.appointmentLetterUrl || ""); }}>
+                      <Edit className="w-3.5 h-3.5 mr-1" /> Set URL
+                    </Button>
+                  </div>
+                </div>
+                {editing === r.placement.id && (
+                  <div className="mt-2 flex gap-2">
+                    <Input value={letterUrl} onChange={(e) => setLetterUrl(e.target.value)}
+                      placeholder="https://... (link to signed PDF)" className="h-9 text-sm" />
+                    <Button size="sm" disabled={!letterUrl || uploadLetter.isPending}
+                      onClick={() => uploadLetter.mutate({ id: r.placement.id, url: letterUrl })}>
+                      {uploadLetter.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "Save"}
+                    </Button>
+                    <Button size="sm" variant="ghost" onClick={() => { setEditing(null); setLetterUrl(""); }}>Cancel</Button>
+                  </div>
+                )}
+              </div>
+
+              {/* Welfare check-ins visibility (read-mostly for employer) */}
+              {(r.placement.welfare30Day || r.placement.welfare60Day || r.placement.welfare90Day || r.placement.candidateWelfareNote) && (
+                <div className="mt-3 p-3 bg-rose-50/60 border border-rose-200 rounded-lg">
+                  <p className="text-xs font-semibold text-rose-800 flex items-center gap-1.5"><Heart className="w-3.5 h-3.5" /> Post-placement welfare</p>
+                  <div className="grid sm:grid-cols-3 gap-2 mt-2 text-[11px]">
+                    {["30", "60", "90"].map((m) => {
+                      const st = r.placement[`welfare${m}Day`];
+                      const at = r.placement[`welfare${m}DayAt`];
+                      return (
+                        <div key={m} className="bg-white rounded border border-rose-100 p-2">
+                          <p className="text-slate-500">{m}-day</p>
+                          <p className={`font-semibold capitalize ${st === "ok" ? "text-emerald-700" : st === "concerns" ? "text-amber-700" : "text-slate-400"}`}>{st?.replace(/_/g, " ") ?? "Not recorded"}</p>
+                          {at && <p className="text-[10px] text-slate-400">{new Date(at).toLocaleDateString("en-IN")}</p>}
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {r.placement.candidateWelfareNote && (
+                    <div className="mt-2 bg-white rounded border border-rose-100 p-2">
+                      <p className="text-[10px] uppercase text-rose-700 font-semibold">Candidate update</p>
+                      <p className="text-xs text-slate-700 mt-0.5">{r.placement.candidateWelfareNote}</p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Employer Reports (reuses agent reports endpoint scoped to employer's jobs) ──
+function EmployerReports() {
+  const { data: res, isLoading } = useQuery({
+    queryKey: ["/api/v1/agent/reports"],
+    queryFn: () => fetchJson("/api/v1/agent/reports"),
+  });
+  if (isLoading) return <div className="p-10 text-center"><Loader2 className="w-6 h-6 animate-spin text-blue-600 inline" /></div>;
+  const d = res?.data ?? { jobs: { total: 0, active: 0 }, applicants: { total: 0, funnel: {}, conversionPct: 0 }, placements: { total: 0, avgTimeToPlaceDays: 0, topCountries: [] }, trend: [] };
+  const maxTrend = Math.max(1, ...d.trend.map((t: any) => t.count));
+
+  const Card = ({ label, value, subtitle }: any) => (
+    <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
+      <p className="text-[10px] uppercase tracking-wide text-slate-500 font-semibold">{label}</p>
+      <p className="text-2xl font-bold text-slate-900 tabular-nums mt-1">{value}</p>
+      {subtitle && <p className="text-[11px] text-slate-400 mt-1">{subtitle}</p>}
+    </div>
+  );
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <Card label="Jobs (active)" value={`${d.jobs.active} / ${d.jobs.total}`} subtitle="Active of total posted" />
+        <Card label="Applicants" value={d.applicants.total} subtitle="Across your jobs" />
+        <Card label="Placements" value={d.placements.total} subtitle="Successful placements" />
+        <Card label="Conversion" value={`${d.applicants.conversionPct}%`} subtitle="Applied → Placed" />
+      </div>
+
+      <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
+        <h3 className="text-sm font-bold text-slate-900 mb-3 flex items-center gap-2">
+          <TrendingUp className="w-4 h-4 text-indigo-600" /> Applicant funnel
+        </h3>
+        <div className="grid grid-cols-3 md:grid-cols-7 gap-2">
+          {[
+            { k: "submitted", label: "Submitted", color: "bg-blue-100 text-blue-700" },
+            { k: "reviewed", label: "Reviewed", color: "bg-amber-100 text-amber-700" },
+            { k: "shortlisted", label: "Shortlisted", color: "bg-purple-100 text-purple-700" },
+            { k: "interview_scheduled", label: "Interview", color: "bg-cyan-100 text-cyan-700" },
+            { k: "selected", label: "Selected", color: "bg-emerald-100 text-emerald-700" },
+            { k: "placed", label: "Placed", color: "bg-green-100 text-green-700" },
+            { k: "rejected", label: "Rejected", color: "bg-red-100 text-red-700" },
+          ].map((s) => (
+            <div key={s.k} className={`${s.color} rounded-lg px-3 py-3`}>
+              <div className="text-[10px] font-medium opacity-90">{s.label}</div>
+              <div className="text-xl font-bold tabular-nums">{d.applicants.funnel?.[s.k] ?? 0}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="grid md:grid-cols-2 gap-4">
+        <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
+          <h3 className="text-sm font-bold text-slate-900 mb-3 flex items-center gap-2">
+            <Clock className="w-4 h-4 text-cyan-600" /> Time to placement
+          </h3>
+          <div className="flex items-baseline gap-2">
+            <span className="text-4xl font-bold text-slate-900 tabular-nums">{d.placements.avgTimeToPlaceDays}</span>
+            <span className="text-slate-500 text-sm">days average</span>
+          </div>
+        </div>
+        <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
+          <h3 className="text-sm font-bold text-slate-900 mb-3 flex items-center gap-2">
+            <Globe className="w-4 h-4 text-amber-600" /> Top destinations
+          </h3>
+          {d.placements.topCountries.length === 0
+            ? <p className="text-xs text-slate-400">No placements yet.</p>
+            : <div className="space-y-2">{d.placements.topCountries.map((c: any) => (
+                <div key={c.country} className="flex items-center justify-between text-sm">
+                  <span className="text-slate-700">{c.country}</span><span className="font-bold">{c.count}</span>
+                </div>
+              ))}</div>}
+        </div>
+      </div>
+
+      <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
+        <h3 className="text-sm font-bold text-slate-900 mb-3 flex items-center gap-2">
+          <Activity className="w-4 h-4 text-blue-600" /> Applications over time
+        </h3>
+        {d.trend.length === 0
+          ? <p className="text-xs text-slate-400">Not enough data yet.</p>
+          : <div className="flex items-end gap-2 h-32">
+              {d.trend.map((t: any) => (
+                <div key={t.month} className="flex-1 flex flex-col items-center">
+                  <div className="w-full bg-gradient-to-t from-blue-500 to-indigo-500 rounded-t"
+                    style={{ height: `${(t.count / maxTrend) * 100}%`, minHeight: "4px" }} title={`${t.month}: ${t.count}`} />
+                  <span className="text-[10px] text-slate-400 mt-1">{t.month.slice(5)}</span>
+                </div>
+              ))}
+            </div>}
+      </div>
+    </div>
+  );
+}
+
+// ── Awaiting-your-decision hero card ─────────────────────────────────
+function AwaitingDecisionHero({ setActiveView }: { setActiveView: (v: string) => void }) {
+  const { data: res } = useQuery({
+    queryKey: ["/api/v1/employer/review-queue"],
+    queryFn: () => fetchJson("/api/v1/employer/review-queue"),
+  });
+  const rows: any[] = res?.data ?? [];
+  const awaiting = rows.filter((r) => r.application.status === "shortlisted" && !r.application.employerDecision);
+
+  return (
+    <motion.div variants={fadeUp}
+      className="bg-gradient-to-br from-indigo-600 via-purple-600 to-purple-700 text-white rounded-2xl p-6 shadow-lg">
+      <div className="flex items-start justify-between flex-wrap gap-4">
+        <div>
+          <p className="text-xs uppercase tracking-wider text-purple-200 font-semibold">Primary queue</p>
+          <h2 className="text-2xl font-bold mt-1">Awaiting your decision</h2>
+          <p className="text-sm text-purple-100 mt-1 max-w-xl">
+            Candidates the agency has shortlisted against your requisitions. Approve them for interview, or request replacements.
+          </p>
+        </div>
+        <div className="text-right">
+          <p className="text-6xl font-bold tabular-nums">{awaiting.length}</p>
+          <p className="text-xs text-purple-200 uppercase tracking-wide font-semibold">candidates</p>
+        </div>
+      </div>
+
+      {awaiting.length > 0 && (
+        <div className="mt-5">
+          <p className="text-xs text-purple-200 mb-2">Next 3 to review:</p>
+          <div className="space-y-2">
+            {awaiting.slice(0, 3).map((r) => {
+              const c = r.candidate, j = r.job;
+              return (
+                <Link key={r.application.id} href={`/employer/review/${j.id}`}
+                  className="flex items-center justify-between bg-white/10 hover:bg-white/15 backdrop-blur rounded-lg p-3 transition">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-9 h-9 rounded-lg bg-white/20 text-white text-xs font-bold flex items-center justify-center shrink-0">
+                      {(c.fullName || "?").split(/\s+/).slice(0, 2).map((w: string) => w[0]).join("").toUpperCase()}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-white truncate">{c.fullName}</p>
+                      <p className="text-[11px] text-purple-200 truncate">for {j.title}</p>
+                    </div>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-purple-200" />
+                </Link>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </motion.div>
+  );
+}
+
+// ── Requisitions progress cards ──────────────────────────────────────
+function RequisitionsProgress({ setActiveView }: { setActiveView: (v: string) => void }) {
+  const { data: res, isLoading } = useQuery({
+    queryKey: ["/api/v1/employer/requisitions"],
+    queryFn: () => fetchJson("/api/v1/employer/requisitions"),
+  });
+  const rows: any[] = res?.data ?? [];
+  if (isLoading || rows.length === 0) return null;
+
+  return (
+    <motion.div variants={fadeUp} className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+          <Briefcase className="w-4 h-4 text-purple-600" /> Active Requisitions
+        </h3>
+        <Button variant="ghost" size="sm" onClick={() => setActiveView("jobs")} className="text-xs text-purple-600 font-semibold">
+          View all <ArrowRight className="w-3.5 h-3.5 ml-1" />
+        </Button>
+      </div>
+      <div className="space-y-3">
+        {rows.slice(0, 4).map((r: any) => {
+          const pct = r.stats.progressPct;
+          const isUrgent = r.priority === "urgent" || r.priority === "critical";
+          return (
+            <Link key={r.id} href={`/employer/review/${r.id}`}
+              className="block bg-gradient-to-r from-slate-50 to-white rounded-xl border border-slate-200 hover:border-purple-400 hover:shadow-sm p-4 transition">
+              <div className="flex items-start justify-between gap-3 flex-wrap">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-bold text-slate-900">{r.title}</p>
+                    {isUrgent && (
+                      <Badge className={`text-[10px] ${r.priority === "critical" ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-700"}`}>
+                        {r.priority === "critical" ? "🔥 Critical" : "⚡ Urgent"}
+                      </Badge>
+                    )}
+                  </div>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    <MapPin className="w-3 h-3 inline mr-1" />
+                    {r.location}, {r.country}
+                    {r.hiringDeadline && (
+                      <span className="ml-3">
+                        <Calendar className="w-3 h-3 inline mr-1" />
+                        Deadline: {new Date(r.hiringDeadline).toLocaleDateString("en-IN")}
+                      </span>
+                    )}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className="text-2xl font-bold text-slate-900 tabular-nums">
+                    {r.stats.placed + r.stats.selected}<span className="text-sm text-slate-400"> / {r.targetHires ?? 1}</span>
+                  </p>
+                  <p className="text-[10px] uppercase text-slate-500 font-semibold">Hires</p>
+                </div>
+              </div>
+
+              <div className="mt-3 h-2 bg-slate-100 rounded-full overflow-hidden">
+                <div className="h-full bg-gradient-to-r from-purple-500 to-indigo-600 rounded-full transition-all"
+                  style={{ width: `${pct}%` }} />
+              </div>
+
+              <div className="flex flex-wrap items-center gap-4 mt-3 text-[11px]">
+                {r.stats.awaitingDecision > 0 && (
+                  <span className="flex items-center gap-1 font-semibold text-purple-700">
+                    <Eye className="w-3.5 h-3.5" /> {r.stats.awaitingDecision} awaiting your review
+                  </span>
+                )}
+                {r.stats.approvedForInterview > 0 && (
+                  <span className="text-emerald-700">{r.stats.approvedForInterview} approved</span>
+                )}
+                {r.stats.selected > 0 && (
+                  <span className="text-blue-700">{r.stats.selected} selected</span>
+                )}
+                <span className="ml-auto text-purple-600 font-medium">Review queue →</span>
+              </div>
+            </Link>
+          );
+        })}
+      </div>
+    </motion.div>
+  );
+}
