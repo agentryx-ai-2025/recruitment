@@ -2,7 +2,7 @@ import pg from 'pg';
 const { Pool } = pg;
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { type User, type InsertUser, users } from "@shared/schema";
-import { eq } from "drizzle-orm";
+import { eq, or } from "drizzle-orm";
 
 export interface IStorage {
   db?: any; // Expose db for direct queries when needed
@@ -25,7 +25,7 @@ export class MemStorage implements IStorage {
 
   async getUserByUsername(username: string): Promise<User | undefined> {
     return Array.from(this.users.values()).find(
-      (user) => user.username === username,
+      (user) => user.username === username || user.email === username,
     );
   }
 
@@ -69,7 +69,9 @@ export class PgStorage implements IStorage {
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
-    const result = await this.db.select().from(users).where(eq(users.username, username)).limit(1);
+    const result = await this.db.select().from(users).where(
+      or(eq(users.username, username), eq(users.email, username))
+    ).limit(1);
     return result[0];
   }
 
