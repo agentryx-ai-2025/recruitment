@@ -328,8 +328,17 @@ async function computeSignals(db: any): Promise<any[]> {
       });
     }
 
-    // 13. SMTP not configured
-    if (!process.env.SMTP_HOST) {
+    // 13. SMTP not configured — check the runtime admin-config first (the
+    // Integrations panel writes provider_config), then fall back to env.
+    // Earlier this signal only looked at env, so the panel could light up
+    // "SMTP not configured" even after admin saved SMTP2GO credentials.
+    const emailCfg = await db.execute(sql`
+      SELECT enabled, (config->>'host') AS host
+      FROM provider_config WHERE id='email' LIMIT 1
+    `);
+    const emailEnabled = (emailCfg.rows?.[0] as any)?.enabled === true
+      && !!((emailCfg.rows?.[0] as any)?.host);
+    if (!emailEnabled && !process.env.SMTP_HOST) {
       signals.push({
         id: "smtp_not_configured",
         severity: "warning",
