@@ -191,5 +191,11 @@ import { seedCountryInfo } from "./services/country-info.seed";
     reusePort: true,
   }, () => {
     logger.info(`serving on port ${port} in ${env.NODE_ENV} mode`);
+    // Start the backup scheduler after listen — it'll tick once a minute and
+    // fire a snapshot when (auto_enabled && hour=schedule_hour && not-yet-today).
+    // No-op until the admin toggles auto_enabled=true via the UI.
+    import("./services/backup.service")
+      .then(({ startBackupScheduler }) => startBackupScheduler())
+      .catch((e) => logger.warn(`backup scheduler not started: ${e.message}`));
   });
 })();

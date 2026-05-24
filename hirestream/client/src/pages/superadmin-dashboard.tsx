@@ -2121,6 +2121,10 @@ function ProcessRestartButton() {
 }
 
 // ── Backups View ──
+// Full-system snapshots: HireStream DB + Verify DB + uploads from both apps
+// bundled into one tar.gz per snapshot. Manual creates plus scheduled auto
+// backups with admin-configurable retention. Backend logic in
+// server/services/backup.service.ts.
 function BackupsView() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -2128,6 +2132,7 @@ function BackupsView() {
   const { data: bkRes, isLoading } = useQuery({
     queryKey: ["/api/v1/superadmin/ops/backups"],
     queryFn: () => fetchJson("/api/v1/superadmin/ops/backups"),
+    refetchInterval: 30_000, // pick up the auto-scheduler's runs without manual refresh
   });
 
   const createBackup = useMutation({
@@ -2142,9 +2147,13 @@ function BackupsView() {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/v1/superadmin/ops/backups"] });
-      toast({ title: "Backup created", description: `${data.data.name} (${data.data.size_mb} MB)` });
+      const w = data.data?.warnings?.length;
+      toast({
+        title: "Snapshot created",
+        description: `${data.data.name} (${data.data.size_mb} MB${w ? `, ${w} warnings` : ""})`,
+      });
     },
-    onError: (err: any) => toast({ title: "Backup failed", description: err.message, variant: "destructive" }),
+    onError: (err: any) => toast({ title: "Snapshot failed", description: err.message, variant: "destructive" }),
   });
 
   const deleteBackup = useMutation({
@@ -2159,25 +2168,137 @@ function BackupsView() {
     },
   });
 
+  // ── Schedule + retention controls. State is hydrated from the server's
+  // settings on the first list-fetch, then echoed-through to the server on
+  // every change so the scheduler picks it up within 60s of the user toggling.
+  const settings = bkRes?.settings;
+  const [autoEnabled, setAutoEnabled] = useState<boolean | null>(null);
+  const [scheduleHour, setScheduleHour] = useState<number>(2);
+  const [retentionDays, setRetentionDays] = useState<number>(14);
+  useEffect(() => {
+    if (settings && autoEnabled === null) {
+      setAutoEnabled(!!settings.autoEnabled);
+      setScheduleHour(Number(settings.scheduleHour ?? 2));
+      setRetentionDays(Number(settings.retentionDays ?? 14));
+    }
+  }, [settings, autoEnabled]);
+
+  const saveSettings = useMutation({
+    mutationFn: async (patch: any) => {
+      const res = await fetch("/api/v1/superadmin/ops/backups/settings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(patch),
+      });
+      if (!res.ok) { const err = await res.json(); throw new Error(err.message); }
+      return res.json();
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/v1/superadmin/ops/backups"] }),
+    onError: (err: any) => toast({ title: "Couldn't save schedule", description: err.message, variant: "destructive" }),
+  });
+
   const backups = bkRes?.data || [];
+  const hourFmt = (h: number) => {
+    const suffix = h >= 12 ? "PM" : "AM";
+    const h12 = h % 12 === 0 ? 12 : h % 12;
+    return `${h12}:00 ${suffix}`;
+  };
 
   return (
     <div className="space-y-5">
+
+      {/* ── Schedule + retention panel ───────────────────────────────── */}
+      <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
+        <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2 mb-4">
+          <Settings className="w-4 h-4 text-indigo-600" /> Automatic Backup Schedule
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Toggle */}
+          <div className="rounded-lg border border-slate-200 p-3">
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-xs font-semibold text-slate-700">Auto-backup</label>
+              <button
+                onClick={() => {
+                  const next = !autoEnabled;
+                  setAutoEnabled(next);
+                  saveSettings.mutate({ autoEnabled: next });
+                }}
+                className={`relative w-10 h-5 rounded-full transition-colors ${autoEnabled ? "bg-emerald-500" : "bg-slate-300"}`}
+              >
+                <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${autoEnabled ? "left-5" : "left-0.5"}`} />
+              </button>
+            </div>
+            <p className="text-[10px] text-slate-500">
+              {autoEnabled
+                ? `Runs daily at ${hourFmt(scheduleHour)} server time. Old snapshots auto-prune after ${retentionDays} days.`
+                : "Disabled — only manual snapshots will be created."}
+            </p>
+          </div>
+          {/* Hour */}
+          <div className="rounded-lg border border-slate-200 p-3">
+            <label className="text-xs font-semibold text-slate-700 block mb-2">Schedule hour (24h)</label>
+            <select
+              value={scheduleHour}
+              onChange={(e) => {
+                const h = Number(e.target.value);
+                setScheduleHour(h);
+                saveSettings.mutate({ scheduleHour: h });
+              }}
+              className="w-full text-sm rounded border-slate-200 px-2 py-1"
+            >
+              {Array.from({ length: 24 }).map((_, h) => (
+                <option key={h} value={h}>{String(h).padStart(2, "0")}:00  ({hourFmt(h)})</option>
+              ))}
+            </select>
+            <p className="text-[10px] text-slate-500 mt-1">Server time (UTC on staging). Pick a low-traffic hour.</p>
+          </div>
+          {/* Retention */}
+          <div className="rounded-lg border border-slate-200 p-3">
+            <label className="text-xs font-semibold text-slate-700 block mb-2">Retention (days)</label>
+            <input
+              type="number"
+              min={1}
+              max={365}
+              value={retentionDays}
+              onChange={(e) => {
+                const d = Math.max(1, Math.min(365, parseInt(e.target.value) || 14));
+                setRetentionDays(d);
+              }}
+              onBlur={() => saveSettings.mutate({ retentionDays })}
+              className="w-full text-sm rounded border-slate-200 px-2 py-1"
+            />
+            <p className="text-[10px] text-slate-500 mt-1">Snapshots older than this are auto-deleted after each run.</p>
+          </div>
+        </div>
+
+        {/* Last-run status pill */}
+        {settings?.lastRunAt && (
+          <div className="mt-3 flex items-center gap-2 text-xs">
+            <span className="text-slate-500">Last auto-run:</span>
+            <span className="font-mono text-slate-700">{new Date(settings.lastRunAt).toLocaleString("en-IN")}</span>
+            <span className={`px-2 py-0.5 rounded text-[10px] font-semibold ${
+              (settings.lastRunStatus || "").startsWith("ok") ? "bg-emerald-100 text-emerald-800" : "bg-red-100 text-red-800"
+            }`}>{settings.lastRunStatus}</span>
+          </div>
+        )}
+      </div>
+
+      {/* ── Manual create + snapshots list ───────────────────────────── */}
       <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-            <HardDrive className="w-4 h-4 text-emerald-600" /> Database Backups ({backups.length})
+            <HardDrive className="w-4 h-4 text-emerald-600" /> Snapshots ({backups.length})
           </h3>
           <Button size="sm" onClick={() => createBackup.mutate()} disabled={createBackup.isPending}
             className="rounded-lg bg-emerald-600 text-white gap-1.5">
             {createBackup.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Database className="w-3.5 h-3.5" />}
-            Create Backup
+            {createBackup.isPending ? "Bundling…" : "Create Snapshot Now"}
           </Button>
         </div>
 
         <div className="text-xs text-slate-500 mb-3 flex items-center gap-3 flex-wrap">
-          {bkRes?.db_size_mb && <span>Live DB size: <strong>{bkRes.db_size_mb} MB</strong></span>}
-          {bkRes?.backup_dir && <span className="font-mono">{bkRes.backup_dir}</span>}
+          {bkRes?.db_size_mb && <span>Live HireStream DB: <strong>{bkRes.db_size_mb} MB</strong></span>}
+          {bkRes?.backup_dir && <span className="font-mono text-[10px]">{bkRes.backup_dir}</span>}
         </div>
 
         {isLoading ? (
@@ -2185,35 +2306,48 @@ function BackupsView() {
         ) : backups.length === 0 ? (
           <div className="text-center py-12 text-slate-400">
             <HardDrive className="w-10 h-10 mx-auto mb-2 opacity-40" />
-            <p className="text-sm">No backups yet — click "Create Backup"</p>
+            <p className="text-sm">No snapshots yet — click "Create Snapshot Now"</p>
           </div>
         ) : (
           <div className="space-y-2">
-            {backups.map((b: any) => (
-              <div key={b.name} className="flex items-center justify-between p-3 rounded-lg border border-slate-100 hover:bg-slate-50">
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-mono font-semibold text-slate-900 truncate">{b.name}</p>
-                  <p className="text-[11px] text-slate-500">
-                    {b.size_mb} MB · created {new Date(b.created_at).toLocaleString("en-IN")}
-                  </p>
+            {backups.map((b: any) => {
+              const isLegacy = b.kind === "legacy_sql" || (b.name && b.name.endsWith(".sql"));
+              return (
+                <div key={b.name} className="flex items-center justify-between p-3 rounded-lg border border-slate-100 hover:bg-slate-50">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="text-sm font-mono font-semibold text-slate-900 truncate">{b.name}</p>
+                      {isLegacy && (
+                        <span className="text-[9px] uppercase font-semibold bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded" title="DB-only — predates the full-system snapshot format">
+                          legacy
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-slate-500">
+                      {b.size_mb} MB · created {new Date(b.created_at).toLocaleString("en-IN")}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <Button size="sm" variant="outline" onClick={() => window.open(`/api/v1/superadmin/ops/backups/${encodeURIComponent(b.name)}/download`, "_blank")}
+                      className="rounded-lg text-xs">
+                      Download
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => deleteBackup.mutate(b.name)}
+                      className="rounded-lg text-xs text-red-600 border-red-200 hover:bg-red-50">
+                      Delete
+                    </Button>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  <Button size="sm" variant="outline" onClick={() => window.open(`/api/v1/superadmin/ops/backups/${encodeURIComponent(b.name)}/download`, "_blank")}
-                    className="rounded-lg text-xs">
-                    Download
-                  </Button>
-                  <Button size="sm" variant="outline" onClick={() => deleteBackup.mutate(b.name)}
-                    className="rounded-lg text-xs text-red-600 border-red-200 hover:bg-red-50">
-                    Delete
-                  </Button>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
 
-        <div className="mt-4 p-3 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-800">
-          <strong>Note:</strong> Backups use <code className="bg-white/60 px-1 rounded">pg_dump</code> on the server. Production deployments should automate via cron.
+        <div className="mt-4 p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-xs text-emerald-800">
+          <strong>What's in a snapshot:</strong> HireStream DB (<code className="bg-white/60 px-1 rounded">pg_dump</code>) +
+          Agentryx Verify DB + both apps' <code className="bg-white/60 px-1 rounded">uploads/</code> directories +
+          a JSON manifest. Single <code className="bg-white/60 px-1 rounded">.tar.gz</code> bundle per snapshot.
+          Restore with <code className="bg-white/60 px-1 rounded">scripts/restore-snapshot.sh &lt;file.tar.gz&gt;</code>.
         </div>
       </div>
 

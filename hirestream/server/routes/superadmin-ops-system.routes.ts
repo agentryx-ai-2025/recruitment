@@ -273,29 +273,26 @@ router.post("/sql/execute", async (req, res) => {
   }
 });
 
-// ─── BACKUPS — list + create + download ─────────────────────────────────
-const BACKUP_DIR = path.resolve(process.cwd(), "backups");
-
-function ensureBackupDir() {
-  if (!fs.existsSync(BACKUP_DIR)) fs.mkdirSync(BACKUP_DIR, { recursive: true });
-}
+// ─── BACKUPS — full-system snapshots via services/backup.service ─────────
+// The actual snapshot logic lives in services/backup.service so the same
+// `createSnapshot()` is reachable both from the admin UI (here) and the
+// auto-scheduler at server boot. This file is now a thin REST adapter.
+import {
+  BACKUP_DIR,
+  createSnapshot,
+  listSnapshots,
+  deleteSnapshot,
+  enforceRetention,
+  getBackupSettings,
+  updateBackupSettings,
+} from "../services/backup.service";
 
 router.get("/backups", async (_req, res) => {
   try {
-    ensureBackupDir();
-    const files = fs.readdirSync(BACKUP_DIR)
-      .filter(f => f.endsWith(".sql") || f.endsWith(".sql.gz"))
-      .map(f => {
-        const stat = fs.statSync(path.join(BACKUP_DIR, f));
-        return {
-          name: f,
-          size_mb: Math.round((stat.size / 1024 / 1024) * 100) / 100,
-          created_at: stat.mtime.toISOString(),
-        };
-      })
-      .sort((a, b) => b.created_at.localeCompare(a.created_at));
+    const files = listSnapshots();
+    const settings = await getBackupSettings();
 
-    // DB size for context
+    // Live DB size for context — same as before.
     let db_size_mb = null;
     try {
       if (storage.db) {
@@ -310,7 +307,28 @@ router.get("/backups", async (_req, res) => {
       data: files,
       backup_dir: BACKUP_DIR,
       db_size_mb,
+      settings,
     });
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// Get just the schedule + retention settings (used by the UI's settings panel).
+router.get("/backups/settings", async (_req, res) => {
+  try {
+    res.json({ success: true, data: await getBackupSettings() });
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// Update schedule + retention. Body keys are optional — only the ones sent
+// get applied. Coerced + clamped server-side in updateBackupSettings.
+router.patch("/backups/settings", async (req, res) => {
+  try {
+    const next = await updateBackupSettings(req.body ?? {});
+    res.json({ success: true, data: next });
   } catch (err: any) {
     res.status(500).json({ success: false, message: err.message });
   }
@@ -318,60 +336,37 @@ router.get("/backups", async (_req, res) => {
 
 router.post("/backups/create", async (req, res) => {
   try {
-    const { confirmation } = req.body;
+    const { confirmation } = req.body ?? {};
     if (confirmation !== "CREATE_BACKUP") {
       return res.status(400).json({ success: false, message: "Send { confirmation: 'CREATE_BACKUP' }" });
     }
-    ensureBackupDir();
 
-    const dbUrl = process.env.DATABASE_URL;
-    if (!dbUrl) return res.status(500).json({ success: false, message: "DATABASE_URL not set" });
+    // 6-minute upper bound on the request — the snapshot service itself has
+    // per-step timeouts (5 min each) but the HTTP path needs its own ceiling.
+    const snap = await createSnapshot();
 
-    const ts = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
-    const filename = `hirestream-${ts}.sql`;
-    const filepath = path.join(BACKUP_DIR, filename);
+    // Prune old snapshots according to the configured retention so manual
+    // creates also keep disk usage bounded.
+    const { retentionDays } = await getBackupSettings();
+    enforceRetention(retentionDays);
 
-    // Run pg_dump (must be on PATH)
-    try {
-      await execFileAsync("pg_dump", [
-        "--no-owner", "--no-acl", "--clean", "--if-exists",
-        "-f", filepath, dbUrl,
-      ], { timeout: 120000 }); // 2 min timeout
-
-      const stat = fs.statSync(filepath);
-      res.json({
-        success: true,
-        data: {
-          name: filename,
-          size_mb: Math.round((stat.size / 1024 / 1024) * 100) / 100,
-          created_at: stat.mtime.toISOString(),
-        },
-      });
-    } catch (err: any) {
-      // Cleanup partial file
-      if (fs.existsSync(filepath)) fs.unlinkSync(filepath);
-      res.status(500).json({
-        success: false,
-        message: `pg_dump failed: ${err.message?.slice(0, 200)}`,
-      });
-    }
+    res.json({ success: true, data: snap });
   } catch (err: any) {
-    res.status(500).json({ success: false, message: err.message });
+    res.status(500).json({ success: false, message: `Snapshot failed: ${err.message?.slice(0, 300)}` });
   }
 });
 
 router.get("/backups/:filename/download", async (req, res) => {
   try {
-    ensureBackupDir();
-    // Prevent path traversal
     const safe = path.basename(req.params.filename);
     const filepath = path.join(BACKUP_DIR, safe);
-
     if (!fs.existsSync(filepath)) {
       return res.status(404).json({ success: false, message: "Backup not found" });
     }
-
-    res.setHeader("Content-Type", "application/sql");
+    // Set MIME based on extension. New snapshots are tar.gz; legacy .sql
+    // dumps stay supported for the old downloads still in backups/.
+    const mime = safe.endsWith(".tar.gz") ? "application/gzip" : "application/sql";
+    res.setHeader("Content-Type", mime);
     res.setHeader("Content-Disposition", `attachment; filename="${safe}"`);
     fs.createReadStream(filepath).pipe(res);
   } catch (err: any) {
@@ -381,14 +376,8 @@ router.get("/backups/:filename/download", async (req, res) => {
 
 router.delete("/backups/:filename", async (req, res) => {
   try {
-    ensureBackupDir();
-    const safe = path.basename(req.params.filename);
-    const filepath = path.join(BACKUP_DIR, safe);
-
-    if (!fs.existsSync(filepath)) {
-      return res.status(404).json({ success: false, message: "Backup not found" });
-    }
-    fs.unlinkSync(filepath);
+    const ok = deleteSnapshot(req.params.filename);
+    if (!ok) return res.status(404).json({ success: false, message: "Backup not found" });
     res.json({ success: true, message: "Backup deleted" });
   } catch (err: any) {
     res.status(500).json({ success: false, message: err.message });
