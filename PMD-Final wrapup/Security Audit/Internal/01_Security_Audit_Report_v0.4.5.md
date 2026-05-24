@@ -53,8 +53,8 @@
 - **What:** Any authenticated agent could change the status of any application, including those on jobs owned by other agencies.
 - **Reproduction:** `curl -b agent_a.cookie -X PATCH -d '{"status":"reviewed"}' …/applications/<other_agent_app>/status` returned `HTTP 200` and changed the row.
 - **Impact:** Malicious agent could reject every applicant on a competitor's job, mark them placed, or add embarrassing rejection feedback.
-- **Root cause:** [server/routes/application.routes.ts:36](../server/routes/application.routes.ts#L36) fetched the application by id and went straight to status update with no ownership check. The bulk-status endpoint already filtered correctly; this single-status path was missed.
-- **Fix:** Added ownership guard — `if (user.role === 'agent') job.agentId === user.id` and equivalent for employer (direct + via parent requisition). Admin/superadmin bypass preserved. Lives at [application.routes.ts:38-58](../server/routes/application.routes.ts#L38-L58). Verified: cross-agent attempts now return `403`; own-job updates still work.
+- **Root cause:** [server/routes/application.routes.ts:36](../../../hirestream/server/routes/application.routes.ts#L36) fetched the application by id and went straight to status update with no ownership check. The bulk-status endpoint already filtered correctly; this single-status path was missed.
+- **Fix:** Added ownership guard — `if (user.role === 'agent') job.agentId === user.id` and equivalent for employer (direct + via parent requisition). Admin/superadmin bypass preserved. Lives at [application.routes.ts:38-58](../../../hirestream/server/routes/application.routes.ts#L38-L58). Verified: cross-agent attempts now return `403`; own-job updates still work.
 
 **H-2 — 8 high-severity transitive npm dependencies (OPEN)**
 - **What:** `npm audit` reports 8 high-severity vulns across drizzle-orm, express (body-parser), lodash, minimatch, path-to-regexp, picomatch, rollup, systeminformation.
