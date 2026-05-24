@@ -736,3 +736,51 @@ export const candidateReferences = pgTable("candidate_references", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 export type CandidateReference = typeof candidateReferences.$inferSelect;
+
+// ── Mobile Auth: Refresh Token Rotation ─────────────────────────────
+// JWT bearer-token flow for mobile clients. Access tokens are short-lived
+// (15min) and stateless; refresh tokens are long-lived (30 days) and stored
+// hashed in this table for rotation + reuse detection. See
+// /PMD-Final wrapup/MobileApps/05_Backend_API_Adaptations.md §1.
+export const mobileRefreshTokens = pgTable("mobile_refresh_tokens", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+  tokenHash: text("token_hash").notNull(),           // SHA-256 of the refresh token
+  deviceId: text("device_id"),                        // e.g. "android-PixelOS-abc123"
+  userAgent: text("user_agent"),
+  issuedAt: timestamp("issued_at").notNull().defaultNow(),
+  expiresAt: timestamp("expires_at").notNull(),
+  revokedAt: timestamp("revoked_at"),
+  rotatedTo: varchar("rotated_to"),                   // FK → self (chain for refresh rotation)
+});
+
+// ── Mobile Push: Device Token Registration ──────────────────────────
+// Stores FCM (Android) or APNs (iOS) device tokens. One user can have
+// multiple devices. Stale tokens are cleaned on delivery failure. See
+// /PMD-Final wrapup/MobileApps/05_Backend_API_Adaptations.md §4.
+export const mobilePushTokens = pgTable("mobile_push_tokens", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+  platform: text("platform").notNull(),               // 'android' | 'ios'
+  token: text("token").notNull().unique(),             // the FCM or APNs token
+  deviceId: text("device_id"),
+  appVersion: text("app_version"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  lastSeenAt: timestamp("last_seen_at").notNull().defaultNow(),
+});
+
+export const insertMobileRefreshTokenSchema = createInsertSchema(mobileRefreshTokens).omit({
+  id: true,
+  issuedAt: true,
+  revokedAt: true,
+  rotatedTo: true,
+});
+
+export const insertMobilePushTokenSchema = createInsertSchema(mobilePushTokens).omit({
+  id: true,
+  createdAt: true,
+  lastSeenAt: true,
+});
+
+export type MobileRefreshToken = typeof mobileRefreshTokens.$inferSelect;
+export type MobilePushToken = typeof mobilePushTokens.$inferSelect;

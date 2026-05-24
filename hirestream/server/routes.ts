@@ -30,6 +30,11 @@ import savedSearchesRouter from "./routes/saved-searches.routes";
 import publicStatusRouter from "./routes/public-status.routes";
 import { authLimiter } from "./middleware/rateLimit.middleware";
 import { env, cookieSecure } from "./config/env.config";
+// ── Mobile API surface ──────────────────────────────────────────────
+import { mobileBearer } from "./middleware/mobileBearer.middleware";
+import mobileAuthRouter from "./routes/mobile-auth.routes";
+import mobilePushRouter from "./routes/mobile-push.routes";
+import mobileConfigRouter from "./routes/mobile-config.routes";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Use PostgreSQL session store in production, memory in test
@@ -60,6 +65,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     })
   );
 
+  // Mobile bearer auth — runs BEFORE passport session so Bearer tokens
+  // get processed first. If no Bearer header, falls through to session.
+  app.use(mobileBearer);
   app.use(passport.initialize());
   app.use(passport.session());
 
@@ -92,6 +100,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/v1/public/status", publicStatusRouter);
   app.use("/api/v1/employer", employerRouter);
   app.use("/api/v1/admin/oversight", adminOversightRouter);
+
+  // ── Mobile API routes ───────────────────────────────────────────────
+  app.use("/api/v1/mobile/auth", authLimiter, mobileAuthRouter);
+  app.use("/api/v1/mobile/push", mobilePushRouter);
+  app.use("/api/v1/mobile", mobileConfigRouter);
 
   const httpServer = createServer(app);
 

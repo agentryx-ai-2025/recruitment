@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 import { logger } from "../config/logger.config";
 import { sendEmail } from "./email.service";
 import { sendSms } from "./sms.service";
+import { sendPushToUser } from "./pushNotifications";
 
 interface NotifyOptions {
   userId: string;
@@ -64,6 +65,16 @@ export async function notify(opts: NotifyOptions): Promise<void> {
       sendSms(user.phoneNumber, `HireStream: ${opts.title} — ${opts.message}`)
         .catch((err) => logger.error(`SMS notification failed for ${user.phoneNumber}: ${err}`));
     }
+
+    // Send mobile push notification (fire-and-forget)
+    sendPushToUser(opts.userId, {
+      title: opts.title,
+      body: opts.message,
+      data: {
+        type: opts.type,
+        ...opts.metadata,
+      },
+    }).catch((err) => logger.error(`Push notification failed for ${opts.userId}: ${err}`));
   } catch (error) {
     // Notification failures should not break the main flow
     logger.error(`Notification creation failed: ${error}`);

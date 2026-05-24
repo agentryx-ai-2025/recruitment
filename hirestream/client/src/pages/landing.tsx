@@ -42,29 +42,7 @@ export default function LandingPage() {
 
   return (
     <div className="min-h-screen">
-      {/* ── Demo / Staging Disclaimer ────────────────────────────── */}
-      <div
-        className={`overflow-hidden transition-all duration-700 ease-in-out ${showBanner ? "max-h-40 opacity-100" : "max-h-0 opacity-0"}`}
-      >
-        <div className="relative bg-gradient-to-r from-amber-50 via-orange-50 to-amber-50 border-b border-amber-200/60">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex items-center gap-3">
-            <div className="shrink-0 w-8 h-8 rounded-full bg-amber-100 border border-amber-200 flex items-center justify-center">
-              <Info className="w-4 h-4 text-amber-600" />
-            </div>
-            <p className="text-sm text-amber-800 flex-1">
-              <span className="font-semibold">Sample landing page.</span>{" "}
-              Logos, branding, content, and design shown here are placeholders for demonstration purposes.
-              All visual artifacts will be customised to match the department's official branding and requirements before final submission.
-            </p>
-            <button
-              onClick={() => setShowBanner(false)}
-              className="shrink-0 w-7 h-7 rounded-full bg-amber-100 hover:bg-amber-200 flex items-center justify-center transition-colors"
-            >
-              <X className="w-3.5 h-3.5 text-amber-600" />
-            </button>
-          </div>
-        </div>
-      </div>
+
 
       {/* ── Hero Section ─────────────────────────────────────────── */}
       <section className="relative overflow-hidden bg-gradient-to-br from-blue-950 via-blue-800 to-blue-700">

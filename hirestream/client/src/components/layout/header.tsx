@@ -85,9 +85,7 @@ export function Header() {
               className="flex items-center gap-3 hover:opacity-80 transition-opacity"
               title="Go to homepage"
             >
-              <div className="w-9 h-9 bg-gradient-to-br from-blue-700 to-blue-900 rounded-lg flex items-center justify-center">
-                <Globe className="w-5 h-5 text-white" />
-              </div>
+              <img src="/hpsedc-logo.png" alt="HPSEDC" className="w-[58px] h-[58px] rounded-lg object-contain" />
               <div className="hidden sm:block text-left">
                 <h1 className="text-lg font-bold text-gray-900 leading-tight">HireStream</h1>
                 <p className="text-[10px] text-gray-500 leading-tight">HPSEDC Overseas Placement</p>
@@ -180,6 +178,11 @@ export function Header() {
                     <DropdownMenuItem onClick={() => setLocation("/")}>
                       <Home className="w-4 h-4 mr-2" /> Dashboard
                     </DropdownMenuItem>
+                    {user.role === "candidate" && (
+                      <DropdownMenuItem onClick={() => setLocation("/profile")}>
+                        <UserIcon className="w-4 h-4 mr-2" /> My Profile
+                      </DropdownMenuItem>
+                    )}
                     <DropdownMenuItem onClick={() => setPasswordOpen(true)}>
                       <KeyRound className="w-4 h-4 mr-2" /> Change Password
                     </DropdownMenuItem>

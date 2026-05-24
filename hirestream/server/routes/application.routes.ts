@@ -399,4 +399,52 @@ function calculateScoreBreakdown(candidate: any, job: any) {
   };
 }
 
+// ── Candidate Withdraw Application ──────────────────────────────────
+router.post("/:id/withdraw", protect, async (req, res, next) => {
+  try {
+    const db = storage.db;
+    if (!db) return res.status(500).json({ success: false, error: { code: 500, message: "Database not available" } });
+
+    const user = req.user as any;
+    if (user.role !== "candidate") {
+      return res.status(403).json({ success: false, error: { code: 403, message: "Only candidates can withdraw applications" } });
+    }
+
+    // Find the application
+    const [app] = await db.select().from(applications).where(eq(applications.id, req.params.id)).limit(1);
+    if (!app) return res.status(404).json({ success: false, error: { code: 404, message: "Application not found" } });
+
+    // Verify ownership: candidate must own this application
+    if (app.candidateId) {
+      const [cand] = await db.select().from(candidates).where(eq(candidates.id, app.candidateId)).limit(1);
+      if (!cand || cand.userId !== user.id) {
+        return res.status(403).json({ success: false, error: { code: 403, message: "You can only withdraw your own applications" } });
+      }
+    }
+
+    // Don't allow withdraw on terminal states
+    const terminalStatuses = ["rejected", "withdrawn", "completed", "placed"];
+    if (terminalStatuses.includes(app.status || "")) {
+      return res.status(400).json({ success: false, error: { code: 400, message: `Cannot withdraw an application with status "${app.status}"` } });
+    }
+
+    const [updated] = await db.update(applications).set({ status: "withdrawn" }).where(eq(applications.id, app.id)).returning();
+
+    // Audit log
+    try {
+      const { logTransition } = await import("../services/audit-transitions.service");
+      await logTransition({
+        actorUserId: user.id, actorRole: user.role,
+        entityType: "application", entityId: app.id, action: "status_change",
+        fromState: app.status || "submitted", toState: "withdrawn",
+        reason: "Candidate withdrew application",
+        ipAddress: req.ip,
+      });
+    } catch (e: any) { logger.warn(`audit on withdraw failed: ${e?.message}`); }
+
+    logger.info(`Application ${app.id} withdrawn by candidate ${user.id}`);
+    res.json({ success: true, data: updated });
+  } catch (err) { next(err); }
+});
+
 export default router;

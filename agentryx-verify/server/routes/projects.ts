@@ -3,7 +3,7 @@ import path from "path";
 import fs from "fs";
 import { db } from "../config/db";
 import {
-  projects, requirements, signoffs, comments, issues, reviewers, attachments, projectSprints,
+  projects, requirements, signoffs, comments, issues, reviewers, attachments, projectSprints, auditLog,
 } from "@shared/schema";
 import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { requireAuth } from "../middleware/auth";
@@ -45,7 +45,66 @@ projectsRouter.get("/", async (req, res) => {
   const rows = await db.select().from(projects)
     .orderBy(asc(projects.sortOrder), asc(projects.name));
   const filtered = isAdminRole(role) ? rows : rows.filter((p) => p.visibleToNonAdmin);
-  res.json(filtered);
+
+  // Per-project counts so Home cards render "🔧 Needs fixing" without
+  // round-tripping each one. Role-aware so each persona sees their own
+  // scoreboard:
+  //   - admin / delivery: cross-stage backlog (most-downstream Fail/Partial
+  //     OR delivery-side incomplete). Drives the global dev metric.
+  //   - tester (agentryx / htis / hpsedc_staging / hpsedc_final): their
+  //     own funnel — items at THEIR level not yet accepted (pending or
+  //     own Fail/Partial), plus delivery-side incomplete.
+  //   - observer / unauthenticated: same view as admin (read-only).
+  const projectIds = filtered.map((p) => p.id);
+  if (projectIds.length === 0) return res.json([]);
+
+  const allReqs = await db.select().from(requirements).where(inArray(requirements.projectId, projectIds));
+  const reqIds = allReqs.map((r) => r.id);
+  const allSignoffs = reqIds.length
+    ? await db.select().from(signoffs).where(inArray(signoffs.requirementId, reqIds))
+    : [];
+
+  const PIPELINE_ORDER = ["agentryx", "htis", "hpsedc_staging", "hpsedc_final"] as const;
+  type PipelineLevel = typeof PIPELINE_ORDER[number];
+  const isTesterLevel = (r: string | null): r is PipelineLevel =>
+    r === "agentryx" || r === "htis" || r === "hpsedc_staging" || r === "hpsedc_final";
+
+  // Pre-compute helpers used by either scope. Build both indexes once.
+  const latestByReq = new Map<string, { decision: string; idx: number }>();
+  const myByReq = new Map<string, string>(); // reqId → my-level decision (when role is a tester)
+  for (const s of allSignoffs) {
+    const idx = PIPELINE_ORDER.indexOf(s.level as any);
+    const existing = latestByReq.get(s.requirementId);
+    if (!existing || idx > existing.idx) {
+      latestByReq.set(s.requirementId, { decision: s.decision as string, idx });
+    }
+    if (isTesterLevel(role) && s.level === role) {
+      myByReq.set(s.requirementId, s.decision as string);
+    }
+  }
+
+  const counts = new Map<string, { reviewable: number; needsFix: number }>();
+  for (const id of projectIds) counts.set(id, { reviewable: 0, needsFix: 0 });
+  const useTesterScope = isTesterLevel(role);
+
+  for (const r of allReqs) {
+    const c = counts.get(r.projectId)!;
+    if (r.status === "deferred" || r.status === "n_a") continue;
+    c.reviewable++;
+    const deliveryDefect = r.status === "partial" || r.status === "not_delivered";
+    if (deliveryDefect) { c.needsFix++; continue; }
+    if (useTesterScope) {
+      const my = myByReq.get(r.id);
+      if (!my || my === "rejected" || my === "waived") c.needsFix++;
+    } else {
+      const latest = latestByReq.get(r.id);
+      if (latest && (latest.decision === "rejected" || latest.decision === "waived")) {
+        c.needsFix++;
+      }
+    }
+  }
+
+  res.json(filtered.map((p) => ({ ...p, ...(counts.get(p.id) ?? { reviewable: 0, needsFix: 0 }) })));
 });
 
 // Public: project by slug + summary counts
@@ -141,18 +200,38 @@ projectsRouter.post("/:slug/requirements/:reqId/signoff", requireAuth, uploadIma
     and(eq(signoffs.requirementId, reqId), eq(signoffs.level, level))
   );
   let signoffRow;
+  let auditAction: string;
   if (existing[0]) {
     [signoffRow] = await db.update(signoffs).set({
       decision, comment: comment ?? null, reviewerId: req.session.reviewerId!, signedAt: new Date(),
     }).where(eq(signoffs.id, existing[0].id)).returning();
+    auditAction = "signoff.updated";
   } else {
     [signoffRow] = await db.insert(signoffs).values({
       requirementId: reqId, level, decision, comment: comment ?? null,
       reviewerId: req.session.reviewerId!,
     }).returning();
+    auditAction = "signoff.created";
   }
 
   const newAttachments = await saveAttachments(files, "signoff", signoffRow.id, req.session.reviewerId!);
+
+  // Activity-feed event. Look up requirement → project so the feed can be
+  // scoped per-project. Fail soft — a missed audit row shouldn't break the
+  // signoff response.
+  try {
+    const [r] = await db.select({ projectId: requirements.projectId, itemRef: requirements.itemRef })
+      .from(requirements).where(eq(requirements.id, reqId));
+    if (r) {
+      await db.insert(auditLog).values({
+        projectId: r.projectId,
+        reviewerId: req.session.reviewerId!,
+        action: auditAction,
+        meta: { itemRef: r.itemRef, level, decision },
+      });
+    }
+  } catch (e) { console.error("audit_log insert failed (signoff)", e); }
+
   res.json({ ...signoffRow, attachments: newAttachments });
 });
 
@@ -209,7 +288,49 @@ projectsRouter.delete("/:slug/requirements/:reqId/signoff", requireAuth, async (
   }
 
   await db.delete(signoffs).where(and(eq(signoffs.requirementId, reqId), eq(signoffs.level, level as any)));
+
+  try {
+    const [r] = await db.select({ projectId: requirements.projectId, itemRef: requirements.itemRef })
+      .from(requirements).where(eq(requirements.id, reqId));
+    if (r) {
+      await db.insert(auditLog).values({
+        projectId: r.projectId,
+        reviewerId: req.session.reviewerId!,
+        action: "signoff.cleared",
+        meta: { itemRef: r.itemRef, level },
+      });
+    }
+  } catch (e) { console.error("audit_log insert failed (signoff cleared)", e); }
+
   res.json({ ok: true });
+});
+
+// ── Activity feed ────────────────────────────────────────────────────
+// Reads recent audit_log rows for a project, joined with reviewer name +
+// org. Scoped per-project; admin reviewers see all activity, others see
+// the same view (audit log isn't sensitive — it's the same data they'd
+// see by watching the matrix update). Default limit 20, max 100.
+projectsRouter.get("/:slug/activity", requireAuth, async (req, res) => {
+  const [project] = await db.select().from(projects).where(eq(projects.slug, req.params.slug));
+  if (!project) return res.status(404).json({ error: "Not found" });
+  const rawLimit = parseInt(String(req.query.limit ?? "20"), 10);
+  const limit = Number.isFinite(rawLimit) ? Math.min(Math.max(rawLimit, 1), 100) : 20;
+
+  const rows = await db.select({
+    id: auditLog.id,
+    action: auditLog.action,
+    meta: auditLog.meta,
+    createdAt: auditLog.createdAt,
+    reviewerName: reviewers.name,
+    reviewerOrg: reviewers.organization,
+    reviewerRole: reviewers.role,
+  }).from(auditLog)
+    .leftJoin(reviewers, eq(reviewers.id, auditLog.reviewerId))
+    .where(eq(auditLog.projectId, project.id))
+    .orderBy(desc(auditLog.createdAt))
+    .limit(limit);
+
+  res.json(rows);
 });
 
 // Comments for a requirement — includes attachments grouped by comment

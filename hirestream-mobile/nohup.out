@@ -1,0 +1,122 @@
+Starting project at /home/subhash.thakur.india/Projects/Recruitment/hirestream-mobile
+Starting Metro Bundler
+Waiting on http://localhost:8081
+Logs for your project will appear below.
+Starting project at /home/subhash.thakur.india/Projects/Recruitment/hirestream-mobile
+Starting Metro Bundler
+Waiting on http://localhost:8081
+Logs for your project will appear below.
+Android ./App.tsx ░░░░░░░░░░░░░░░░  0.0% (0/1)
+Android ./App.tsx ░░░░░░░░░░░░░░░░  4.0% ( 10/110)
+Android ./App.tsx ▓░░░░░░░░░░░░░░░  6.9% ( 44/167)
+Android ./App.tsx ▓▓▓▓░░░░░░░░░░░░ 29.1% (152/282)
+Android ./App.tsx ▓▓▓▓▓░░░░░░░░░░░ 35.8% (255/426)
+Android ./App.tsx ▓▓▓▓▓▓▓▓▓░░░░░░░ 58.6% (372/486)
+Android ./App.tsx ▓▓▓▓▓▓▓▓▓▓▓░░░░░ 74.1% (446/518)
+Android ./App.tsx ▓▓▓▓▓▓▓▓▓▓▓▓░░░░ 78.3% (470/550)
+Android ./App.tsx ▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░ 88.1% (582/620)
+Android ./App.tsx ▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░ 89.0% (637/690)
+Android Bundled 38608ms App.tsx (737 modules)
+Android ./App.tsx ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░ 99.9% (737/737)
+Starting project at /home/subhash.thakur.india/Projects/Recruitment/hirestream-mobile
+Starting Metro Bundler
+warning: Bundler cache is empty, rebuilding (this may take a minute)
+Waiting on http://localhost:8081
+Logs for your project will appear below.
+Android ./App.tsx ░░░░░░░░░░░░░░░░  0.0% (0/1)
+Android ./App.tsx ░░░░░░░░░░░░░░░░  4.0% ( 24/142)
+Android ./App.tsx ▓▓▓▓░░░░░░░░░░░░ 25.9% (116/228)
+Android ./App.tsx ▓▓▓▓▓▓░░░░░░░░░░ 38.6% (216/354)
+Android ./App.tsx ▓▓▓▓▓▓▓▓▓▓▓░░░░░ 74.9% (353/408)
+Android ./App.tsx ▓▓▓▓▓▓▓▓▓▓▓▓░░░░ 80.7% (386/432)
+Android ./App.tsx ▓▓▓▓▓▓▓▓▓▓▓▓▓░░░ 85.6% (422/456)
+Android ./App.tsx ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░ 94.4% (525/558)
+Android ./App.tsx ░░░░░░░░░░░░░░░░  0.0% (0/1)
+Android Bundled 30237ms App.tsx (603 modules)
+Android Bundled 6579ms App.tsx (1 module)
+Android Bundled 87ms App.tsx (1 module)
+Android ./App.tsx ░░░░░░░░░░░░░░░░  0.0% (0/1)
+Android Bundled 88ms App.tsx (1 module)
+Starting project at /home/subhash.thakur.india/Projects/Recruitment/hirestream-mobile
+Starting Metro Bundler
+warning: Bundler cache is empty, rebuilding (this may take a minute)
+Waiting on http://localhost:8081
+Logs for your project will appear below.
+Starting project at /home/subhash.thakur.india/Projects/Recruitment/hirestream-mobile
+Starting Metro Bundler
+warning: Bundler cache is empty, rebuilding (this may take a minute)
+Waiting on http://localhost:8081
+Logs for your project will appear below.
+Android ./index.ts ░░░░░░░░░░░░░░░░  0.0% (0/1)
+Android ./index.ts ▓▓░░░░░░░░░░░░░░ 17.7% ( 48/161)
+Android ./index.ts ▓▓░░░░░░░░░░░░░░ 18.3% (106/248)
+Android ./index.ts ▓▓▓▓▓▓░░░░░░░░░░ 39.0% (241/386)
+Android ./index.ts ▓▓▓▓▓▓▓▓░░░░░░░░ 56.0% (339/453)
+Android ./index.ts ▓▓▓▓▓▓▓▓▓▓▓▓▓░░░ 82.0% (466/516)
+Android ./index.ts ▓▓▓▓▓▓▓▓▓▓▓▓▓░░░ 85.8% (502/542)
+Android ./index.ts ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░ 94.2% (591/609)
+Android ./index.ts ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░ 94.8% (641/671)
+Android Bundled 33790ms index.ts (697 modules)
+Android ./index.ts ▓░░░░░░░░░░░░░░░  8.6% ( 46/157)
+Android ./index.ts ▓▓▓▓▓░░░░░░░░░░░ 34.1% (184/315)
+Android ./index.ts ▓▓▓▓▓▓▓▓░░░░░░░░ 51.0% (317/444)
+Android ./index.ts ▓▓▓▓▓▓▓▓▓▓▓▓▓░░░ 83.3% (464/511)
+Android ./index.ts ▓▓▓▓▓▓▓▓▓▓▓▓▓░░░ 86.1% (528/572)
+Android ./index.ts ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░ 94.8% (637/667)
+Android Bundled 23947ms index.ts (683 modules)
+ WARN  🚨 React Native's New Architecture is always enabled in Expo Go, but it is explicitly disabled in your project's app config. This may lead to unexpected behavior when creating a production or development build. Remove "newArchEnabled": false from your app.json.
+Learn more: https://docs.expo.dev/guides/new-architecture/
+Android ./index.ts ░░░░░░░░░░░░░░░░  0.0% (0/1)
+Android Bundled 2906ms index.ts (1 module)
+ WARN  🚨 React Native's New Architecture is always enabled in Expo Go, but it is explicitly disabled in your project's app config. This may lead to unexpected behavior when creating a production or development build. Remove "newArchEnabled": false from your app.json.
+Learn more: https://docs.expo.dev/guides/new-architecture/
+Android ./index.ts ░░░░░░░░░░░░░░░░  0.0% (0/1)
+Android Bundled 1517ms index.ts (1 module)
+ WARN  🚨 React Native's New Architecture is always enabled in Expo Go, but it is explicitly disabled in your project's app config. This may lead to unexpected behavior when creating a production or development build. Remove "newArchEnabled": false from your app.json.
+Learn more: https://docs.expo.dev/guides/new-architecture/
+Android ./index.ts ░░░░░░░░░░░░░░░░  0.0% (0/1)
+Android Bundled 713ms index.ts (1 module)
+ WARN  🚨 React Native's New Architecture is always enabled in Expo Go, but it is explicitly disabled in your project's app config. This may lead to unexpected behavior when creating a production or development build. Remove "newArchEnabled": false from your app.json.
+Learn more: https://docs.expo.dev/guides/new-architecture/
+Android ./index.ts ░░░░░░░░░░░░░░░░  0.0% (0/1)
+Android Bundled 583ms index.ts (1 module)
+ WARN  🚨 React Native's New Architecture is always enabled in Expo Go, but it is explicitly disabled in your project's app config. This may lead to unexpected behavior when creating a production or development build. Remove "newArchEnabled": false from your app.json.
+Learn more: https://docs.expo.dev/guides/new-architecture/
+Android ./index.ts ░░░░░░░░░░░░░░░░  0.0% (0/1)
+Android Bundled 978ms index.ts (1 module)
+ WARN  🚨 React Native's New Architecture is always enabled in Expo Go, but it is explicitly disabled in your project's app config. This may lead to unexpected behavior when creating a production or development build. Remove "newArchEnabled": false from your app.json.
+Learn more: https://docs.expo.dev/guides/new-architecture/
+Android ./index.ts ░░░░░░░░░░░░░░░░  0.0% (0/1)
+Android Bundled 1313ms index.ts (1 module)
+ WARN  🚨 React Native's New Architecture is always enabled in Expo Go, but it is explicitly disabled in your project's app config. This may lead to unexpected behavior when creating a production or development build. Remove "newArchEnabled": false from your app.json.
+Learn more: https://docs.expo.dev/guides/new-architecture/
+Android ./index.ts ░░░░░░░░░░░░░░░░  0.0% (0/1)
+Android Bundled 2751ms index.ts (1 module)
+ WARN  🚨 React Native's New Architecture is always enabled in Expo Go, but it is explicitly disabled in your project's app config. This may lead to unexpected behavior when creating a production or development build. Remove "newArchEnabled": false from your app.json.
+Learn more: https://docs.expo.dev/guides/new-architecture/
+Android ./index.ts ░░░░░░░░░░░░░░░░  0.0% (0/1)
+Android Bundled 58ms index.ts (1 module)
+ WARN  🚨 React Native's New Architecture is always enabled in Expo Go, but it is explicitly disabled in your project's app config. This may lead to unexpected behavior when creating a production or development build. Remove "newArchEnabled": false from your app.json.
+Learn more: https://docs.expo.dev/guides/new-architecture/
+Android ./index.ts ░░░░░░░░░░░░░░░░  0.0% (0/1)
+Android Bundled 84ms index.ts (1 module)
+ WARN  🚨 React Native's New Architecture is always enabled in Expo Go, but it is explicitly disabled in your project's app config. This may lead to unexpected behavior when creating a production or development build. Remove "newArchEnabled": false from your app.json.
+Learn more: https://docs.expo.dev/guides/new-architecture/
+Starting project at /home/subhash.thakur.india/Projects/Recruitment/hirestream-mobile
+Starting Metro Bundler
+warning: Bundler cache is empty, rebuilding (this may take a minute)
+Waiting on http://localhost:8081
+Logs for your project will appear below.
+Android ./index.ts ░░░░░░░░░░░░░░░░  0.0% (0/1)
+Android ./index.ts ▓░░░░░░░░░░░░░░░  9.0% ( 19/180)
+Android ./index.ts ▓░░░░░░░░░░░░░░░ 12.2% ( 74/212)
+Android ./index.ts ▓▓░░░░░░░░░░░░░░ 17.1% (131/317)
+Android ./index.ts ▓▓▓▓▓▓░░░░░░░░░░ 41.1% (291/454)
+Android ./index.ts ▓▓▓▓▓▓▓▓░░░░░░░░ 53.9% (403/549)
+Android ./index.ts ▓▓▓▓▓▓▓▓▓▓▓▓░░░░ 75.8% (518/595)
+Android ./index.ts ▓▓▓▓▓▓▓▓▓▓▓▓░░░░ 79.4% (550/618)
+Android ./index.ts ▓▓▓▓▓▓▓▓▓▓▓▓▓░░░ 82.4% (628/695)
+Android ./index.ts ▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░ 89.6% (722/772)
+Android Bundled 37587ms index.ts (788 modules)
+ WARN  🚨 React Native's New Architecture is always enabled in Expo Go, but it is explicitly disabled in your project's app config. This may lead to unexpected behavior when creating a production or development build. Remove "newArchEnabled": false from your app.json.
+Learn more: https://docs.expo.dev/guides/new-architecture/

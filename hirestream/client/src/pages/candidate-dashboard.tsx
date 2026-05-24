@@ -145,6 +145,7 @@ export default function CandidateDashboard() {
               <PhotoAvatar photoUrl={profile.photoUrl} name={profile.fullName || "?"} size="w-10 h-10" />
               <div className="min-w-0 flex-1">
                 <p className="font-bold text-slate-900 text-sm leading-snug truncate">{profile.fullName || "Complete Profile"}</p>
+                <p className="text-[11px] text-blue-600 font-medium truncate">@{(profile.username || profile.email || "").split("@")[0]}</p>
                 <p className="text-xs text-slate-500 truncate">{profile.email}</p>
               </div>
             </div>
@@ -204,6 +205,11 @@ export default function CandidateDashboard() {
                 </Button>
               );
             })()}
+            {/* Always-visible Edit Profile link */}
+            <Button variant="outline" size="sm" onClick={() => setLocation("/profile")}
+              className="w-full rounded-lg text-xs font-semibold mt-2 border-slate-300 text-slate-700 hover:bg-slate-50">
+              <User className="w-3.5 h-3.5 mr-1.5" /> Edit Profile
+            </Button>
           </div>
 
           {/* Navigation */}

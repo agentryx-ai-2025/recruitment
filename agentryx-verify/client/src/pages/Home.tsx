@@ -1,14 +1,15 @@
 import { useEffect, useState } from "react";
 import { Link } from "wouter";
-import { ClipboardCheck, Sparkles, ArrowRight, Lightbulb, ListChecks, ArrowDown, Eye, EyeOff } from "lucide-react";
+import { ClipboardCheck, Sparkles, ArrowRight, Lightbulb, ListChecks, ArrowDown, Eye, EyeOff, Smartphone } from "lucide-react";
 import { Header } from "../components/Header";
 import { api } from "../lib/api";
 import { useRequireAuth } from "../lib/useRequireAuth";
 
-const PROJECT_ORDER: Record<string, { icon: "frs" | "smoke" | "extras"; badge: string; badgeColor: string; tip: string }> = {
+const PROJECT_ORDER: Record<string, { icon: "frs" | "mobile" | "smoke" | "extras"; badge: string; badgeColor: string; tip: string }> = {
   "hirestream-v1.4":        { icon: "frs",    badge: "START HERE", badgeColor: "bg-emerald-600 text-white",     tip: "Review and sign off the contracted FRS requirements first. This is the primary acceptance gate." },
-  "hirestream-htis-smoke":  { icon: "smoke",  badge: "STEP 2",     badgeColor: "bg-sky-100 text-sky-800",     tip: "HTIS generic QA smoke checklist (77 rows, 15 sections). Verdicts from the Apr 22 workbook are pre-loaded in the HTIS signoff column." },
-  "hirestream-v1.5-extras": { icon: "extras", badge: "STEP 3",     badgeColor: "bg-indigo-100 text-indigo-700", tip: "Beyond-FRS enhancements delivered above the contracted scope. Hidden from non-admin reviewers by default — admin can re-enable." },
+  "hirestream-mobile-v1.0": { icon: "mobile", badge: "STEP 2",     badgeColor: "bg-sky-100 text-sky-800",       tip: "Android mobile app testing. Install Expo Go, scan the QR code on the project page, and test candidate features." },
+  "hirestream-htis-smoke":  { icon: "smoke",  badge: "STEP 3",     badgeColor: "bg-sky-100 text-sky-800",       tip: "HTIS generic QA smoke checklist (77 rows, 15 sections). Verdicts from the Apr 22 workbook are pre-loaded in the HTIS signoff column." },
+  "hirestream-v1.5-extras": { icon: "extras", badge: "STEP 4",     badgeColor: "bg-indigo-100 text-indigo-700", tip: "Beyond-FRS enhancements delivered above the contracted scope. Hidden from non-admin reviewers by default — admin can re-enable." },
 };
 
 export function Home() {
@@ -94,18 +95,22 @@ export function Home() {
             // strings aren't detected by the class scanner).
             const border =
               variant === "frs"   ? "border-emerald-300 bg-emerald-50/50 hover:border-emerald-500" :
+              variant === "mobile"? "border-violet-300 bg-violet-50/40 hover:border-violet-500"    :
               variant === "smoke" ? "border-sky-300 bg-sky-50/40 hover:border-sky-500"             :
                                     "border-slate-200 bg-white hover:border-indigo-400";
             const iconBox =
               variant === "frs"   ? "bg-emerald-600 text-white" :
+              variant === "mobile"? "bg-violet-600 text-white"  :
               variant === "smoke" ? "bg-sky-600 text-white"     :
                                     "bg-indigo-100 text-indigo-600";
             const arrow =
               variant === "frs"   ? "text-emerald-500" :
+              variant === "mobile"? "text-violet-500"  :
               variant === "smoke" ? "text-sky-500"     :
                                     "text-slate-400";
             const tipColor =
               variant === "frs"   ? "text-emerald-700" :
+              variant === "mobile"? "text-violet-700"  :
               variant === "smoke" ? "text-sky-700"     :
                                     "text-indigo-600";
             return (
@@ -116,9 +121,11 @@ export function Home() {
                       <div className={`shrink-0 w-11 h-11 rounded-lg flex items-center justify-center ${iconBox}`}>
                         {variant === "frs"
                           ? <ClipboardCheck className="w-6 h-6" />
-                          : variant === "smoke"
-                            ? <ListChecks className="w-6 h-6" />
-                            : <Sparkles className="w-6 h-6" />}
+                          : variant === "mobile"
+                            ? <Smartphone className="w-6 h-6" />
+                            : variant === "smoke"
+                              ? <ListChecks className="w-6 h-6" />
+                              : <Sparkles className="w-6 h-6" />}
                       </div>
                       <div className="min-w-0">
                         <div className="flex items-center gap-2.5 flex-wrap">
@@ -138,6 +145,23 @@ export function Home() {
                         <div className="flex items-center gap-3 mt-2 text-xs text-slate-400">
                           <span>{p.contractor} → {p.client}</span>
                           <span>build {p.buildRef}</span>
+                          {/* Dev-team scoreboard. Renders as a red pill when
+                              there's anything to fix; collapses to a quiet
+                              green pill when the project is clean. The
+                              click-through opens the project — reviewers
+                              can flip on the "Needs fixing" chip there to
+                              focus on just the open items. */}
+                          {typeof p.needsFix === "number" && p.reviewable > 0 && (
+                            p.needsFix > 0 ? (
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-red-100 text-red-800 border border-red-200 font-medium">
+                                🔧 {p.needsFix} need{p.needsFix === 1 ? "s" : ""} fixing
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 font-medium">
+                                ✓ no open defects
+                              </span>
+                            )
+                          )}
                         </div>
                         {meta && (
                           <div className={`mt-3 text-xs ${tipColor}`}>

@@ -72,6 +72,9 @@ export const api = {
 
   attachmentUrl: (id: string) => `/api/projects/attachments/${id}`,
 
+  listActivity: (slug: string, limit = 20) =>
+    req<any[]>(`/api/projects/${slug}/activity?limit=${limit}`),
+
   listIssues: (slug: string) => req<any[]>(`/api/projects/${slug}/issues`),
   createIssue: (slug: string, payload: any) =>
     req<any>(`/api/projects/${slug}/issues`, { method: "POST", body: JSON.stringify(payload) }),

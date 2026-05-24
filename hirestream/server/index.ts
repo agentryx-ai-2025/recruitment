@@ -97,6 +97,23 @@ app.use("/uploads/hs/candidates/photos", express.static(HS_PHOTOS_DIR, {
   fallthrough: false,
 }));
 
+// ── App version (single source of truth) ────────────────────────────
+// Read at startup from /VERSION at the app root so the same file drives
+// both the footer pill in the UI and any future health/about endpoints.
+// Bumping a release is `echo 0.4.2.0 > VERSION && pm2 restart hirestream`.
+// File format: a single 4-segment dotted string. Trailing newline allowed.
+import { readFileSync } from "node:fs";
+import { resolve as resolvePath } from "node:path";
+let APP_VERSION = "0.0.0.0";
+try {
+  APP_VERSION = readFileSync(resolvePath(process.cwd(), "VERSION"), "utf8").trim() || "0.0.0.0";
+} catch {
+  // VERSION file missing — keep the placeholder rather than crashing the boot.
+}
+app.get("/api/v1/version", (_req, res) => {
+  res.json({ success: true, data: { version: APP_VERSION } });
+});
+
 // ── Rate limiting ───────────────────────────────────────────────────
 app.use("/api", apiLimiter);
 

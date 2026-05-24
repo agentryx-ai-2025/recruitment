@@ -85,10 +85,20 @@ authRouter.post("/logout", (req, res) => {
   });
 });
 
-// GET /api/auth/me
+// GET /api/auth/me — returns the current reviewer minus the password hash.
+// The hash should never reach the browser even though it's bcrypted; this was
+// a v0.2.0 leak fixed in v0.2.1.
 authRouter.get("/me", async (req, res) => {
   if (!req.session.reviewerId) return res.json({ reviewer: null });
-  const [r] = await db.select().from(reviewers).where(eq(reviewers.id, req.session.reviewerId));
+  const [r] = await db.select({
+    id: reviewers.id,
+    username: reviewers.username,
+    email: reviewers.email,
+    name: reviewers.name,
+    organization: reviewers.organization,
+    role: reviewers.role,
+    createdAt: reviewers.createdAt,
+  }).from(reviewers).where(eq(reviewers.id, req.session.reviewerId));
   res.json({ reviewer: r ?? null });
 });
 

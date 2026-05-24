@@ -5,8 +5,8 @@ import bcrypt from "bcrypt";
 import { format } from "date-fns";
 import { getAllSettings, updateSetting } from "../services/settings.service";
 import { storage } from "../storage";
-import { users, auditLog } from "@shared/schema";
-import { eq } from "drizzle-orm";
+import { users, auditLog, notificationTemplates } from "@shared/schema";
+import { eq, and } from "drizzle-orm";
 import { sensitiveLimiter } from "../middleware/rateLimit.middleware";
 import { logger } from "../config/logger.config";
 
@@ -163,9 +163,7 @@ router.post("/lifecycle/run", async (_req, res, next) => {
 });
 
 // ── Notification templates (PWS §5) ──────────────────────────────────
-import { notificationTemplates } from "@shared/schema";
-import { storage } from "../storage";
-import { and as _and, eq as _eq } from "drizzle-orm";
+// (notificationTemplates imported at top of file)
 
 router.get("/notification-templates", async (_req, res, next) => {
   try {
@@ -195,7 +193,7 @@ router.put("/notification-templates/:eventKey/:recipientRole", async (req, res, 
 
     const result = await db.update(notificationTemplates)
       .set(update)
-      .where(_and(_eq(notificationTemplates.eventKey, eventKey), _eq(notificationTemplates.recipientRole, recipientRole)))
+      .where(and(eq(notificationTemplates.eventKey, eventKey), eq(notificationTemplates.recipientRole, recipientRole)))
       .returning();
     if (result.length === 0) return res.status(404).json({ success: false, message: "Template not found" });
     res.json({ success: true, data: result[0] });

@@ -1,0 +1,62 @@
+name: Mobile CI
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'hirestream-mobile/**'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'hirestream-mobile/**'
+
+defaults:
+  run:
+    working-directory: hirestream-mobile
+
+jobs:
+  lint-typecheck:
+    name: Lint & Type Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: hirestream-mobile/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: ESLint
+        run: npm run lint
+
+      - name: TypeScript check
+        run: npm run typecheck
+
+  build-preview:
+    name: EAS Preview Build
+    needs: lint-typecheck
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: hirestream-mobile/package-lock.json
+
+      - uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build preview APK
+        run: eas build --platform android --profile preview --non-interactive

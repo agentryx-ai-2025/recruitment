@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "wouter";
-import { Download, FileText, MessageSquare, AlertCircle, Filter, LogIn, ChevronRight, Lightbulb, MousePointerClick, CircleDot, X, Paperclip } from "lucide-react";
+import { Download, FileText, MessageSquare, AlertCircle, Filter, LogIn, ChevronRight, Lightbulb, MousePointerClick, CircleDot, X, Paperclip, Link2, Check } from "lucide-react";
 import { Link } from "wouter";
 import { Header } from "../components/Header";
 import { api } from "../lib/api";
@@ -8,6 +8,7 @@ import { useRequireAuth } from "../lib/useRequireAuth";
 import { FeedbackCard } from "../components/FeedbackCard";
 import { FeedbackDialog } from "../components/FeedbackDialog";
 import { SprintSection } from "../components/SprintSection";
+import { ActivityFeed } from "../components/ActivityFeed";
 
 type LevelKey = "agentryx" | "htis" | "hpsedc_staging" | "hpsedc_final";
 type RoleKey = "candidate" | "agent" | "employer" | "officer" | "cross";
@@ -52,6 +53,18 @@ function needsReverify(req: any, signoff: any | undefined, deployedSprints: any[
   );
 }
 
+// The most-recent deployed sprint that fixed this requirement after the
+// reviewer's last decision. Used to compose the auto-comment when the
+// reviewer one-click-passes the reverify chip.
+function reverifySprint(req: any, signoff: any | undefined, deployedSprints: any[] | undefined) {
+  if (!needsReverify(req, signoff, deployedSprints)) return null;
+  const signedAt = new Date(signoff!.signedAt).getTime();
+  const candidates = (deployedSprints ?? [])
+    .filter((sp) => sp.deployedAt && (sp.fixedItemRefs ?? []).includes(req.itemRef) && new Date(sp.deployedAt).getTime() > signedAt)
+    .sort((a, b) => new Date(b.deployedAt).getTime() - new Date(a.deployedAt).getTime());
+  return candidates[0] ?? null;
+}
+
 function statFor(reqs: any[], signoffs: any[], level: LevelKey): Stat {
   const active = reqs.filter(r => r.status !== "deferred" && r.status !== "n_a");
   const deferred = reqs.filter(r => r.status === "deferred" || r.status === "n_a").length;
@@ -71,12 +84,94 @@ function statFor(reqs: any[], signoffs: any[], level: LevelKey): Stat {
   return { total, reviewable, pass, partial, fail, pending, deferred, pct };
 }
 
+// Pipeline stages, ordered earliest-to-latest. Used to decide which signoff
+// is the "current verdict" for a row — later stages override earlier ones.
+const PIPELINE_ORDER: LevelKey[] = ["agentryx", "htis", "hpsedc_staging", "hpsedc_final"];
+
+// Find the most-downstream signoff for a requirement. If HTIS rejected then
+// HPSEDC Staging accepted, the row is considered cleared — Staging is later
+// in the pipeline and represents the current state. Returns null when no
+// reviewer has touched the row.
+function latestSignoff(reqId: string, signoffs: any[]) {
+  let latest: any = null;
+  let latestIdx = -1;
+  for (const s of signoffs) {
+    if (s.requirementId !== reqId) continue;
+    const idx = PIPELINE_ORDER.indexOf(s.level);
+    if (idx > latestIdx) { latestIdx = idx; latest = s; }
+  }
+  return latest;
+}
+
+// Scope for the "Needs fixing" filter — different reviewers see different
+// definitions of "their work" so we compute against the relevant scope.
+//   - { kind: "level", level }: tester view. A row needs fixing if THEIR
+//     level hasn't accepted it yet (pending or own Fail/Partial). Plus any
+//     delivery-partial. This is each tester's personal funnel.
+//   - { kind: "latest" }: admin/delivery view. A row needs fixing if the
+//     most-downstream signoff is Fail/Partial, OR delivery-side partial.
+//     Cross-stage backlog the dev team drives to zero.
+type FixScope = { kind: "level"; level: LevelKey } | { kind: "latest" };
+
+// Shared identifier to compute "needs fixing" — kept here so ContextStrip,
+// RoleDetail, role chips, and section tabs all answer the same question.
+function reqNeedsFix(r: any, signoffs: any[], scope: FixScope) {
+  if (r.status === "deferred" || r.status === "n_a") return false;
+
+  if (scope.kind === "level") {
+    // Tester scope: items at MY level that I haven't passed. Includes
+    // pending (no signoff yet), my own Fail (rejected), my own Partial
+    // (waived). Delivery-side partial always counts so the tester sees
+    // the unfinished items that need their decision.
+    if (r.status === "partial" || r.status === "not_delivered") return true;
+    const my = signoffs.find((s) => s.requirementId === r.id && s.level === scope.level);
+    if (!my) return true;
+    return my.decision === "rejected" || my.decision === "waived";
+  }
+  // Admin "latest" scope: most-downstream verdict + delivery-partial.
+  if (r.status === "partial" || r.status === "not_delivered") return true;
+  const latest = latestSignoff(r.id, signoffs);
+  if (!latest) return false;
+  return latest.decision === "rejected" || latest.decision === "waived";
+}
+
+// Role → default fix scope. Admin/delivery see the cross-stage view;
+// every other reviewer sees their own pipeline level.
+function defaultFixScope(role: string | undefined | null): FixScope {
+  if (!role) return { kind: "latest" };
+  if (role === "admin" || role === "delivery") return { kind: "latest" };
+  if (role === "agentryx" || role === "htis" || role === "hpsedc_staging" || role === "hpsedc_final") {
+    return { kind: "level", level: role as LevelKey };
+  }
+  return { kind: "latest" };
+}
+
+const NEEDS_FIX_KEY = "verify-needs-fix-only";
+
 export function ProjectView() {
   const { slug } = useParams<{ slug: string }>();
   const { reviewer: me, loading: authLoading } = useRequireAuth();
   const [data, setData] = useState<any>(null);
   const [level, setLevel] = useState<LevelKey>("agentryx");
   const [activeRole, setActiveRole] = useState<RoleKey | null>(null);
+  // Universal "Needs fixing" scope. Lives at project level so a single toggle
+  // at the top filters every role chip count, every section, and every
+  // detail view. Persisted in localStorage so a dev/tester who opens the
+  // project tomorrow lands in the same view they left in.
+  const [needsFixOnly, setNeedsFixOnly] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    return window.localStorage.getItem(NEEDS_FIX_KEY) === "1";
+  });
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(NEEDS_FIX_KEY, needsFixOnly ? "1" : "0");
+    }
+  }, [needsFixOnly]);
+
+  // Each tester sees their own funnel; admin/delivery see the cross-stage
+  // dev backlog. The scope feeds every needs-fix calculation so role chips,
+  // section tabs, and the matrix all answer the same question.
+  const fixScope: FixScope = useMemo(() => defaultFixScope(me?.role), [me]);
 
   // Which pipeline levels can the current reviewer actually sign off on?
   const allowedLevels: LevelKey[] = useMemo(() => {
@@ -93,6 +188,32 @@ export function ProjectView() {
 
   useEffect(() => { if (me) reload(); }, [slug, me]);
   function reload() { api.getProject(slug).then(setData); }
+
+  // Deep-link support: `/p/<slug>#row=<itemRef>` opens the project, switches
+  // to the right role, scrolls the row into view, and pulses an amber ring
+  // on it for 2s. Lets reviewers paste row links to each other in chat.
+  // The matching `id="req-<itemRef>"` is set on the table row below; the
+  // section-tab fix-up happens inside RoleDetail via the same hash.
+  useEffect(() => {
+    if (!data) return;
+    const m = window.location.hash.match(/^#row=(.+)$/);
+    if (!m) return;
+    const itemRef = decodeURIComponent(m[1]);
+    const req = data.requirements.find((r: any) => r.itemRef === itemRef);
+    if (!req) return;
+    const role = ROLES.find((rl) => rl.sections.includes(req.section));
+    if (role) setActiveRole(role.key as RoleKey);
+    // Defer scroll until role/section render — RoleDetail handles its own
+    // section selection from the same hash.
+    const t = window.setTimeout(() => {
+      const el = document.getElementById(`req-${itemRef}`);
+      if (!el) return;
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      el.classList.add("ring-2", "ring-amber-400");
+      window.setTimeout(() => el.classList.remove("ring-2", "ring-amber-400"), 2000);
+    }, 250);
+    return () => window.clearTimeout(t);
+  }, [data]);
 
   const [feedbackOpen, setFeedbackOpen] = useState(false);
 
@@ -158,6 +279,10 @@ export function ProjectView() {
         <ContextStrip
           data={data} level={level} activeRole={activeRole}
           onPickRole={setActiveRole}
+          needsFixOnly={needsFixOnly}
+          onToggleNeedsFix={() => setNeedsFixOnly((v) => !v)}
+          fixScope={fixScope}
+          me={me}
         />
 
         {/* Sign-in banner when un-authed on a role (so disabled circles aren't a mystery) */}
@@ -169,6 +294,9 @@ export function ProjectView() {
             slug={slug} data={data} me={me} level={level}
             canEditLevel={allowedLevels.includes(level)}
             role={ROLES.find(r => r.key === activeRole)!}
+            needsFixOnly={needsFixOnly}
+            onToggleNeedsFix={() => setNeedsFixOnly((v) => !v)}
+            fixScope={fixScope}
             onChanged={reload}
           />
         ) : (
@@ -177,6 +305,7 @@ export function ProjectView() {
           />
         )}
 
+        <ActivityFeed slug={slug} me={me} />
         <IssuesPanel slug={slug} canEdit={!!me} me={me} />
       </div>
     </div>
@@ -273,15 +402,211 @@ function ReviewerTip({ me, allowedLevels, activeRole }: {
   );
 }
 
+// ─── Mobile App Setup Guide ──────────────────────────────────────────────
+// Renders only on the mobile project page. Three tabs: Android setup,
+// iOS setup (coming soon), and test accounts. Collapsible.
+function MobileSetupGuide() {
+  const [open, setOpen] = useState(true);
+  const [tab, setTab] = useState<"android" | "ios" | "accounts">("android");
+  const [lightbox, setLightbox] = useState<string | null>(null);
+
+  return (
+    <div className="mt-6 rounded-xl border border-slate-200 bg-white overflow-hidden shadow-sm">
+      {/* Lightbox overlay */}
+      {lightbox && (
+        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-8 cursor-pointer" onClick={() => setLightbox(null)}>
+          <img src={lightbox} alt="Preview" className="max-h-[85vh] max-w-[90vw] rounded-xl shadow-2xl border-2 border-white/20" />
+          <button className="absolute top-6 right-8 text-white/80 hover:text-white text-3xl font-light" onClick={() => setLightbox(null)}>✕</button>
+        </div>
+      )}
+      <button onClick={() => setOpen(v => !v)}
+        className="w-full flex items-center justify-between px-5 py-3.5 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 transition">
+        <div className="flex items-center gap-3">
+          <span className="text-xl">📱</span>
+          <div className="text-left">
+            <div className="text-base font-bold text-white">HireStream Mobile — Mobile App</div>
+            <div className="text-[11px] text-violet-100">Setup your test environment · Scan QR code · Start testing</div>
+          </div>
+        </div>
+        <span className={`text-white/70 text-sm transition-transform ${open ? "rotate-180" : ""}`}>▼</span>
+      </button>
+
+      {open && (
+        <div className="border-t border-slate-100">
+          <div className="flex gap-2 px-5 py-3 bg-slate-100 border-b border-slate-200">
+            {([
+              { key: "android" as const, icon: "🤖", label: "Android" },
+              { key: "ios" as const, icon: "🍎", label: "iOS" },
+              { key: "accounts" as const, icon: "👤", label: "Test Accounts" },
+            ]).map(t => (
+              <button key={t.key} onClick={() => setTab(t.key)}
+                className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold transition-all shadow-sm ${
+                  tab === t.key
+                    ? "bg-violet-600 text-white shadow-md ring-2 ring-violet-300"
+                    : "bg-white text-slate-600 border border-slate-300 hover:border-violet-400 hover:text-violet-700 hover:shadow"
+                }`}>
+                <span className="text-base">{t.icon}</span> {t.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="p-5">
+            {tab === "android" && (
+              <div className="grid grid-cols-1 lg:grid-cols-[1fr_auto_auto] gap-5">
+                <div className="space-y-2.5">
+                  <div className="flex gap-2.5 items-start">
+                    <span className="shrink-0 w-6 h-6 rounded-full bg-violet-600 text-white flex items-center justify-center text-xs font-bold mt-0.5">1</span>
+                    <div className="text-sm"><strong className="text-slate-900">Install "Expo Go"</strong><span className="text-slate-500"> — Open <strong>Google Play Store</strong> → search "Expo Go" → Install. </span><span className="text-slate-400 text-xs">(Free, ~60 MB)</span></div>
+                  </div>
+                  <div className="flex gap-2.5 items-start">
+                    <span className="shrink-0 w-6 h-6 rounded-full bg-violet-600 text-white flex items-center justify-center text-xs font-bold mt-0.5">2</span>
+                    <div className="text-sm"><strong className="text-slate-900">Open Expo Go</strong><span className="text-slate-500"> → tap <strong>"Enter URL manually"</strong> or <strong>scan QR code →</strong> (scanning will start loading the app)</span></div>
+                  </div>
+                  <div className="flex gap-2.5 items-start">
+                    <span className="shrink-0 w-6 h-6 rounded-full bg-violet-600 text-white flex items-center justify-center text-xs font-bold mt-0.5">3</span>
+                    <div className="text-sm">
+                      <strong className="text-slate-900">Enter this URL</strong><span className="text-slate-500"> → tap Connect:</span>
+                      <div className="mt-1.5 bg-violet-50 border-2 border-dashed border-violet-300 rounded px-3 py-2 text-center">
+                        <code className="text-sm font-bold text-violet-800">exps://hirestream-mobile.agentryx.dev</code>
+                      </div>
+                      <div className="text-[10px] text-red-500 mt-1 font-medium">⚠️ Use <code className="bg-red-50 px-0.5 rounded">exps://</code> not https://</div>
+                    </div>
+                  </div>
+                  <div className="flex gap-2.5 items-start">
+                    <span className="shrink-0 w-6 h-6 rounded-full bg-violet-600 text-white flex items-center justify-center text-xs font-bold mt-0.5">4</span>
+                    <div className="text-sm"><strong className="text-slate-900">Wait 15–30s</strong><span className="text-slate-500"> for the first load. Subsequent loads are faster.</span></div>
+                  </div>
+                  <div className="flex gap-2.5 items-start">
+                    <span className="shrink-0 w-6 h-6 rounded-full bg-emerald-600 text-white flex items-center justify-center text-xs font-bold mt-0.5">5</span>
+                    <div className="text-sm"><strong className="text-emerald-800">Login</strong><span className="text-slate-500"> — username </span><code className="bg-emerald-50 px-1 py-0.5 rounded font-bold text-emerald-800 text-xs">mobiletest</code><span className="text-slate-500"> · password </span><code className="bg-emerald-50 px-1 py-0.5 rounded font-bold text-emerald-800 text-xs">Mobile@123</code></div>
+                  </div>
+                  <div className="mt-1 bg-amber-50 border border-amber-200 rounded px-3 py-2 text-[10px] text-amber-800 leading-relaxed">
+                    <strong>Troubleshooting:</strong> Won't load? Close Expo Go & reopen. Login fails? Case-sensitive lowercase usernames. Slow? First load is 15–30s.
+                  </div>
+                </div>
+                {/* Preview screenshots — click to enlarge */}
+                <div className="flex flex-col items-center gap-2 bg-slate-50 rounded-lg border border-slate-200 p-3 min-w-[280px]">
+                  <div className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">What you'll see <span className="text-slate-400 normal-case">(click to enlarge)</span></div>
+                  <div className="flex gap-2 items-end">
+                    {[
+                      { src: "/mobile-preview-1.png", alt: "Expo Go home", n: 1 },
+                      { src: "/mobile-preview-2.png", alt: "App loading", n: 2 },
+                      { src: "/mobile-preview-3.png", alt: "Home screen", n: 3 },
+                    ].map((img) => (
+                      <div key={img.n} className="flex flex-col items-center gap-1 cursor-pointer group" onClick={() => setLightbox(img.src)}>
+                        <img src={img.src} alt={img.alt} className="w-[80px] h-auto rounded shadow-sm border border-slate-200 group-hover:ring-2 group-hover:ring-violet-400 group-hover:shadow-md transition" />
+                        <span className="text-[9px] font-bold text-violet-600 bg-violet-100 rounded-full w-4 h-4 flex items-center justify-center">{img.n}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="text-[9px] text-slate-400 text-center leading-tight mt-1">
+                    1 — Expo Go &nbsp;·&nbsp; 2 — Loading &nbsp;·&nbsp; 3 — Home screen
+                  </div>
+                </div>
+                <div className="flex flex-col items-center justify-center bg-violet-50 rounded-lg border border-violet-200 p-5 min-w-[200px]">
+                  <div className="text-xs font-semibold text-violet-700 mb-2">Scan to connect</div>
+                  <img src="/qr-mobile.png" alt="QR Code" width="160" height="160" className="rounded-lg shadow border border-violet-200" />
+                  <div className="mt-2 text-[10px] text-violet-400 font-mono text-center">exps://hirestream-mobile<br/>.agentryx.dev</div>
+                </div>
+              </div>
+            )}
+
+            {tab === "ios" && (
+              <div className="grid grid-cols-1 lg:grid-cols-[1fr_auto] gap-5">
+                <div className="space-y-2.5">
+                  <div className="flex gap-2.5 items-start">
+                    <span className="shrink-0 w-6 h-6 rounded-full bg-violet-600 text-white flex items-center justify-center text-xs font-bold mt-0.5">1</span>
+                    <div className="text-sm"><strong className="text-slate-900">Install "Expo Go"</strong><span className="text-slate-500"> — Open the <strong>App Store</strong> on your iPhone → search "Expo Go" → Install. </span><span className="text-slate-400 text-xs">(Free, by Expo Project)</span></div>
+                  </div>
+                  <div className="flex gap-2.5 items-start">
+                    <span className="shrink-0 w-6 h-6 rounded-full bg-violet-600 text-white flex items-center justify-center text-xs font-bold mt-0.5">2</span>
+                    <div className="text-sm">
+                      <strong className="text-slate-900">Open Safari</strong><span className="text-slate-500"> (not Expo Go!) and <strong>manually type</strong> this URL in the address bar:</span>
+                      <div className="mt-1.5 bg-violet-50 border-2 border-dashed border-violet-300 rounded px-3 py-2 text-center">
+                        <code className="text-sm font-bold text-violet-800">exps://hirestream-mobile.agentryx.dev</code>
+                      </div>
+                      <div className="text-[10px] text-red-500 mt-1 font-medium">⚠️ Use <code className="bg-red-50 px-0.5 rounded">exps://</code> not https:// · QR codes do not work on iOS — you must type the URL manually</div>
+                    </div>
+                  </div>
+                  <div className="flex gap-2.5 items-start">
+                    <span className="shrink-0 w-6 h-6 rounded-full bg-violet-600 text-white flex items-center justify-center text-xs font-bold mt-0.5">3</span>
+                    <div className="text-sm"><strong className="text-slate-900">Tap "Open"</strong><span className="text-slate-500"> when iOS asks <em>"Open this page in Expo Go?"</em> — the app will launch and start loading.</span></div>
+                  </div>
+                  <div className="flex gap-2.5 items-start">
+                    <span className="shrink-0 w-6 h-6 rounded-full bg-violet-600 text-white flex items-center justify-center text-xs font-bold mt-0.5">4</span>
+                    <div className="text-sm"><strong className="text-slate-900">Wait 15–30s</strong><span className="text-slate-500"> for the first load. Subsequent loads are faster.</span></div>
+                  </div>
+                  <div className="flex gap-2.5 items-start">
+                    <span className="shrink-0 w-6 h-6 rounded-full bg-emerald-600 text-white flex items-center justify-center text-xs font-bold mt-0.5">5</span>
+                    <div className="text-sm"><strong className="text-emerald-800">Login</strong><span className="text-slate-500"> — username </span><code className="bg-emerald-50 px-1 py-0.5 rounded font-bold text-emerald-800 text-xs">mobiletest</code><span className="text-slate-500"> · password </span><code className="bg-emerald-50 px-1 py-0.5 rounded font-bold text-emerald-800 text-xs">Mobile@123</code></div>
+                  </div>
+                  <div className="mt-1 bg-blue-50 border border-blue-200 rounded px-3 py-2 text-[10px] text-blue-800 leading-relaxed">
+                    <strong>📌 Why Safari?</strong> iOS Expo Go does not have "Enter URL manually" like Android. Type the URL in Safari — iOS automatically opens Expo Go.
+                  </div>
+                </div>
+                {/* iOS preview screenshots — right column */}
+                <div className="flex flex-col items-center gap-2 bg-slate-50 rounded-lg border border-slate-200 p-3 min-w-[300px]">
+                  <div className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">What you'll see <span className="text-slate-400 normal-case">(click to enlarge)</span></div>
+                  <div className="flex gap-1.5 items-end">
+                    {[
+                      { src: "/ios-preview-1.png", alt: "Expo Go on iOS", n: 1, label: "Expo Go" },
+                      { src: "/ios-preview-2.png", alt: "Type URL in Safari", n: 2, label: "Safari" },
+                      { src: "/ios-preview-3.png", alt: "Open in Expo Go dialog", n: 3, label: "Tap Open" },
+                      { src: "/ios-preview-4.png", alt: "App loading", n: 4, label: "Loading" },
+                      { src: "/ios-preview-5.png", alt: "Home screen", n: 5, label: "Home" },
+                    ].map((img) => (
+                      <div key={img.n} className="flex flex-col items-center gap-0.5 cursor-pointer group" onClick={() => setLightbox(img.src)}>
+                        <img src={img.src} alt={img.alt} className="w-[52px] h-auto rounded shadow-sm border border-slate-200 group-hover:ring-2 group-hover:ring-violet-400 group-hover:shadow-md transition" />
+                        <span className="text-[8px] font-bold text-violet-600 bg-violet-100 rounded-full w-3.5 h-3.5 flex items-center justify-center">{img.n}</span>
+                        <span className="text-[7px] text-slate-400 leading-none">{img.label}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {tab === "accounts" && (
+              <div className="space-y-3">
+                <table className="w-full text-sm border border-slate-200 rounded-lg overflow-hidden">
+                  <thead className="text-[10px] uppercase text-slate-500 bg-slate-50">
+                    <tr><th className="px-3 py-2 text-left">Username</th><th className="px-3 py-2 text-left">Password</th><th className="px-3 py-2 text-left">Profile</th><th className="px-3 py-2 text-left">Best for testing</th></tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    <tr className="bg-emerald-50"><td className="px-3 py-2 font-mono font-bold text-emerald-800">mobiletest</td><td className="px-3 py-2 font-mono">Mobile@123</td><td className="px-3 py-2">Candidate</td><td className="px-3 py-2 text-slate-600">⭐ Start here</td></tr>
+                    <tr><td className="px-3 py-2 font-mono">priya_verma</td><td className="px-3 py-2 font-mono">test123</td><td className="px-3 py-2">100% complete</td><td className="px-3 py-2 text-slate-600">Full profile, accepted placement</td></tr>
+                    <tr><td className="px-3 py-2 font-mono">meera_iyer</td><td className="px-3 py-2 font-mono">test123</td><td className="px-3 py-2">88% complete</td><td className="px-3 py-2 text-slate-600">Missing documents</td></tr>
+                    <tr><td className="px-3 py-2 font-mono">demo_candidate</td><td className="px-3 py-2 font-mono">test123</td><td className="px-3 py-2">Basic</td><td className="px-3 py-2 text-slate-600">Fresh testing</td></tr>
+                    <tr><td className="px-3 py-2 font-mono">rohan_mehta</td><td className="px-3 py-2 font-mono">test123</td><td className="px-3 py-2">Basic</td><td className="px-3 py-2 text-slate-600">Alternate account</td></tr>
+                  </tbody>
+                </table>
+                <div className="flex gap-3 text-[11px]">
+                  <div className="flex-1 bg-blue-50 border border-blue-200 rounded px-3 py-2 text-blue-800">💡 Same database as web portal <code className="bg-blue-100 px-0.5 rounded">hirestream-stg.agentryx.dev</code></div>
+                  <div className="flex-1 bg-slate-50 border border-slate-200 rounded px-3 py-2 text-slate-600">📝 Create new accounts via "Create Account" on login screen</div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function PipelineOverview({ data, level, onOpenRole }: {
   data: any; level: LevelKey; onOpenRole: (r: RoleKey) => void;
 }) {
+  const isMobile = data.project.slug?.includes("mobile");
   return (
     <>
-      {/* Role cards */}
+      {/* Mobile app setup guide — only on the mobile project */}
+      {isMobile && <MobileSetupGuide />}
+
+      {/* Role cards — only show roles that have requirements in this project */}
       <div className="mt-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {ROLES.filter(r => r.key !== "cross").map((role) => {
           const reqs = data.requirements.filter((r: any) => role.sections.includes(r.section));
+          if (reqs.length === 0) return null;
           const s = statFor(reqs, data.signoffs, level);
           return <RoleCard key={role.key} role={role} stat={s} onClick={() => onOpenRole(role.key)} />;
         })}
@@ -436,14 +761,27 @@ function Donut({ pct }: { pct: number }) {
   );
 }
 
-function RoleDetail({ slug, data, me, level, canEditLevel, role, onChanged }: {
+function RoleDetail({ slug, data, me, level, canEditLevel, role, onChanged, needsFixOnly, onToggleNeedsFix, fixScope }: {
   slug: string; data: any; me: any; level: LevelKey; canEditLevel: boolean;
   role: (typeof ROLES)[number]; onChanged: () => void;
+  needsFixOnly: boolean; onToggleNeedsFix: () => void;
+  fixScope: FixScope;
 }) {
   const [filter, setFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [pendingOnly, setPendingOnly] = useState(false);
   const [openReq, setOpenReq] = useState<string | null>(null);
-  const [activeSection, setActiveSection] = useState<number>(role.sections[0]);
+  const [activeSection, setActiveSection] = useState<number>(() => {
+    // Honour `#row=<itemRef>` deep-links by landing the user on the section
+    // that contains the requested row instead of the role's first section.
+    const m = typeof window !== "undefined" ? window.location.hash.match(/^#row=(.+)$/) : null;
+    if (m) {
+      const itemRef = decodeURIComponent(m[1]);
+      const req = data.requirements.find((r: any) => r.itemRef === itemRef);
+      if (req && role.sections.includes(req.section)) return req.section;
+    }
+    return role.sections[0];
+  });
 
   const reqsInRole = data.requirements.filter((r: any) => role.sections.includes(r.section));
   const reqsInSection = reqsInRole.filter((r: any) => r.section === activeSection);
@@ -452,7 +790,14 @@ function RoleDetail({ slug, data, me, level, canEditLevel, role, onChanged }: {
   const filtered = reqsInSection.filter((r: any) => {
     const matchesText = !filter || r.itemRef.includes(filter) || r.description.toLowerCase().includes(filter.toLowerCase());
     const matchesStatus = statusFilter === "all" || r.status === statusFilter;
-    return matchesText && matchesStatus;
+    // "My pending only" — show rows where this reviewer's level has no
+    // signoff yet. Excludes deferred/n_a (those aren't signoffable). The
+    // chip is hidden when there's nothing pending so it never lies.
+    const isDeferredRow = r.status === "deferred" || r.status === "n_a";
+    const so = data.signoffs.find((s: any) => s.requirementId === r.id && s.level === level);
+    const matchesPending = !pendingOnly || (!isDeferredRow && !so);
+    const matchesNeedsFix = !needsFixOnly || reqNeedsFix(r, data.signoffs, fixScope);
+    return matchesText && matchesStatus && matchesPending && matchesNeedsFix;
   }).sort((a: any, b: any) => {
     const aDeferred = a.status === "deferred" || a.status === "n_a" ? 1 : 0;
     const bDeferred = b.status === "deferred" || b.status === "n_a" ? 1 : 0;
@@ -470,12 +815,15 @@ function RoleDetail({ slug, data, me, level, canEditLevel, role, onChanged }: {
   return (
     <div className="mt-4 grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_320px] gap-4">
       <div className="min-w-0">
-      {/* Section tabs — avoids one long scrolling list */}
+      {/* Section tabs — avoids one long scrolling list. Per-section fix
+          count surfaces here too so the tester can see at-a-glance which
+          sections still have open work. */}
       {role.sections.length > 1 && (
         <div className="mt-4 flex gap-1 overflow-x-auto border-b border-slate-200 max-w-full">
           {role.sections.map((n) => {
             const reqs = reqsInRole.filter((r: any) => r.section === n);
             const s = statFor(reqs, data.signoffs, level);
+            const fixCount = reqs.filter((r: any) => reqNeedsFix(r, data.signoffs, fixScope)).length;
             const isActive = activeSection === n;
             return (
               <button key={n} onClick={() => setActiveSection(n)}
@@ -485,16 +833,64 @@ function RoleDetail({ slug, data, me, level, canEditLevel, role, onChanged }: {
                     : "border-transparent text-slate-500 hover:text-slate-900"
                 }`}>
                 {sectionLabel(n)} <span className="ml-1 text-[10px] text-slate-400">({s.pass}/{s.reviewable}{s.deferred > 0 ? ` +${s.deferred}⛔` : ""})</span>
+                {fixCount > 0 && (
+                  <span className="ml-1 inline-flex items-center text-[10px] font-semibold px-1 py-0.5 rounded bg-red-100 text-red-700 border border-red-200"
+                    title={`${fixCount} item${fixCount === 1 ? "" : "s"} need fixing in this section`}>
+                    🔧 {fixCount}
+                  </span>
+                )}
               </button>
             );
           })}
         </div>
       )}
 
-      <div className="mt-4 flex gap-2 items-center">
+      <div className="mt-4 flex gap-2 items-center flex-wrap">
         <Filter className="w-4 h-4 text-slate-400" />
         <input placeholder="Filter by ID or text…" value={filter} onChange={(e) => setFilter(e.target.value)}
-          className="flex-1 border border-slate-200 rounded px-3 py-1.5 text-sm" />
+          className="flex-1 min-w-[200px] border border-slate-200 rounded px-3 py-1.5 text-sm" />
+        {(() => {
+          // Pending count for the active level — drives both the visible
+          // chip count and whether the chip renders at all (hidden at 0).
+          const pendingCount = reqsInRole.filter((r: any) => {
+            if (r.status === "deferred" || r.status === "n_a") return false;
+            return !data.signoffs.some((s: any) => s.requirementId === r.id && s.level === level);
+          }).length;
+          if (pendingCount === 0 && !pendingOnly) return null;
+          return (
+            <button onClick={() => setPendingOnly((v) => !v)}
+              className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium border transition ${
+                pendingOnly
+                  ? "bg-amber-100 border-amber-400 text-amber-900 shadow-sm"
+                  : "bg-white border-slate-200 text-slate-600 hover:border-amber-300 hover:bg-amber-50"
+              }`}
+              title={pendingOnly ? "Showing only requirements awaiting your signoff. Click to show all." : "Show only requirements awaiting your signoff at this level."}>
+              {pendingOnly && <Check className="w-3 h-3" />}
+              ⏳ My pending {pendingCount > 0 && <span className="font-mono">({pendingCount})</span>}
+            </button>
+          );
+        })()}
+        {(() => {
+          // Per-role count for the chip badge. Shares state with the
+          // project-wide toggle in ContextStrip — toggling either flips
+          // both, persisted in localStorage.
+          const needsFixCount = reqsInRole.filter((r: any) => reqNeedsFix(r, data.signoffs, fixScope)).length;
+          if (needsFixCount === 0 && !needsFixOnly) return null;
+          return (
+            <button onClick={onToggleNeedsFix}
+              className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium border transition ${
+                needsFixOnly
+                  ? "bg-red-100 border-red-400 text-red-900 shadow-sm"
+                  : "bg-white border-slate-200 text-slate-600 hover:border-red-300 hover:bg-red-50"
+              }`}
+              title={needsFixOnly
+                ? "Universal Dev-fix view active across all roles + sections. Click to show all."
+                : `Show only items that need fixing in ${role.label} (${needsFixCount}). Toggle is project-wide.`}>
+              {needsFixOnly && <Check className="w-3 h-3" />}
+              🔧 Needs fixing {needsFixCount > 0 && <span className="font-mono">({needsFixCount})</span>}
+            </button>
+          );
+        })()}
         <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}
           className="border border-slate-200 rounded px-3 py-1.5 text-sm bg-white">
           <option value="all">All statuses</option>
@@ -543,7 +939,8 @@ function RoleDetail({ slug, data, me, level, canEditLevel, role, onChanged }: {
                       </td>
                     </tr>
                   )}
-                  <tr key={r.id} className={[
+                  <tr key={r.id} id={`req-${r.itemRef}`} className={[
+                    "group/row transition",
                     isDeferred
                       ? "border-t border-slate-100 bg-slate-50/70 opacity-50"
                       : "border-t border-slate-100 hover:bg-slate-50",
@@ -601,14 +998,22 @@ function RoleDetail({ slug, data, me, level, canEditLevel, role, onChanged }: {
                       <SignoffCell slug={slug} reqId={r.id} level={level} current={so}
                         canEdit={!!me && canEditLevel}
                         reverify={needsReverify(r, so, data.deployedSprints)}
+                        reverifySprint={reverifySprint(r, so, data.deployedSprints)}
                         onChanged={onChanged} />
                     )}
                     <td className="text-center">
                       {!isDeferred && (
-                        <button onClick={() => setOpenReq(openReq === r.id ? null : r.id)}
-                          className="text-slate-400 hover:text-agentryx-600">
-                          <MessageSquare className="w-4 h-4 inline" />
-                        </button>
+                        <div className="inline-flex items-center gap-2">
+                          {/* Copy-row-link — appears on row hover. Pasting the
+                              URL anywhere (chat, ticket, email) reopens the
+                              project on this exact row with an amber pulse. */}
+                          <CopyRowLink itemRef={r.itemRef} />
+                          <button onClick={() => setOpenReq(openReq === r.id ? null : r.id)}
+                            className="text-slate-400 hover:text-agentryx-600"
+                            title="Open instructions / discussion">
+                            <MessageSquare className="w-4 h-4 inline" />
+                          </button>
+                        </div>
                       )}
                     </td>
                   </tr>
@@ -744,26 +1149,132 @@ function RoleDashboard({ role, reqsInRole, data, level, canEditLevel, me }: {
 // Always visible once the user is past the project header. Shows the
 // breadcrumb, overall approval meter for the active pipeline, and a
 // one-click chip per role so switching never requires going "back".
-function ContextStrip({ data, level, activeRole, onPickRole }: {
+function ContextStrip({ data, level, activeRole, onPickRole, needsFixOnly, onToggleNeedsFix, fixScope, me }: {
   data: any; level: LevelKey; activeRole: RoleKey | null;
   onPickRole: (r: RoleKey | null) => void;
+  needsFixOnly: boolean;
+  onToggleNeedsFix: () => void;
+  fixScope: FixScope;
+  me: any;
 }) {
   const overall = useMemo(() => statFor(data.requirements, data.signoffs, level), [data, level]);
   const levelLabel = LEVELS.find(l => l.key === level)!.label;
+  const isAdminLike = me?.role === "admin" || me?.role === "delivery";
+  // Project-wide open-defect count (all roles, all sections), scoped to
+  // either the tester's own level or the admin's cross-stage view.
+  const needsFixCount = useMemo(
+    () => data.requirements.filter((r: any) => reqNeedsFix(r, data.signoffs, fixScope)).length,
+    [data, fixScope]
+  );
+  // Source breakdown for the explainer. Counts the same rows as
+  // `needsFixCount` and classifies each by why it's there.
+  // - For the admin "latest" scope: by the most-downstream flagged level
+  // - For a tester "level" scope: by their own status (pending vs. their flag)
+  const breakdown = useMemo(() => {
+    const b = {
+      delivery: 0,
+      agentryx: 0, htis: 0, hpsedc_staging: 0, hpsedc_final: 0,
+      myPending: 0, myFlagged: 0,
+    };
+    for (const r of data.requirements) {
+      if (!reqNeedsFix(r, data.signoffs, fixScope)) continue;
+      if (r.status === "partial" || r.status === "not_delivered") { b.delivery++; continue; }
+      if (fixScope.kind === "level") {
+        const my = data.signoffs.find((s: any) => s.requirementId === r.id && s.level === fixScope.level);
+        if (!my) b.myPending++;
+        else b.myFlagged++;
+        continue;
+      }
+      // admin "latest" scope
+      const latest = latestSignoff(r.id, data.signoffs);
+      if (latest) b[latest.level as keyof typeof b]++;
+    }
+    return b;
+  }, [data, fixScope]);
 
   return (
-    <div className="mt-6 bg-white border border-slate-200 rounded-xl p-4">
-      {/* Breadcrumb */}
-      <div className="flex items-center gap-1.5 text-xs text-slate-500">
-        <button onClick={() => onPickRole(null)}
-          className="hover:text-agentryx-600 hover:underline">Overview</button>
-        <ChevronRight className="w-3 h-3 text-slate-300" />
-        <span className="text-slate-700 font-medium">{levelLabel}</span>
-        {activeRole && (<>
+    <div className={`mt-6 border rounded-xl p-4 transition ${
+      needsFixOnly ? "bg-red-50/30 border-red-200" : "bg-white border-slate-200"
+    }`}>
+      {/* Breadcrumb — leads with "All projects" so reviewers always have a
+          one-click path back to the projects list, not just to this project's
+          own overview. Reviewers were getting stuck inside a deep section view
+          with no obvious return path. */}
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex items-center gap-1.5 text-xs text-slate-500">
+          <Link href="/" className="hover:text-agentryx-600 hover:underline">All projects</Link>
           <ChevronRight className="w-3 h-3 text-slate-300" />
-          <span className="text-slate-900 font-semibold">{ROLES.find(r => r.key === activeRole)!.label}</span>
-        </>)}
+          <button onClick={() => onPickRole(null)}
+            className="hover:text-agentryx-600 hover:underline">Overview</button>
+          <ChevronRight className="w-3 h-3 text-slate-300" />
+          <span className="text-slate-700 font-medium">{levelLabel}</span>
+          {activeRole && (<>
+            <ChevronRight className="w-3 h-3 text-slate-300" />
+            <span className="text-slate-900 font-semibold">{ROLES.find(r => r.key === activeRole)!.label}</span>
+          </>)}
+        </div>
+
+        {/* Universal "Needs fixing" toggle — applies across every role and
+            section in the project. Persisted in localStorage so the dev
+            team's daily view stays consistent. Hidden when count is zero
+            and the filter isn't already active (so it never lies). */}
+        {(needsFixCount > 0 || needsFixOnly) && (
+          <button onClick={onToggleNeedsFix}
+            className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold border transition ${
+              needsFixOnly
+                ? "bg-red-600 border-red-600 text-white shadow-sm"
+                : "bg-white border-red-300 text-red-700 hover:bg-red-50"
+            }`}
+            title={fixScope.kind === "level"
+              ? `Your funnel — items at ${LEVELS.find(l => l.key === fixScope.level)!.label} you haven't passed yet. Click to ${needsFixOnly ? "show all" : "scope the matrix to your work"}.`
+              : `Cross-stage dev backlog — rows whose latest verdict is Fail/Partial or delivery-side incomplete. Click to ${needsFixOnly ? "show all" : "scope to open items"}.`}>
+            {needsFixOnly && <Check className="w-3 h-3" />}
+            🔧 {fixScope.kind === "level" ? "My funnel" : "Needs fixing"} <span className="font-mono">({needsFixCount})</span>
+          </button>
+        )}
       </div>
+
+      {/* Active-filter explainer — copy adapts to the current scope so the
+          tester sees their own funnel breakdown and the admin sees the
+          cross-stage one. */}
+      {needsFixOnly && (
+        <div className="mt-3 rounded-md bg-red-100/60 border border-red-200 px-3 py-2 text-[11px] text-red-900 leading-snug">
+          {fixScope.kind === "level" ? (
+            <>
+              <span className="font-semibold">Your funnel — </span>
+              items at <span className="font-medium">{LEVELS.find(l => l.key === fixScope.level)!.label}</span> you haven't passed yet.
+              {(breakdown.myPending + breakdown.myFlagged + breakdown.delivery) > 0 && (
+                <> Currently: {
+                  [
+                    breakdown.myPending > 0 && <span key="p"><span className="font-mono">{breakdown.myPending}</span> pending your signoff</span>,
+                    breakdown.myFlagged > 0 && <span key="m"><span className="font-mono">{breakdown.myFlagged}</span> you flagged Fail/Partial</span>,
+                    breakdown.delivery > 0 && <span key="d"><span className="font-mono">{breakdown.delivery}</span> delivery-side partial</span>,
+                  ].filter(Boolean).reduce((acc: any[], el, i) => i === 0 ? [el] : [...acc, " · ", el], [])
+                }.</>
+              )}
+              {" "}Other reviewers' verdicts don't appear here — this is your work to clear.
+            </>
+          ) : (
+            <>
+              <span className="font-semibold">Dev-fix view (admin) — </span>
+              rows whose <em>latest</em> reviewer verdict is Fail / Partial, plus delivery-side incomplete.
+              {(breakdown.delivery + breakdown.agentryx + breakdown.htis + breakdown.hpsedc_staging + breakdown.hpsedc_final) > 0 && (
+                <> Currently: {
+                  [
+                    breakdown.delivery > 0 && <span key="d"><span className="font-mono">{breakdown.delivery}</span> delivery-side partial</span>,
+                    breakdown.agentryx > 0 && <span key="a"><span className="font-mono">{breakdown.agentryx}</span> still awaiting Agentryx</span>,
+                    breakdown.htis > 0 && <span key="h"><span className="font-mono">{breakdown.htis}</span> awaiting HTIS</span>,
+                    breakdown.hpsedc_staging > 0 && <span key="s"><span className="font-mono">{breakdown.hpsedc_staging}</span> rejected at HPSEDC Staging</span>,
+                    breakdown.hpsedc_final > 0 && <span key="f"><span className="font-mono">{breakdown.hpsedc_final}</span> rejected at HPSEDC Final</span>,
+                  ].filter(Boolean).reduce((acc: any[], el, i) => i === 0 ? [el] : [...acc, " · ", el], [])
+                }.</>
+              )}
+              {" "}A later Pass on the same row clears it from this view.
+              {isAdminLike && <span className="ml-1 italic text-red-700/80">(Per-level multi-select / OR / AND filter coming next.)</span>}
+            </>
+          )}
+        </div>
+      )}
 
       {/* Overall meter — compact, always visible.
           Headline ratio on the left makes the denominator explicit; without it
@@ -792,11 +1303,16 @@ function ContextStrip({ data, level, activeRole, onPickRole }: {
         </div>
       </div>
 
-      {/* Role chips — click to open or switch */}
+      {/* Role chips — click to open or switch. Small red "🔧 N" badge
+          appears whenever a role has open defects, so the dev team can
+          spot at-a-glance which roles still have work — independent of
+          whether the top-level Needs-fixing filter is active. */}
       <div className="mt-3 flex flex-wrap gap-2">
         {ROLES.map((role) => {
           const reqs = data.requirements.filter((r: any) => role.sections.includes(r.section));
+          if (reqs.length === 0) return null;
           const s = statFor(reqs, data.signoffs, level);
+          const fixCount = reqs.filter((r: any) => reqNeedsFix(r, data.signoffs, fixScope)).length;
           const isActive = activeRole === role.key;
           return (
             <button key={role.key} onClick={() => onPickRole(role.key)}
@@ -808,6 +1324,12 @@ function ContextStrip({ data, level, activeRole, onPickRole }: {
               <span className={`w-2.5 h-2.5 rounded-full bg-gradient-to-r ${role.accent}`} />
               <span className="font-medium">{role.label}</span>
               <span className="text-slate-400 font-mono">{s.pass}/{s.reviewable}{s.deferred > 0 ? ` +${s.deferred}⛔` : ""}</span>
+              {fixCount > 0 && (
+                <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-red-100 text-red-700 border border-red-200"
+                  title={`${fixCount} item${fixCount === 1 ? "" : "s"} need fixing in ${role.label}`}>
+                  🔧 {fixCount}
+                </span>
+              )}
               <span className={`text-[10px] px-1.5 py-0.5 rounded ${
                 s.pct >= 80 ? "bg-emerald-100 text-emerald-700"
                 : s.pct >= 50 ? "bg-lime-100 text-lime-700"
@@ -874,11 +1396,12 @@ function DecisionDot({ d }: { d?: Decision | string }) {
   return <span className={`inline-block w-1.5 h-1.5 rounded-full ${cls}`} />;
 }
 
-function SignoffCell({ slug, reqId, level, current, canEdit, onChanged, reverify }: any) {
+function SignoffCell({ slug, reqId, level, current, canEdit, onChanged, reverify, reverifySprint }: any) {
   const [open, setOpen] = useState(false);
   const [comment, setComment] = useState(current?.comment ?? "");
   const [files, setFiles] = useState<File[]>([]);
   const [busy, setBusy] = useState(false);
+  const [reverifying, setReverifying] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const popoverRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -968,13 +1491,45 @@ function SignoffCell({ slug, reqId, level, current, canEdit, onChanged, reverify
         className={`inline-flex items-center justify-center w-9 h-9 rounded-full text-base font-semibold ${cls} ${canEdit ? "hover:ring-2 hover:ring-agentryx-300 cursor-pointer" : "cursor-not-allowed"}`}
         title={canEdit ? (current ? current.decision : "Not signed off") : "Your role cannot sign off at this level"}>{glyph}</button>
       {/* Re-verify chip — appears when a deployed sprint has listed this item as
-          fixed and the reviewer's decision predates that deploy. Signals the
-          reviewer should re-test the item with the new build. */}
+          fixed and the reviewer's decision predates that deploy. Clicking it
+          (when canEdit) flips the decision to Pass with an auto-comment naming
+          the sprint + buildRef. Saves the four-click round-trip of opening the
+          popover, retyping a comment, and clicking Pass. */}
       {reverify && (
-        <div className="mt-1 inline-flex items-center gap-0.5 text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-indigo-100 text-indigo-800 border border-indigo-200 whitespace-nowrap"
-          title="This item was fixed in a recent sprint. Please re-verify.">
-          🔁 re-verify
-        </div>
+        canEdit && reverifySprint ? (
+          <button
+            disabled={reverifying}
+            onClick={async (e) => {
+              e.stopPropagation();
+              if (reverifying) return;
+              const ok = window.confirm(
+                `Mark this item as Pass after re-verifying against ${reverifySprint.buildRef ?? "the latest build"}?\n\n` +
+                `Sprint: ${reverifySprint.name}\n` +
+                `(You can still change this decision later.)`
+              );
+              if (!ok) return;
+              setReverifying(true);
+              try {
+                const note = `Re-verified after ${reverifySprint.name}${reverifySprint.buildRef ? ` (${reverifySprint.buildRef})` : ""}.`;
+                const previous = current?.comment ? `${current.comment}\n\n${note}` : note;
+                await api.signoff(slug, reqId, level, "accepted", previous, []);
+                onChanged();
+              } catch (err: any) {
+                alert(`Re-verify failed: ${err?.message ?? "please try again"}`);
+              } finally {
+                setReverifying(false);
+              }
+            }}
+            className="mt-1 inline-flex items-center gap-0.5 text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-indigo-100 text-indigo-800 border border-indigo-200 hover:bg-indigo-200 hover:border-indigo-400 disabled:opacity-50 transition whitespace-nowrap cursor-pointer"
+            title={`Click to mark Pass after re-verifying. Auto-comments "${reverifySprint.name}".`}>
+            {reverifying ? "saving…" : "🔁 re-verify ✓"}
+          </button>
+        ) : (
+          <div className="mt-1 inline-flex items-center gap-0.5 text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-indigo-100 text-indigo-800 border border-indigo-200 whitespace-nowrap"
+            title="This item was fixed in a recent sprint. Please re-verify.">
+            🔁 re-verify
+          </div>
+        )
       )}
       {open && canEdit && (
         <div ref={popoverRef}
@@ -994,6 +1549,27 @@ function SignoffCell({ slug, reqId, level, current, canEdit, onChanged, reverify
           <textarea value={comment} onChange={(e) => setComment(e.target.value)} onPaste={onPaste}
             placeholder="Comment (optional). You can paste a screenshot here (Cmd/Ctrl + V)."
             className="w-full border border-slate-200 rounded px-2 py-1 text-xs h-16" />
+
+          {/* One-click reasons — prepend a short tag into the comment so the
+              most-common rejection / partial verdicts don't need typing.
+              Reviewers can still edit the textarea after picking. */}
+          <div className="mt-1.5 flex flex-wrap gap-1">
+            {[
+              "Repro unclear",
+              "Works on my build",
+              "Wrong env / creds",
+              "Out of scope",
+              "Awaiting clarification",
+              "Needs re-test",
+            ].map((tag) => (
+              <button key={tag} type="button"
+                onClick={() => setComment((c: string) => c ? `${tag} — ${c}` : `${tag} — `)}
+                className="text-[10px] px-1.5 py-0.5 rounded border border-slate-200 text-slate-600 bg-white hover:border-agentryx-400 hover:text-agentryx-700 hover:bg-slate-50"
+                title={`Prefill comment with "${tag}"`}>
+                + {tag}
+              </button>
+            ))}
+          </div>
 
           {existingAttachments.length > 0 && (
             <div className="mt-2">
@@ -1229,6 +1805,31 @@ function CommentThread({ slug, reqId, canPost }: any) {
         </div>
       )}
     </div>
+  );
+}
+
+// Copy-link button on each row. Hidden until row hover (group/row hover) so
+// the matrix stays visually clean; on click, copies the absolute URL with a
+// `#row=<itemRef>` hash and flips to a check-mark for 1.5s as confirmation.
+function CopyRowLink({ itemRef }: { itemRef: string }) {
+  const [copied, setCopied] = useState(false);
+  function copy(e: React.MouseEvent) {
+    e.stopPropagation();
+    const url = `${window.location.origin}${window.location.pathname}#row=${encodeURIComponent(itemRef)}`;
+    navigator.clipboard.writeText(url).then(() => {
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1500);
+    }).catch(() => {
+      // Fallback: prompt so user can manually copy.
+      window.prompt("Copy this link:", url);
+    });
+  }
+  return (
+    <button onClick={copy}
+      className={`opacity-0 group-hover/row:opacity-100 focus:opacity-100 transition ${copied ? "text-emerald-600" : "text-slate-400 hover:text-agentryx-600"}`}
+      title={copied ? "Link copied!" : `Copy link to row ${itemRef}`}>
+      {copied ? <Check className="w-4 h-4 inline" /> : <Link2 className="w-4 h-4 inline" />}
+    </button>
   );
 }
 

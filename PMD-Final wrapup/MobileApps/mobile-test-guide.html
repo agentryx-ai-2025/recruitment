@@ -1,0 +1,671 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>HireStream Mobile App — Quick Testing Guide</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+  
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  
+  body {
+    font-family: 'Inter', -apple-system, sans-serif;
+    color: #1e293b;
+    line-height: 1.5;
+    font-size: 11px;
+  }
+  
+  .page {
+    width: 210mm;
+    min-height: 297mm;
+    padding: 18mm 20mm 15mm 20mm;
+    page-break-after: always;
+    position: relative;
+  }
+  .page:last-child { page-break-after: auto; }
+
+  /* Header bar */
+  .header {
+    background: linear-gradient(135deg, #7c3aed, #4f46e5);
+    color: white;
+    padding: 14px 20px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 18px;
+  }
+  .header-icon { font-size: 22px; }
+  .header h1 { font-size: 16px; font-weight: 800; letter-spacing: -0.3px; }
+  .header .sub { font-size: 9px; opacity: 0.8; margin-top: 2px; }
+
+  /* Version badge */
+  .badge {
+    display: inline-block;
+    background: rgba(255,255,255,0.2);
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 9px;
+    font-weight: 600;
+    margin-left: auto;
+  }
+
+  /* Section headers */
+  h2 {
+    font-size: 14px;
+    font-weight: 700;
+    color: #4f46e5;
+    margin: 16px 0 8px 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  h2 .num {
+    background: #4f46e5;
+    color: white;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 700;
+  }
+
+  h3 {
+    font-size: 12px;
+    font-weight: 700;
+    color: #334155;
+    margin: 12px 0 6px 0;
+  }
+
+  /* Steps */
+  .steps { margin: 8px 0; }
+  .step {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    margin-bottom: 6px;
+  }
+  .step-num {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #7c3aed;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    font-weight: 700;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+  .step-num.green { background: #059669; }
+  .step-text { font-size: 11px; }
+  .step-text strong { color: #1e293b; }
+
+  /* URL box */
+  .url-box {
+    background: #f5f3ff;
+    border: 2px dashed #a78bfa;
+    border-radius: 6px;
+    padding: 6px 12px;
+    text-align: center;
+    margin: 6px 0 4px 0;
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+    font-weight: 700;
+    color: #5b21b6;
+  }
+  .warning-text {
+    color: #dc2626;
+    font-size: 9px;
+    font-weight: 600;
+  }
+
+  /* Info boxes */
+  .info-box {
+    border-radius: 6px;
+    padding: 8px 12px;
+    font-size: 9px;
+    margin: 8px 0;
+    line-height: 1.5;
+  }
+  .info-blue { background: #eff6ff; border: 1px solid #bfdbfe; color: #1e40af; }
+  .info-amber { background: #fffbeb; border: 1px solid #fde68a; color: #92400e; }
+  .info-green { background: #ecfdf5; border: 1px solid #a7f3d0; color: #065f46; }
+
+  /* Screenshot grid */
+  .screenshots {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    margin: 10px 0;
+    align-items: flex-end;
+  }
+  .screenshot {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+  }
+  .screenshot img {
+    width: 90px;
+    height: auto;
+    border-radius: 6px;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  }
+  .screenshot .label {
+    font-size: 8px;
+    color: #64748b;
+    text-align: center;
+    font-weight: 600;
+  }
+  .screenshot .num-badge {
+    background: #ede9fe;
+    color: #7c3aed;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 8px;
+    font-weight: 700;
+  }
+
+  /* Two-column layout */
+  .two-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+  .col-box {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 12px 14px;
+  }
+  .col-box h3 {
+    margin-top: 0;
+    color: #4f46e5;
+  }
+
+  /* Credentials table */
+  .cred-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 10px;
+    margin: 8px 0;
+  }
+  .cred-table th {
+    background: #f1f5f9;
+    padding: 6px 10px;
+    text-align: left;
+    font-size: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #64748b;
+    border-bottom: 1px solid #e2e8f0;
+  }
+  .cred-table td {
+    padding: 6px 10px;
+    border-bottom: 1px solid #f1f5f9;
+  }
+  .cred-table tr.highlight td {
+    background: #ecfdf5;
+    font-weight: 600;
+  }
+  .mono { font-family: 'Courier New', monospace; font-size: 10px; }
+
+  /* Troubleshooting */
+  .trouble-item {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 6px;
+    font-size: 10px;
+  }
+  .trouble-q { font-weight: 700; color: #dc2626; min-width: 140px; }
+  .trouble-a { color: #334155; }
+
+  /* Footer */
+  .footer {
+    position: absolute;
+    bottom: 12mm;
+    left: 20mm;
+    right: 20mm;
+    display: flex;
+    justify-content: space-between;
+    font-size: 8px;
+    color: #94a3b8;
+    border-top: 1px solid #e2e8f0;
+    padding-top: 6px;
+  }
+
+  /* QR area */
+  .qr-section {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: #f5f3ff;
+    border: 1px solid #ddd6fe;
+    border-radius: 8px;
+    padding: 10px 14px;
+    margin: 10px 0;
+  }
+  .qr-section img {
+    width: 80px;
+    height: 80px;
+    border-radius: 6px;
+    border: 1px solid #ddd6fe;
+  }
+  .qr-info {
+    font-size: 10px;
+  }
+  .qr-info .title { font-weight: 700; color: #5b21b6; font-size: 11px; }
+  .qr-info .url { font-family: monospace; color: #7c3aed; font-size: 10px; }
+
+  /* Divider */
+  .divider {
+    border: none;
+    border-top: 1px solid #e2e8f0;
+    margin: 14px 0;
+  }
+
+  @media print {
+    body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+    .page { padding: 15mm 18mm 12mm 18mm; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════ PAGE 1: PORTAL NAVIGATION ═══════════════════════ -->
+<div class="page">
+  <div class="header" style="background: linear-gradient(135deg, #f59e0b, #ea580c);">
+    <span class="header-icon">🌐</span>
+    <div>
+      <h1>HireStream Mobile App — Quick Testing Guide</h1>
+      <div class="sub">HPSEDC Overseas Placement Portal · Android & iOS · v1.0</div>
+    </div>
+    <span class="badge">HTIS Testing</span>
+  </div>
+
+  <h2 style="color:#f59e0b;"><span class="num" style="background:#f59e0b;">1</span> Getting Started — Open the Verify Portal</h2>
+
+  <div class="steps">
+    <div class="step">
+      <span class="step-num" style="background:#f59e0b;">1</span>
+      <div class="step-text">
+        <strong>Open the Verify portal</strong> in your browser:
+        <div class="url-box" style="border-color:#fbbf24; background:#fffbeb; color:#92400e;">https://verify-stg.agentryx.dev</div>
+      </div>
+    </div>
+    <div class="step">
+      <span class="step-num" style="background:#f59e0b;">2</span>
+      <div class="step-text"><strong>You'll see "Projects under verification"</strong> — a list of projects to review. There are two project cards:</div>
+    </div>
+  </div>
+
+  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 8px 0;">
+    <!-- Card 1 -->
+    <div style="border: 2px solid #e2e8f0; border-radius: 8px; padding: 10px 14px; background: #f8fafc;">
+      <div style="display:inline-block; background:#dcfce7; color:#166534; font-size:8px; font-weight:700; padding:2px 8px; border-radius:10px; margin-bottom:6px;">START HERE</div>
+      <div style="font-size:12px; font-weight:700; color:#1e293b;">HireStream — HPSEDC Overseas Placement Portal</div>
+      <div style="font-size:9px; color:#64748b; margin-top:3px;">Web portal for overseas employment placement services</div>
+      <div style="font-size:8px; color:#94a3b8; margin-top:4px;">This is the <strong>web portal</strong> — review this first</div>
+    </div>
+    <!-- Card 2 -->
+    <div style="border: 3px solid #7c3aed; border-radius: 8px; padding: 10px 14px; background: #f5f3ff; position: relative;">
+      <div style="position:absolute; top:-8px; right:10px; background:#dc2626; color:white; font-size:8px; font-weight:700; padding:2px 10px; border-radius:10px;">👈 CLICK THIS ONE</div>
+      <div style="display:inline-block; background:#e0e7ff; color:#3730a3; font-size:8px; font-weight:700; padding:2px 8px; border-radius:10px; margin-bottom:6px;">STEP 2</div>
+      <div style="font-size:12px; font-weight:700; color:#1e293b;">HireStream Mobile — Android/iOS App v1.0</div>
+      <div style="font-size:9px; color:#64748b; margin-top:3px;">Android mobile application for HireStream. React Native + Expo.</div>
+      <div style="font-size:9px; color:#dc2626; margin-top:4px; font-weight:600;">🔧 47 need fixing</div>
+    </div>
+  </div>
+
+  <div class="steps" style="margin-top: 6px;">
+    <div class="step">
+      <span class="step-num" style="background:#f59e0b;">3</span>
+      <div class="step-text"><strong>Click the second card</strong> — "HireStream Mobile — Android/iOS App v1.0" to open the mobile testing project.</div>
+    </div>
+  </div>
+
+  <hr class="divider">
+
+  <h2 style="color:#7c3aed;"><span class="num" style="background:#7c3aed;">2</span> What You'll See — The Project Page</h2>
+
+  <div style="display: grid; grid-template-columns: 1fr auto; gap: 16px;">
+    <div>
+      <div style="font-size:10px; margin-bottom:8px; color:#334155;">After clicking the mobile project card, you'll land on this page. Here's what to look for:</div>
+
+      <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; padding:8px 12px; margin-bottom:6px;">
+        <div style="font-size:9px; font-weight:700; color:#7c3aed; margin-bottom:3px;">📊 Progress Overview</div>
+        <div style="font-size:9px; color:#475569;">Shows overall sign-off status: <strong>0 / 47 passed</strong> (starts at 0%). Split into <strong>Candidate (31)</strong> and <strong>Cross-cutting (16)</strong> sections.</div>
+      </div>
+
+      <div style="background:#f5f3ff; border:1px solid #ddd6fe; border-radius:6px; padding:8px 12px; margin-bottom:6px;">
+        <div style="font-size:9px; font-weight:700; color:#7c3aed; margin-bottom:3px;">📱 Mobile App Setup Guide</div>
+        <div style="font-size:9px; color:#475569;">Purple panel with <strong>Android / iOS / Test Accounts</strong> tabs. Follow these instructions to install and test the app on your phone.</div>
+      </div>
+
+      <div style="background:#ecfdf5; border:1px solid #a7f3d0; border-radius:6px; padding:8px 12px; margin-bottom:6px;">
+        <div style="font-size:9px; font-weight:700; color:#059669; margin-bottom:3px;">✅ Role Cards (below the setup guide)</div>
+        <div style="font-size:9px; color:#475569;">Click a <strong>role card</strong> → review requirements → click the <strong>signoff circle</strong> next to each → mark <strong>Pass / Partial / Fail</strong>.</div>
+      </div>
+    </div>
+    <div style="min-width:200px;">
+      <img src="file:///home/subhash.thakur.india/Projects/Recruitment/PMD-Final wrapup/MobileApps/verify-project.png" alt="Project page" style="width:200px; border-radius:8px; border:1px solid #e2e8f0; box-shadow:0 2px 8px rgba(0,0,0,0.1);">
+      <div style="text-align:center; font-size:8px; color:#94a3b8; margin-top:4px;">Project page after clicking</div>
+    </div>
+  </div>
+
+  <hr class="divider">
+
+  <h2 style="color:#059669;"><span class="num" style="background:#059669;">3</span> Testing Workflow Summary</h2>
+
+  <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;">
+    <div style="background:linear-gradient(135deg,#fef3c7,#fffbeb); border:1px solid #fde68a; border-radius:8px; padding:10px; text-align:center;">
+      <div style="font-size:18px; margin-bottom:4px;">🌐</div>
+      <div style="font-size:9px; font-weight:700; color:#92400e;">Step 1</div>
+      <div style="font-size:8px; color:#78350f; margin-top:2px;">Open Verify Portal<br><code style="font-size:7px;">verify-stg.agentryx.dev</code></div>
+    </div>
+    <div style="background:linear-gradient(135deg,#ede9fe,#f5f3ff); border:1px solid #ddd6fe; border-radius:8px; padding:10px; text-align:center;">
+      <div style="font-size:18px; margin-bottom:4px;">📱</div>
+      <div style="font-size:9px; font-weight:700; color:#5b21b6;">Step 2</div>
+      <div style="font-size:8px; color:#6d28d9; margin-top:2px;">Click Mobile project<br>Follow setup guide</div>
+    </div>
+    <div style="background:linear-gradient(135deg,#dbeafe,#eff6ff); border:1px solid #bfdbfe; border-radius:8px; padding:10px; text-align:center;">
+      <div style="font-size:18px; margin-bottom:4px;">🧪</div>
+      <div style="font-size:9px; font-weight:700; color:#1e40af;">Step 3</div>
+      <div style="font-size:8px; color:#1d4ed8; margin-top:2px;">Install Expo Go<br>Test the app</div>
+    </div>
+    <div style="background:linear-gradient(135deg,#dcfce7,#ecfdf5); border:1px solid #a7f3d0; border-radius:8px; padding:10px; text-align:center;">
+      <div style="font-size:18px; margin-bottom:4px;">✅</div>
+      <div style="font-size:9px; font-weight:700; color:#166534;">Step 4</div>
+      <div style="font-size:8px; color:#15803d; margin-top:2px;">Sign off each<br>requirement on portal</div>
+    </div>
+  </div>
+
+  <div class="info-green" style="margin-top:10px;">
+    <strong>📖 Next pages:</strong> Page 2 has detailed Android & iOS setup instructions with screenshots. Page 3 has test accounts, troubleshooting, and sign-off details.
+  </div>
+
+  <div class="footer">
+    <span>HireStream Mobile App · HPSEDC · Agentryx AI</span>
+    <span>Page 1 of 3</span>
+  </div>
+</div>
+
+<!-- ═══════════════════════ PAGE 2: APP SETUP ═══════════════════════ -->
+<div class="page">
+  <div class="header">
+    <span class="header-icon">📱</span>
+    <div>
+      <h1>Mobile App Setup — Android & iOS</h1>
+      <div class="sub">Install Expo Go · Connect to HireStream · Start testing</div>
+    </div>
+    <span class="badge">Page 2</span>
+  </div>
+
+  <h2><span class="num">A</span> Android Setup (Recommended)</h2>
+  
+  <div style="display: grid; grid-template-columns: 1fr auto; gap: 14px;">
+    <div>
+      <div class="steps">
+        <div class="step">
+          <span class="step-num">1</span>
+          <div class="step-text"><strong>Install "Expo Go"</strong> — Open <strong>Google Play Store</strong> → search "Expo Go" → Install. <span style="color:#94a3b8; font-size:9px;">(Free, ~60 MB)</span></div>
+        </div>
+        <div class="step">
+          <span class="step-num">2</span>
+          <div class="step-text"><strong>Open Expo Go</strong> → tap <strong>"Enter URL manually"</strong> or <strong>scan QR code →</strong> (scanning will start loading the app)</div>
+        </div>
+        <div class="step">
+          <span class="step-num">3</span>
+          <div class="step-text">
+            <strong>Enter this URL</strong> → tap Connect:
+            <div class="url-box">exps://hirestream-mobile.agentryx.dev</div>
+            <div class="warning-text">⚠️ Use exps:// not https://</div>
+          </div>
+        </div>
+        <div class="step">
+          <span class="step-num">4</span>
+          <div class="step-text"><strong>Wait 15–30s</strong> for the first load. Subsequent loads are faster.</div>
+        </div>
+        <div class="step">
+          <span class="step-num green">5</span>
+          <div class="step-text"><strong style="color:#059669;">Login</strong> — username <code class="mono" style="background:#ecfdf5; padding:1px 4px; border-radius:3px; color:#065f46;">mobiletest</code> · password <code class="mono" style="background:#ecfdf5; padding:1px 4px; border-radius:3px; color:#065f46;">Mobile@123</code></div>
+        </div>
+      </div>
+    </div>
+    <div class="qr-section" style="flex-direction: column; min-width: 110px;">
+      <div style="font-size:9px; font-weight:700; color:#5b21b6; margin-bottom:4px;">Scan to connect</div>
+      <img src="file:///home/subhash.thakur.india/Projects/Recruitment/agentryx-verify/client/public/qr-mobile.png" alt="QR" style="width:90px; height:90px;">
+      <div style="font-size:8px; color:#a78bfa; font-family:monospace; text-align:center; margin-top:4px;">exps://hirestream-mobile<br>.agentryx.dev</div>
+    </div>
+  </div>
+
+  <div class="info-amber">
+    <strong>Troubleshooting:</strong> Won't load? Close Expo Go & reopen. Login fails? Case-sensitive lowercase usernames. Slow? First load is 15–30s.
+  </div>
+
+  <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:10px 14px; margin-top:10px;">
+    <div style="font-size:9px; font-weight:600; color:#64748b; text-transform:uppercase; letter-spacing:0.5px; text-align:center; margin-bottom:8px;">What you'll see on Android</div>
+    <div class="screenshots">
+      <div class="screenshot">
+        <img src="file:///home/subhash.thakur.india/Projects/Recruitment/agentryx-verify/client/public/mobile-preview-1.png" alt="Expo Go">
+        <span class="num-badge">1</span>
+        <span class="label">Expo Go</span>
+      </div>
+      <div class="screenshot">
+        <img src="file:///home/subhash.thakur.india/Projects/Recruitment/agentryx-verify/client/public/mobile-preview-2.png" alt="Loading">
+        <span class="num-badge">2</span>
+        <span class="label">Loading</span>
+      </div>
+      <div class="screenshot">
+        <img src="file:///home/subhash.thakur.india/Projects/Recruitment/agentryx-verify/client/public/mobile-preview-3.png" alt="Home">
+        <span class="num-badge">3</span>
+        <span class="label">Home Screen</span>
+      </div>
+    </div>
+  </div>
+
+  <hr class="divider">
+
+  <h2><span class="num">B</span> iOS Setup (iPhone)</h2>
+
+  <div class="steps">
+    <div class="step">
+      <span class="step-num">1</span>
+      <div class="step-text"><strong>Install "Expo Go"</strong> — Open the <strong>App Store</strong> on your iPhone → search "Expo Go" → Install.</div>
+    </div>
+    <div class="step">
+      <span class="step-num">2</span>
+      <div class="step-text">
+        <strong>Open Safari</strong> (not Expo Go!) and <strong>manually type</strong> this URL in the address bar:
+        <div class="url-box">exps://hirestream-mobile.agentryx.dev</div>
+        <div class="warning-text">⚠️ Use exps:// not https:// · QR codes do NOT work on iOS — type the URL manually</div>
+      </div>
+    </div>
+    <div class="step">
+      <span class="step-num">3</span>
+      <div class="step-text"><strong>Tap "Open"</strong> when iOS asks <em>"Open this page in Expo Go?"</em> — the app will launch automatically.</div>
+    </div>
+    <div class="step">
+      <span class="step-num">4</span>
+      <div class="step-text"><strong>Wait 15–30s</strong> for the first load → <strong style="color:#059669;">Login</strong> with same credentials above.</div>
+    </div>
+  </div>
+
+  <div class="info-blue">
+    <strong>📌 Why Safari?</strong> iOS Expo Go does not have "Enter URL manually" like Android. Type the URL in Safari — iOS will automatically redirect to Expo Go.
+  </div>
+
+  <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:10px 14px; margin-top:8px;">
+    <div style="font-size:9px; font-weight:600; color:#64748b; text-transform:uppercase; letter-spacing:0.5px; text-align:center; margin-bottom:8px;">What you'll see on iPhone</div>
+    <div class="screenshots">
+      <div class="screenshot">
+        <img src="file:///home/subhash.thakur.india/Projects/Recruitment/agentryx-verify/client/public/ios-preview-1.png" alt="Expo Go" style="width:70px;">
+        <span class="num-badge">1</span>
+        <span class="label">Expo Go</span>
+      </div>
+      <div class="screenshot">
+        <img src="file:///home/subhash.thakur.india/Projects/Recruitment/agentryx-verify/client/public/ios-preview-2.png" alt="Safari" style="width:70px;">
+        <span class="num-badge">2</span>
+        <span class="label">Safari URL</span>
+      </div>
+      <div class="screenshot">
+        <img src="file:///home/subhash.thakur.india/Projects/Recruitment/agentryx-verify/client/public/ios-preview-3.png" alt="Open Dialog" style="width:70px;">
+        <span class="num-badge">3</span>
+        <span class="label">Tap Open</span>
+      </div>
+      <div class="screenshot">
+        <img src="file:///home/subhash.thakur.india/Projects/Recruitment/agentryx-verify/client/public/ios-preview-4.png" alt="Loading" style="width:70px;">
+        <span class="num-badge">4</span>
+        <span class="label">Loading</span>
+      </div>
+      <div class="screenshot">
+        <img src="file:///home/subhash.thakur.india/Projects/Recruitment/agentryx-verify/client/public/ios-preview-5.png" alt="Home" style="width:70px;">
+        <span class="num-badge">5</span>
+        <span class="label">Home</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <span>HireStream Mobile App · HPSEDC · Agentryx AI</span>
+    <span>Page 2 of 3</span>
+  </div>
+</div>
+
+<!-- ═══════════════════════ PAGE 2 ═══════════════════════ -->
+<div class="page">
+  <div class="header" style="background: linear-gradient(135deg, #059669, #0d9488);">
+    <span class="header-icon">🧪</span>
+    <div>
+      <h1>Test Accounts & Troubleshooting</h1>
+      <div class="sub">Login credentials · Common issues · Testing portal</div>
+    </div>
+  </div>
+
+  <h2 style="color:#059669;"><span class="num" style="background:#059669;">C</span> Test Accounts</h2>
+
+  <table class="cred-table">
+    <thead>
+      <tr>
+        <th>Username</th>
+        <th>Password</th>
+        <th>Profile</th>
+        <th>Best for testing</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr class="highlight">
+        <td class="mono">mobiletest</td>
+        <td class="mono">Mobile@123</td>
+        <td>Candidate</td>
+        <td>⭐ Start here</td>
+      </tr>
+      <tr>
+        <td class="mono">priya_verma</td>
+        <td class="mono">test123</td>
+        <td>100% complete</td>
+        <td>Full profile, accepted placement</td>
+      </tr>
+      <tr>
+        <td class="mono">meera_iyer</td>
+        <td class="mono">test123</td>
+        <td>88% complete</td>
+        <td>Missing documents</td>
+      </tr>
+      <tr>
+        <td class="mono">demo_candidate</td>
+        <td class="mono">test123</td>
+        <td>Basic</td>
+        <td>Fresh testing</td>
+      </tr>
+      <tr>
+        <td class="mono">rohan_mehta</td>
+        <td class="mono">test123</td>
+        <td>Basic</td>
+        <td>Alternate account</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="info-blue">
+    💡 Same database as web portal <code class="mono" style="background:#dbeafe; padding:1px 4px; border-radius:3px;">hirestream-stg.agentryx.dev</code> — changes on mobile are reflected on web and vice versa.
+  </div>
+
+  <hr class="divider">
+
+  <h2 style="color:#dc2626;"><span class="num" style="background:#dc2626;">D</span> Troubleshooting</h2>
+
+  <div style="background:#fef2f2; border:1px solid #fecaca; border-radius:8px; padding:12px 14px;">
+    <div class="trouble-item">
+      <span class="trouble-q">App won't load?</span>
+      <span class="trouble-a">Force-close Expo Go and reopen it. Ensure you're on WiFi, not cellular data.</span>
+    </div>
+    <div class="trouble-item">
+      <span class="trouble-q">Login fails?</span>
+      <span class="trouble-a">Usernames are <strong>case-sensitive lowercase</strong>. Use <code class="mono">mobiletest</code> not <code class="mono">MobileTest</code>.</span>
+    </div>
+    <div class="trouble-item">
+      <span class="trouble-q">Very slow loading?</span>
+      <span class="trouble-a">First load takes <strong>15–30 seconds</strong>. Subsequent loads are much faster (~3s).</span>
+    </div>
+    <div class="trouble-item">
+      <span class="trouble-q">iOS: QR code doesn't work?</span>
+      <span class="trouble-a"><strong>Expected.</strong> iOS does not support QR for Expo. Type the URL in Safari instead.</span>
+    </div>
+    <div class="trouble-item">
+      <span class="trouble-q">Red border on screen?</span>
+      <span class="trouble-a">This is an Expo Go dev-mode indicator. Ignore it — it won't appear in production.</span>
+    </div>
+    <div class="trouble-item">
+      <span class="trouble-q">"Network Error"?</span>
+      <span class="trouble-a">Check internet connection. The app connects to <code class="mono">hirestream-stg.agentryx.dev</code> backend.</span>
+    </div>
+  </div>
+
+  <hr class="divider">
+
+  <h2 style="color:#f59e0b;"><span class="num" style="background:#f59e0b;">E</span> Verify Portal — Sign-off Testing</h2>
+
+  <div class="two-col">
+    <div class="col-box">
+      <h3>📋 How to sign off requirements</h3>
+      <div class="steps" style="margin:4px 0;">
+        <div class="step"><span class="step-num" style="background:#f59e0b; width:16px; height:16px; font-size:8px;">1</span><div class="step-text" style="font-size:10px;">Go to <strong>verify-stg.agentryx.dev</strong></div></div>
+        <div class="step"><span class="step-num" style="background:#f59e0b; width:16px; height:16px; font-size:8px;">2</span><div class="step-text" style="font-size:10px;">Open <strong>HireStream Mobile v1.0</strong> project</div></div>
+        <div class="step"><span class="step-num" style="background:#f59e0b; width:16px; height:16px; font-size:8px;">3</span><div class="step-text" style="font-size:10px;">Click a <strong>role card</strong> (Candidate, Cross-cutting)</div></div>
+        <div class="step"><span class="step-num" style="background:#f59e0b; width:16px; height:16px; font-size:8px;">4</span><div class="step-text" style="font-size:10px;">Click the <strong>signoff circle</strong> → Pass / Partial / Fail</div></div>
+      </div>
+    </div>
+    <div class="col-box">
+      <h3>🔢 What to review</h3>
+      <div style="font-size:10px; margin-top:4px;">
+        <div style="margin-bottom:4px;"><strong>Candidate (§1):</strong> 31 requirements — job search, applications, profile, alerts, documents</div>
+        <div style="margin-bottom:4px;"><strong>Cross-cutting (§5–17):</strong> 16 requirements — auth, navigation, notifications, performance, security</div>
+        <div><strong>Total:</strong> <span style="color:#4f46e5; font-weight:700;">47 requirements</span> to sign off</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="info-green" style="margin-top:10px;">
+    <strong>💡 Tip:</strong> Use the "🔧 Needs fixing" filter on the Verify portal to see only items that need your attention. You can also submit feedback via the "💡 Suggest an idea" button.
+  </div>
+
+  <div class="footer">
+    <span>HireStream Mobile App · HPSEDC · Agentryx AI</span>
+    <span>Page 3 of 3</span>
+  </div>
+</div>
+
+</body>
+</html>

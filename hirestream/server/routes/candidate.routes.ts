@@ -4,7 +4,7 @@ import { validateRequest } from "../middleware/validate.middleware";
 import { storage } from "../storage";
 import { logger } from "../config/logger.config";
 import {
-  updateCandidateSchema, candidates, applications, jobs,
+  updateCandidateSchema, candidates, applications, jobs, users,
   candidateEducation, candidateExperience, documents,
   insertEducationSchema, insertExperienceSchema, placements, interviews,
 } from "@shared/schema";
@@ -28,7 +28,11 @@ router.get("/profile", protect, async (req, res, next) => {
         return res.status(404).json({ success: false, message: "Candidate profile not found" });
      }
      
-     res.json({ success: true, data: result[0] });
+     // Fetch username from users table
+     const userRow = await storage.db.select({ username: users.username }).from(users).where(eq(users.id, userId)).limit(1);
+     const username = userRow?.[0]?.username || null;
+     
+     res.json({ success: true, data: { ...result[0], username } });
   } catch (err) {
     logger.error(`Error fetching candidate profile: ${err}`);
     next(err);
@@ -80,6 +84,13 @@ router.patch("/profile", protect, async (req, res, next) => {
          .set(validatedData)
          .where(eq(candidates.userId, userId))
          .returning();
+
+     // If username was provided, also update the users table
+     if (req.body.username && typeof req.body.username === "string") {
+       await storage.db.update(users)
+         .set({ username: req.body.username.trim() })
+         .where(eq(users.id, userId));
+     }
 
      res.status(200).json({ success: true, data: updated[0] });
   } catch (err) {

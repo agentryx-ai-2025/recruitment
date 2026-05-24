@@ -1,6 +1,7 @@
 import express from 'express';
 import session from 'express-session';
 import { passport } from '../server/config/passport.config';
+import { mobileBearer } from '../server/middleware/mobileBearer.middleware';
 import { storage } from '../server/storage';
 import authRouter from '../server/routes/auth.routes';
 import candidateRouter from '../server/routes/candidate.routes';
@@ -19,6 +20,9 @@ import superadminRouter from '../server/routes/superadmin.routes';
 import superadminOpsRouter from '../server/routes/superadmin-ops.routes';
 import resumeParserRouter from '../server/routes/resume-parser.routes';
 import agentProductivityRouter from '../server/routes/agent-productivity.routes';
+import mobileAuthRouter from '../server/routes/mobile-auth.routes';
+import mobilePushRouter from '../server/routes/mobile-push.routes';
+import mobileConfigRouter from '../server/routes/mobile-config.routes';
 import { errorHandler } from '../server/middleware/errorHandler.middleware';
 import { sanitizeRequest } from '../server/middleware/sanitize.middleware';
 import {
@@ -28,6 +32,7 @@ import {
   recruitmentDrives, interviews, placements,
   grievances, auditLog, faq, announcements, trainingEvents,
   otpCodes, passwordResetTokens,
+  mobileRefreshTokens, mobilePushTokens,
 } from '../shared/schema';
 import { sql } from 'drizzle-orm';
 
@@ -50,6 +55,7 @@ export function createTestApp(): express.Express {
     })
   );
 
+  app.use(mobileBearer);
   app.use(passport.initialize());
   app.use(passport.session());
 
@@ -70,6 +76,10 @@ export function createTestApp(): express.Express {
   app.use('/api/v1/content', contentRouter);
   app.use('/api/v1/resume', resumeParserRouter);
   app.use('/api/v1/agent', agentProductivityRouter);
+  // Mobile API routes
+  app.use('/api/v1/mobile/auth', mobileAuthRouter);
+  app.use('/api/v1/mobile/push', mobilePushRouter);
+  app.use('/api/v1/mobile', mobileConfigRouter);
 
   app.use(errorHandler);
 
@@ -108,6 +118,8 @@ export async function truncateAllTables(): Promise<void> {
       employers,
       candidates,
       jobs,
+      mobile_refresh_tokens,
+      mobile_push_tokens,
       users
     CASCADE
   `);

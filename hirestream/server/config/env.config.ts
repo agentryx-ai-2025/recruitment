@@ -44,6 +44,19 @@ const envSchema = z.object({
   UPLOAD_DIR: z.string().default("/data/uploads"),
   MAX_FILE_SIZE_MB: z.string().transform(Number).default("5"),
 
+  // ── Mobile JWT Auth ──────────────────────────────────────────────
+  // Optional — only needed when mobile API surface is active.
+  JWT_SECRET: z.string().min(32).optional(),
+  JWT_ACCESS_TTL_SEC: z.string().transform(Number).default("900"),      // 15 min
+  JWT_REFRESH_TTL_SEC: z.string().transform(Number).default("2592000"), // 30 days
+  MOBILE_MIN_SUPPORTED_VERSION: z.string().default("1.0.0"),
+  MOBILE_LATEST_VERSION: z.string().default("1.0.0"),
+
+  // ── Firebase Cloud Messaging (push notifications) ────────────────
+  FCM_PROJECT_ID: z.string().optional(),
+  FCM_CLIENT_EMAIL: z.string().optional(),
+  FCM_PRIVATE_KEY: z.string().optional(),
+
   // ── Test ──────────────────────────────────────────────────────────
   TEST_DATABASE_URL: z.string().url().optional(),
 });
@@ -75,4 +88,6 @@ export const features = {
   himAccess: Boolean(env.HIM_ACCESS_CLIENT_ID),
   uidai: Boolean(env.UIDAI_API_ENDPOINT),
   digilocker: Boolean(env.DIGILOCKER_API_ENDPOINT),
+  mobileAuth: Boolean(env.JWT_SECRET),
+  fcm: Boolean(env.FCM_PROJECT_ID && env.FCM_CLIENT_EMAIL && env.FCM_PRIVATE_KEY),
 } as const;

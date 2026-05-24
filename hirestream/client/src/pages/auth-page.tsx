@@ -41,8 +41,8 @@ export default function AuthPage() {
 
         <div className="relative max-w-lg mx-auto">
           <div className="flex items-center gap-3 mb-8">
-            <div className="w-14 h-14 bg-white/10 backdrop-blur-sm border border-white/20 rounded-2xl flex items-center justify-center shadow-xl">
-              <Globe className="w-7 h-7" />
+            <div className="w-14 h-14 bg-white/10 backdrop-blur-sm border border-white/20 rounded-2xl flex items-center justify-center shadow-xl overflow-hidden">
+              <img src="/hpsedc-logo.png" alt="HPSEDC" className="w-12 h-12 object-contain" />
             </div>
             <div>
               <h1 className="text-2xl font-bold tracking-tight">HireStream</h1>
@@ -73,7 +73,7 @@ export default function AuthPage() {
 
           {/* Footer note */}
           <div className="mt-10 pt-6 border-t border-white/10 flex items-center gap-2 text-xs text-blue-200/80">
-            <Shield className="w-3.5 h-3.5" />
+            <img src="/hpsedc-logo.png" alt="HPSEDC" className="w-5 h-5 object-contain" />
             <span>A verified Government of Himachal Pradesh initiative</span>
           </div>
         </div>

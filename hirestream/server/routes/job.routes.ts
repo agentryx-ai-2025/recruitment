@@ -89,10 +89,18 @@ router.post("/", protect, async (req, res, next) => {
     // PWS §2: employer-posted jobs are requisitions (agents_only); agent-posted
     // are public by default unless a parentRequisitionId is being set (derivative).
     // Clients may also pass visibility/parentRequisitionId when cloning or drafting.
+    //
+    // HPSEDC tester report (2026-05-24): employer-posted public jobs were
+    // bypassing the agent middleman, producing orphan applications with no
+    // owner. FRS §2.2 mandates every candidate-facing job flow through an
+    // agent — so when role=employer, we hard-pin visibility to agents_only
+    // regardless of what the client sent. Agents keep the existing override
+    // freedom (drafts / public direct postings).
     const clientVisibility = (req.body?.visibility as string | undefined);
-    const defaultVisibility = userRole === "employer" ? "agents_only" : "public";
-    const visibility = clientVisibility === "agents_only" || clientVisibility === "public"
-      ? clientVisibility : defaultVisibility;
+    const visibility = userRole === "employer"
+      ? "agents_only"
+      : (clientVisibility === "agents_only" || clientVisibility === "public"
+          ? clientVisibility : "public");
 
     const newJob = await db.insert(jobs).values({
       ...validatedData,
@@ -776,6 +784,15 @@ router.post("/:id/apply", protect, async (req, res, next) => {
     }
 
     const job = jobResult[0];
+
+    // FRS visibility — candidates must never apply to agents_only requisitions
+    // even if they have the UUID (e.g. from an old link). Return the same 404
+    // shape as the list-side filter to avoid leaking the resource's existence.
+    // Mirrors the v0.8.6 fix on GET /jobs/:id. Caught one DB row where a
+    // candidate had applied to an agents_only "Riker" job on 2026-04-22.
+    if (job.visibility === "agents_only") {
+      return res.status(404).json({ success: false, error: { code: 404, message: "Job not found or inactive." } });
+    }
 
     // Duplicate check — same candidate + same job
     const existing = await db.select().from(applications)

@@ -392,6 +392,7 @@ function BasicInfoStep({ profile, onNext }: { profile: any; onNext: () => void }
   const [fullName, setFullName] = useState(profile.fullName || "");
   const [email, setEmail] = useState(profile.email || "");
   const [phone, setPhone] = useState(profile.phone || "");
+  const [username, setUsername] = useState(profile.username || "");
   const [addressLine1, setAddressLine1] = useState("");
   const [addressLine2, setAddressLine2] = useState("");
   const [city, setCity] = useState("");
@@ -403,6 +404,7 @@ function BasicInfoStep({ profile, onNext }: { profile: any; onNext: () => void }
     if (profile.fullName) setFullName(profile.fullName);
     if (profile.email) setEmail(profile.email);
     if (profile.phone) setPhone(profile.phone);
+    if (profile.username) setUsername(profile.username);
     if (profile.location) {
       const parts = profile.location.split(",").map((s: string) => s.trim());
       if (parts.length >= 2) { setDistrict(parts[0]); setState(parts[1]); }
@@ -425,7 +427,7 @@ function BasicInfoStep({ profile, onNext }: { profile: any; onNext: () => void }
       const res = await fetch("/api/v1/candidates/profile", {
         method: "PATCH", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          fullName, email, phone, location,
+          fullName, email, phone, location, username: username || undefined,
           addressLine1: addressLine1 || null,
           addressLine2: addressLine2 || null,
           city: city || null,
@@ -461,6 +463,14 @@ function BasicInfoStep({ profile, onNext }: { profile: any; onNext: () => void }
           <FormField label="Email" required icon={Mail}>
             <Input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@example.com"
               className="pl-11 h-12 rounded-xl border-blue-200/80 bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all" />
+          </FormField>
+          <FormField label="Username" icon={User} hint="Your unique login ID">
+            <Input
+              value={username}
+              onChange={e => setUsername(e.target.value)}
+              placeholder="e.g. mobiletest"
+              className="pl-11 h-12 rounded-xl border-blue-200/80 bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all"
+            />
           </FormField>
           <FormField label="Phone Number" icon={Phone} hint="Digits only (optionally with +country code, spaces, or dashes)">
             <Input

@@ -1,10 +1,24 @@
 import { Globe } from "lucide-react";
 import { useLocation } from "wouter";
 import { useTranslation } from "react-i18next";
+import { useQuery } from "@tanstack/react-query";
 
 export function Footer() {
   const [, setLocation] = useLocation();
   const { t } = useTranslation();
+  // Single source of truth — server reads /VERSION at boot and exposes it
+  // here. Bumping a release is `echo 0.4.2.0 > VERSION && pm2 restart`,
+  // no rebuild needed on the client.
+  const { data: verRes } = useQuery({
+    queryKey: ["/api/v1/version"],
+    queryFn: async () => {
+      const r = await fetch("/api/v1/version");
+      if (!r.ok) return { data: { version: "?.?.?.?" } };
+      return r.json();
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+  const appVersion: string = verRes?.data?.version ?? "?.?.?.?";
 
   return (
     <footer className="bg-gray-900 text-white mt-16">
@@ -16,8 +30,8 @@ export function Footer() {
                 <Globe className="w-4 h-4 text-white" />
               </div>
               <h3 className="text-lg font-bold">HireStream</h3>
-              <span className="text-[10px] font-mono text-gray-500 bg-gray-800/60 border border-gray-700 rounded px-1.5 py-0.5" title="Staging build — next UAT drop v0.8.0">
-                v0.4.0
+              <span className="text-[10px] font-mono text-gray-500 bg-gray-800/60 border border-gray-700 rounded px-1.5 py-0.5" title="Build version — read from /VERSION at server boot">
+                v{appVersion}
               </span>
             </div>
             <p className="text-gray-400 text-sm leading-relaxed">
