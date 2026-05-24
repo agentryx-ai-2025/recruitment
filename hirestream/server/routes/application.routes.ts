@@ -36,6 +36,32 @@ router.patch("/:id/status", protect, async (req, res, next) => {
     const [app] = await db.select().from(applications).where(eq(applications.id, req.params.id)).limit(1);
     if (!app) return res.status(404).json({ success: false, error: { code: 404, message: "Application not found" } });
 
+    // ── IDOR guard — agent/employer must own the application's job ────
+    // The bulk-status endpoint below filters by ownership; this single-
+    // status path was missing the same check, so any agent could PATCH any
+    // application's status by knowing its ID. Caught in the v0.4.4.0 self-
+    // audit (Cat B7). admin/superadmin bypass; candidates are already
+    // rejected by the role gate above.
+    if (user.role === "agent" || user.role === "employer") {
+      const [job] = await db.select().from(jobs).where(eq(jobs.id, app.jobId!)).limit(1);
+      if (!job) return res.status(404).json({ success: false, error: { code: 404, message: "Job not found" } });
+      const ownsDirect = (user.role === "agent" && job.agentId === user.id)
+        || (user.role === "employer" && job.employerId === user.id);
+      // Employer also "owns" derivative jobs created off their requisition.
+      let ownsViaParent = false;
+      if (!ownsDirect && user.role === "employer" && job.parentRequisitionId) {
+        const [parent] = await db.select({ employerId: jobs.employerId }).from(jobs)
+          .where(eq(jobs.id, job.parentRequisitionId)).limit(1);
+        ownsViaParent = !!parent && parent.employerId === user.id;
+      }
+      if (!ownsDirect && !ownsViaParent) {
+        return res.status(403).json({
+          success: false,
+          error: { code: 403, message: "You can only update applications on your own jobs." },
+        });
+      }
+    }
+
     // ── Consult runtime settings ──────────────────────────────────────
     const terminal: string[] = await getSetting("pipeline.terminal_states");
     const allowBackward: boolean = await getSetting("pipeline.allow_backward_transitions");
