@@ -62,12 +62,27 @@ beforeEach(async () => {
 
 describe('Phase 5 — Job lifecycle cron (PWS §4)', () => {
   async function createJobWithDeadline(deadlineISO: string | null, createdDaysAgo = 0): Promise<string> {
+    // Create the job through the API with a FUTURE deadline (or none), then
+    // age the deadline via direct SQL. The lifecycle cron is what we're
+    // testing; the create endpoint correctly rejects past-deadline payloads
+    // (HTIS BUG-008 fix in v0.4.3.0), so we mimic real aging here instead of
+    // submitting an invalid payload.
+    const futureDeadline = deadlineISO
+      ? new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0]
+      : null;
     const res = await request(app).post('/api/v1/jobs').set('Cookie', agentCookie).send({
       title: 'Lifecycle test', company: 'LifeCo', location: 'Dubai', country: 'UAE',
       description: 'lifecycle', experience: 1, requirements: [], skills: ['Test'],
-      ...(deadlineISO ? { hiringDeadline: deadlineISO } : {}),
+      ...(futureDeadline ? { hiringDeadline: futureDeadline } : {}),
     });
     const id = res.body.data.id;
+    if (deadlineISO) {
+      // Patch the deadline to whatever the test actually wanted (may be in
+      // the past). Goes around the validation layer because we're simulating
+      // the passage of time.
+      const db = getDb();
+      await db.execute(sql`UPDATE jobs SET hiring_deadline = ${deadlineISO} WHERE id = ${id}`);
+    }
     if (createdDaysAgo > 0) {
       const db = getDb();
       const past = new Date(Date.now() - createdDaysAgo * 86400000);

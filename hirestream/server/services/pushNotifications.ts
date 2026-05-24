@@ -78,7 +78,7 @@ export async function sendPushToUser(
     }
 
     // Build Expo push messages
-    const messages: ExpoPushMessage[] = tokens.map((t) => ({
+    const messages: ExpoPushMessage[] = tokens.map((t: any) => ({
       to: t.token,
       title: payload.title,
       body: payload.body,

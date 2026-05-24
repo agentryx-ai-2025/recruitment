@@ -90,6 +90,30 @@ function verifyMagicBytes(filePath: string, mimeType: string): boolean {
   }
 }
 
+// Multer error → clean HTTP response. Mount on a route that uses upload.* as
+// the LAST middleware so it catches LIMIT_FILE_SIZE / file-filter Errors that
+// otherwise bubble to the global handler as a 500. Used by routes that mount
+// `upload.single("file")` etc.
+export function handleUploadErrors(err: any, _req: Request, res: Response, next: NextFunction) {
+  if (!err) return next();
+  // multer.MulterError instances have a stable `code`
+  if (err.code === "LIMIT_FILE_SIZE") {
+    return res.status(413).json({
+      success: false,
+      error: { code: 413, message: `File too large. Limit is ${Math.round(MAX_SIZE / 1024 / 1024)} MB.` },
+    });
+  }
+  if (err.code === "LIMIT_UNEXPECTED_FILE") {
+    return res.status(400).json({ success: false, error: { code: 400, message: `Unexpected upload field.` } });
+  }
+  // fileFilter throws a bare Error("File type not allowed…") — recognised by
+  // message prefix since multer doesn't tag those with a stable code.
+  if (typeof err.message === "string" && err.message.startsWith("File type not allowed")) {
+    return res.status(400).json({ success: false, error: { code: 400, message: err.message } });
+  }
+  return next(err);
+}
+
 export function verifyUploadedFile(req: Request, res: Response, next: NextFunction) {
   const file = req.file;
   if (!file) return next();

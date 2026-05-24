@@ -3,7 +3,7 @@ import path from "path";
 import fs from "fs/promises";
 import { storage } from "../storage";
 import { protect } from "../middleware/auth.middleware";
-import { upload, UPLOAD_DIR, HS_DOCS_DIR, verifyUploadedFile } from "../middleware/upload.middleware";
+import { upload, UPLOAD_DIR, HS_DOCS_DIR, verifyUploadedFile, handleUploadErrors } from "../middleware/upload.middleware";
 import { documents, candidates, applications, jobs } from "@shared/schema";
 import { eq, and } from "drizzle-orm";
 import { logger } from "../config/logger.config";
@@ -193,5 +193,10 @@ router.delete("/:id", async (req, res, next) => {
     next(error);
   }
 });
+
+// Catch multer-specific errors (LIMIT_FILE_SIZE → 413; file-filter type
+// rejection → 400) before they hit the global handler as 500s. Registered
+// last so it sees errors from every upload route in this router.
+router.use(handleUploadErrors);
 
 export default router;

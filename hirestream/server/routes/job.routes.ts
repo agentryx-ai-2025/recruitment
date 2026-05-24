@@ -59,7 +59,18 @@ router.post("/", protect, async (req, res, next) => {
 
     const isDraft = req.body?.isDraft === true;
     const { isDraft: _discard, ...payload } = req.body ?? {};
-    const validatedData = isDraft ? draftJobSchema.parse(payload) : insertJobSchema.parse(payload);
+    // safeParse so Zod issues surface as a clean 400 with the first
+    // field-level message — `.parse()` threw and the global handler turned it
+    // into a 500 with a JSON-stringified blob, which the HTIS regression
+    // caught on BUG-008's past-date rejection.
+    const parsed = isDraft ? draftJobSchema.safeParse(payload) : insertJobSchema.safeParse(payload);
+    if (!parsed.success) {
+      return res.status(400).json({
+        success: false,
+        error: { code: 400, message: parsed.error.issues[0]?.message ?? "Invalid input", issues: parsed.error.issues },
+      });
+    }
+    const validatedData = parsed.data;
 
     // PWS §7 / Tier 3: cap drafts per user to prevent sprawl
     if (isDraft) {
