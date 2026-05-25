@@ -59,8 +59,14 @@ export default function RegisterScreen({ onNavigateLogin }: RegisterScreenProps)
     if (!fullName.trim()) e.fullName = "Full name is required";
     if (!email.trim()) e.email = "Email is required";
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) e.email = "Invalid email format";
+    // Match the server-side rules in shared/validators.ts so the user gets
+    // immediate, specific feedback instead of a generic 400 from the API.
     if (!password) e.password = "Password is required";
-    else if (password.length < 6) e.password = "Password must be at least 6 characters";
+    else if (password.length < 8) e.password = "Password must be at least 8 characters";
+    else if (!/[A-Z]/.test(password)) e.password = "Password must contain at least one uppercase letter";
+    else if (!/[a-z]/.test(password)) e.password = "Password must contain at least one lowercase letter";
+    else if (!/[0-9]/.test(password)) e.password = "Password must contain at least one digit";
+    else if (!/[^A-Za-z0-9]/.test(password)) e.password = "Password must contain at least one special character (e.g. ! @ # $)";
     if (password !== confirmPassword) e.confirmPassword = "Passwords do not match";
     setErrors(e);
     return Object.keys(e).length === 0;
@@ -157,10 +163,15 @@ export default function RegisterScreen({ onNavigateLogin }: RegisterScreenProps)
             keyboardType: "phone-pad",
           })}
           {renderInput("Password", password, setPassword, "lock-closed-outline", {
-            placeholder: "Minimum 6 characters",
+            placeholder: "At least 8 characters",
             error: errors.password,
             secure: true,
           })}
+          {/* Policy hint — visible to the user before they hit submit so we
+           *  don't end up with the "Validation Error" pop-up after the fact. */}
+          <Text style={styles.passwordHint}>
+            Must include: 8+ chars · uppercase · lowercase · digit · special character (e.g. ! @ # $)
+          </Text>
           {renderInput("Confirm Password", confirmPassword, setConfirmPassword, "lock-closed-outline", {
             placeholder: "Re-enter password",
             error: errors.confirmPassword,
@@ -228,6 +239,7 @@ const styles = StyleSheet.create({
   input: { flex: 1, fontSize: fontSize.md, color: colors.text, height: "100%" },
   eyeButton: { padding: spacing.sm },
   errorText: { fontSize: fontSize.xs, color: colors.error, marginTop: spacing.xs },
+  passwordHint: { fontSize: fontSize.xs, color: colors.textTertiary, marginTop: -spacing.sm, marginBottom: spacing.sm, lineHeight: 16 },
   submitButton: {
     backgroundColor: colors.primary, height: 52, borderRadius: radius.md,
     alignItems: "center", justifyContent: "center", marginTop: spacing.sm,
