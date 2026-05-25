@@ -1515,12 +1515,34 @@ function GrievanceCard({ grievance: g }: { grievance: any }) {
         <div>
           <h4 className="font-medium text-gray-900">{g.subject}</h4>
           <p className="text-sm text-gray-500 mt-1">{g.description}</p>
-          <div className="flex gap-2 mt-2">
+          <div className="flex gap-2 mt-2 flex-wrap">
             <Badge variant="outline" className="text-xs capitalize">{g.category?.replace(/_/g, " ")}</Badge>
             <Badge className={`text-xs ${g.status === "resolved" ? "bg-emerald-600" : g.status === "under_review" ? "bg-blue-600" : "bg-orange-500"} text-white`}>
               {g.status?.replace(/_/g, " ")}
             </Badge>
+            {/* Submitter + owner badges — surfaces the auto-routing decision
+             *  so admins can see at a glance who's expected to act. The
+             *  "Unassigned" badge highlights the admin-queue bucket. */}
+            {g.submitter && (
+              <Badge variant="outline" className="text-xs bg-slate-50 text-slate-700">
+                From: <span className="font-semibold ml-1">{g.submitter.username}</span>
+                <span className="text-slate-500 ml-1">({g.submitter.role})</span>
+              </Badge>
+            )}
+            {g.owner ? (
+              <Badge variant="outline" className="text-xs bg-indigo-50 text-indigo-700 border-indigo-200">
+                Assigned to: <span className="font-semibold ml-1">{g.owner.username}</span>
+                <span className="text-indigo-500 ml-1">({g.owner.role})</span>
+              </Badge>
+            ) : (
+              <Badge variant="outline" className="text-xs bg-amber-50 text-amber-700 border-amber-200">
+                Unassigned — admin queue
+              </Badge>
+            )}
           </div>
+          {g.adminNotes && (
+            <p className="text-[11px] text-slate-400 mt-1 italic">{g.adminNotes}</p>
+          )}
         </div>
         <div className="flex flex-col gap-1 items-end">
           <span className="text-xs text-gray-400">{g.createdAt ? new Date(g.createdAt).toLocaleDateString("en-IN") : ""}</span>
