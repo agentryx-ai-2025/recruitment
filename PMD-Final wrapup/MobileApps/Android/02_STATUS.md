@@ -2,7 +2,9 @@
 
 > **For any agent / engineer reading this:** this file is your context-pickup point. Read it first. It should reflect reality within the last 24 hours of work. If it doesn't, fix it before doing anything else.
 
-**Last updated:** 2026-05-12T18:50Z · **Updated by:** Antigravity + Subhash · **Build version:** dev-0.4.1 (auth sync + env sync)
+**Last updated:** 2026-05-25 · **Updated by:** Claude + Subhash · **Build version:** dev-0.4.1 (no mobile-app code change; backend portal at v0.4.7.0)
+
+> **Backend-side updates that affect mobile (May 21–25):** the portal shipped v0.4.1.0 → v0.4.7.0. Most relevant for mobile: the `/api/v1/me/photo` endpoint now returns clean **413** "File too large. Limit is 5 MB." (was opaque 500 — mobile error UI should re-test); the `PATCH /applications/:id/status` IDOR was patched (agents now correctly get 403 when actioning other-agency apps); workflow integrity tightened so employer-posted jobs are always `agents_only` (mobile candidate browse should never see them); upload error responses across `/api/v1/candidates/documents` are now 400/413, never 500. No mobile-side code changes were required — but a mobile QA pass against the live `hirestream-stg.agentryx.dev` is worth doing before the next mobile build.
 
 ---
 
@@ -36,6 +38,7 @@
 
 | Date | Feature | Build | Notes |
 |---|---|---|---|
+| 2026-05-25 | _(no mobile change)_ — Backend portal at v0.4.7.0 | hirestream@0.4.7.0 | Photo upload returns clean 413 (was 500), IDOR patched, employer-public jobs blocked, photo avatar consistent across listings. Worth a mobile QA pass before next mobile build — see `PMD-Final wrapup/ContextTL/01_Baseline_Context_v0.4.7.md` |
 | 2026-05-12 | Environment Sync (DEV/STG) | dev-0.4.1 | Pointed mobile app to `hirestream.agentryx.dev` so mobile & portal share the same 100% synced DB |
 | 2026-05-12 | Universal Login (Email/Username) | hirestream@1.1.1 | Updated backend `getUserByUsername` to universally accept either email or username |
 | 2026-05-12 | F5.3–F5.5, F5.7 — Document upload flow | dev-0.4.0 | Gallery/Camera pickers, 5MB limit, multipart upload, view/delete |
