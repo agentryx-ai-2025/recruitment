@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { MessageSquare, Plus, Clock, CheckCircle, AlertCircle, Loader2 } from "lucide-react";
+import { MessageSquare, Plus, Clock, CheckCircle, AlertCircle, Loader2, Inbox, ShieldCheck } from "lucide-react";
 import { FIELD_LIMITS } from "@/lib/reference-data";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -27,9 +27,71 @@ export default function GrievancePage() {
   const [description, setDescription] = useState("");
   const { t } = useTranslation();
 
-  const { data: grievanceRes, isLoading } = useQuery({
+  // The page used to call /grievances/my for everyone — which meant agents
+  // and admins (who don't normally submit grievances) saw an empty page even
+  // when they had work assigned to them. v0.4.9.0: role-aware tabs.
+  //   - everyone:                "My Grievances"          (/grievances/my)
+  //   - any role:                "Assigned to me"         (/grievances/assigned-to-me)
+  //   - admin / superadmin only: "All grievances"         (/grievances)
+  const isAdmin = user?.role === "admin" || user?.role === "superadmin";
+  const TAB_MY = "mine";
+  const TAB_ASSIGNED = "assigned";
+  const TAB_ALL = "all";
+  const [tab, setTab] = useState<string>(isAdmin ? TAB_ALL : TAB_MY);
+
+  const { data: myRes, isLoading: myLoading } = useQuery({
     queryKey: ["/api/v1/grievances/my"],
     queryFn: () => fetchJson("/api/v1/grievances/my"),
+  });
+  const { data: assignedRes, isLoading: assignedLoading } = useQuery({
+    queryKey: ["/api/v1/grievances/assigned-to-me"],
+    queryFn: () => fetchJson("/api/v1/grievances/assigned-to-me"),
+    enabled: !!user,   // any logged-in role can have things assigned
+  });
+  const { data: allRes, isLoading: allLoading } = useQuery({
+    queryKey: ["/api/v1/grievances"],
+    queryFn: () => fetchJson("/api/v1/grievances"),
+    enabled: isAdmin,  // god-view only fetched for admins
+  });
+
+  const myList = myRes?.data || [];
+  const assignedList = assignedRes?.data || [];
+  const allList = allRes?.data || [];
+
+  const active =
+    tab === TAB_ASSIGNED ? assignedList :
+    tab === TAB_ALL ? allList :
+    myList;
+  const isLoading =
+    tab === TAB_ASSIGNED ? assignedLoading :
+    tab === TAB_ALL ? allLoading :
+    myLoading;
+
+  // Status-update mutation — visible only on the assigned-to-me tab so an
+  // owner (agent / Agentryx delivery / admin) can move a grievance through
+  // the lifecycle from this page instead of hopping to the admin panel.
+  const updateStatus = useMutation({
+    mutationFn: async ({ id, status, resolutionNotes }: any) => {
+      const body: any = { status };
+      if (resolutionNotes) body.resolutionNotes = resolutionNotes;
+      const r = await fetch(`/api/v1/grievances/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!r.ok) {
+        const e = await r.json().catch(() => ({}));
+        throw new Error(e?.error?.message || e?.message || `Update failed (${r.status})`);
+      }
+      return r.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/v1/grievances/assigned-to-me"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/v1/grievances"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/v1/grievances/my"] });
+      toast({ title: "Updated" });
+    },
+    onError: (e: any) => toast({ title: "Couldn't update", description: e.message, variant: "destructive" }),
   });
 
   const submitMutation = useMutation({
@@ -58,7 +120,7 @@ export default function GrievancePage() {
     },
   });
 
-  const grievances = grievanceRes?.data || [];
+  const grievances = active;
 
   const statusIcon = (status: string) => {
     switch (status) {
@@ -152,6 +214,40 @@ export default function GrievancePage() {
         </div>
       )}
 
+      {/* Tab strip — only show tabs the user can use. Candidates with no
+       *  assigned items get the "My" tab only; agents/admins get the
+       *  full set. Counts give a quick at-a-glance feel for queue size. */}
+      <div className="flex gap-1 mb-5 border-b border-slate-200">
+        <button
+          onClick={() => setTab(TAB_MY)}
+          className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition ${tab === TAB_MY ? "border-blue-600 text-blue-700" : "border-transparent text-slate-500 hover:text-slate-700"}`}
+        >
+          <Inbox className="w-4 h-4 inline mr-1.5 -mt-0.5" />
+          My Grievances
+          <span className="ml-2 text-xs text-slate-400">({myList.length})</span>
+        </button>
+        {assignedList.length > 0 && (
+          <button
+            onClick={() => setTab(TAB_ASSIGNED)}
+            className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition ${tab === TAB_ASSIGNED ? "border-blue-600 text-blue-700" : "border-transparent text-slate-500 hover:text-slate-700"}`}
+          >
+            <MessageSquare className="w-4 h-4 inline mr-1.5 -mt-0.5" />
+            Assigned to me
+            <span className="ml-2 text-xs text-amber-600 font-semibold">({assignedList.length})</span>
+          </button>
+        )}
+        {isAdmin && (
+          <button
+            onClick={() => setTab(TAB_ALL)}
+            className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition ${tab === TAB_ALL ? "border-blue-600 text-blue-700" : "border-transparent text-slate-500 hover:text-slate-700"}`}
+          >
+            <ShieldCheck className="w-4 h-4 inline mr-1.5 -mt-0.5" />
+            All grievances
+            <span className="ml-2 text-xs text-slate-400">({allList.length})</span>
+          </button>
+        )}
+      </div>
+
       {/* Grievance List */}
       {isLoading ? (
         <div className="space-y-4">
@@ -161,41 +257,99 @@ export default function GrievancePage() {
       ) : grievances.length === 0 ? (
         <div className="text-center py-16 text-gray-500 bg-white rounded-lg shadow-sm">
           <MessageSquare className="w-16 h-16 mx-auto mb-4 opacity-30" />
-          <p className="text-lg font-medium">No grievances submitted</p>
-          <p className="text-sm mt-1">Click "New Grievance" if you have an issue to report</p>
+          <p className="text-lg font-medium">
+            {tab === TAB_ASSIGNED ? "Nothing assigned to you"
+              : tab === TAB_ALL ? "No grievances in the system"
+              : "No grievances submitted"}
+          </p>
+          <p className="text-sm mt-1">
+            {tab === TAB_MY ? 'Click "New Grievance" if you have an issue to report' :
+             tab === TAB_ASSIGNED ? "Grievances routed to you will appear here." :
+             "When candidates submit complaints, they'll appear here for triage."}
+          </p>
         </div>
       ) : (
         <div className="space-y-4">
-          {grievances.map((g: any) => (
-            <div key={g.id} className="bg-white rounded-lg shadow-sm border p-5">
-              <div className="flex items-start justify-between">
-                <div className="flex items-start gap-3">
-                  {statusIcon(g.status)}
-                  <div>
-                    <h4 className="font-medium text-gray-900">{g.subject}</h4>
-                    <p className="text-sm text-gray-500 mt-1">{g.description}</p>
-                    <div className="flex items-center gap-2 mt-2">
-                      <Badge variant="outline" className="text-xs capitalize">{g.category?.replace(/_/g, ' ')}</Badge>
-                      <Badge className={`text-xs ${statusColor(g.status)}`}>{g.status?.replace(/_/g, ' ')}</Badge>
-                      <span className="text-xs text-gray-400">{g.createdAt ? new Date(g.createdAt).toLocaleDateString('en-IN') : ''}</span>
+          {grievances.map((g: any) => {
+            // I'm the owner of this row if my user.id matches assigned_to.
+            // Owner sees inline status-change actions; non-owners just read.
+            // (Admin/superadmin always sees actions via the All tab anyway,
+            //  since they have full PATCH rights.)
+            const iAmOwner = !!user && g.assignedTo === user.id;
+            const canAct = (iAmOwner || isAdmin) && g.status !== "resolved";
+            return (
+              <div key={g.id} className="bg-white rounded-lg shadow-sm border p-5">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex items-start gap-3 min-w-0 flex-1">
+                    {statusIcon(g.status)}
+                    <div className="min-w-0 flex-1">
+                      <h4 className="font-medium text-gray-900">{g.subject}</h4>
+                      <p className="text-sm text-gray-500 mt-1 whitespace-pre-wrap">{g.description}</p>
+                      <div className="flex items-center gap-2 mt-2 flex-wrap">
+                        <Badge variant="outline" className="text-xs capitalize">{g.category?.replace(/_/g, ' ')}</Badge>
+                        <Badge className={`text-xs ${statusColor(g.status)}`}>{g.status?.replace(/_/g, ' ')}</Badge>
+                        <span className="text-xs text-gray-400">{g.createdAt ? new Date(g.createdAt).toLocaleDateString('en-IN') : ''}</span>
+                        {/* Show submitter + owner on the admin/assigned tabs so the operator
+                         *  can see who's complaining and who's responsible without clicking in. */}
+                        {tab !== TAB_MY && g.submitter && (
+                          <span className="text-[11px] text-slate-500">
+                            from <span className="font-semibold">{g.submitter.username}</span> ({g.submitter.role})
+                          </span>
+                        )}
+                        {tab !== TAB_MY && (g.owner ? (
+                          <span className="text-[11px] text-indigo-600">
+                            → <span className="font-semibold">{g.owner.username}</span> ({g.owner.role})
+                          </span>
+                        ) : (
+                          <span className="text-[11px] text-amber-600">→ admin queue</span>
+                        ))}
+                      </div>
                     </div>
                   </div>
+                  {canAct && (
+                    <div className="flex flex-col gap-1 shrink-0">
+                      {g.status === "submitted" && (
+                        <Button size="sm" variant="outline" className="text-xs h-7"
+                          disabled={updateStatus.isPending}
+                          onClick={() => updateStatus.mutate({ id: g.id, status: "under_review" })}>
+                          Start Review
+                        </Button>
+                      )}
+                      {g.status === "under_review" && (
+                        <Button size="sm" variant="outline" className="text-xs h-7"
+                          disabled={updateStatus.isPending}
+                          onClick={() => updateStatus.mutate({ id: g.id, status: "action_taken" })}>
+                          Action Taken
+                        </Button>
+                      )}
+                      <Button size="sm" className="bg-emerald-600 text-white text-xs h-7"
+                        disabled={updateStatus.isPending}
+                        onClick={() => {
+                          const note = window.prompt("Resolution note (visible to the submitter):", "");
+                          if (note !== null && note.trim().length > 0) {
+                            updateStatus.mutate({ id: g.id, status: "resolved", resolutionNotes: note.trim() });
+                          }
+                        }}>
+                        Resolve
+                      </Button>
+                    </div>
+                  )}
                 </div>
+                {g.resolutionNotes && (
+                  <div className="mt-3 bg-emerald-50 border border-emerald-200 p-3 rounded text-sm">
+                    <p className="font-medium text-emerald-800">Resolution:</p>
+                    <p className="text-emerald-700 mt-1 whitespace-pre-wrap">{g.resolutionNotes}</p>
+                  </div>
+                )}
+                {g.adminNotes && !g.resolutionNotes && tab !== TAB_MY && (
+                  <div className="mt-3 bg-blue-50 border border-blue-200 p-3 rounded text-sm">
+                    <p className="font-medium text-blue-800">Internal Note:</p>
+                    <p className="text-blue-700 mt-1">{g.adminNotes}</p>
+                  </div>
+                )}
               </div>
-              {g.resolutionNotes && (
-                <div className="mt-3 bg-emerald-50 border border-emerald-200 p-3 rounded text-sm">
-                  <p className="font-medium text-emerald-800">Admin Resolution:</p>
-                  <p className="text-emerald-700 mt-1">{g.resolutionNotes}</p>
-                </div>
-              )}
-              {g.adminNotes && !g.resolutionNotes && (
-                <div className="mt-3 bg-blue-50 border border-blue-200 p-3 rounded text-sm">
-                  <p className="font-medium text-blue-800">Admin Note:</p>
-                  <p className="text-blue-700 mt-1">{g.adminNotes}</p>
-                </div>
-              )}
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
