@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
+import { PhotoAvatar } from "@/components/shared/PhotoAvatar";
 import {
   ArrowLeft, Loader2, CheckCircle, XCircle, Star, Users, MessageSquare,
   ArrowRight, Briefcase, MapPin, Calendar, AlertCircle, Eye, Award,
@@ -385,9 +386,8 @@ function CandidateReviewCard({ app, selected, onToggleSelect, onApprove, onReque
           className="mt-3 w-4 h-4 rounded border-slate-300 text-purple-600 focus:ring-purple-500"
           title="Select for comparison" />
         <Link href={`/agent/candidates/${c.id}`} className="flex items-start gap-3 min-w-0 flex-1 group">
-          <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-purple-500 to-indigo-700 text-white text-lg font-bold flex items-center justify-center shrink-0">
-            {(c.fullName || "?").split(/\s+/).slice(0, 2).map((w: string) => w[0]).join("").toUpperCase()}
-          </div>
+          <PhotoAvatar photoUrl={c.photoUrl} name={c.fullName || "?"}
+            size="w-14 h-14" rounded="rounded-xl" textSize="text-lg" />
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 flex-wrap">
               <p className="text-base font-bold text-slate-900 group-hover:text-purple-700">{c.fullName}</p>
@@ -485,9 +485,8 @@ function CompareModal({ open, onClose, candidates }: { open: boolean; onClose: (
             <div />
             {candidates.map((a) => (
               <div key={a.applicationId} className="bg-purple-50/50 rounded-lg p-3 border border-purple-100">
-                <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-purple-500 to-indigo-700 text-white text-xs font-bold flex items-center justify-center mb-2">
-                  {(a.candidate.fullName || "?").split(/\s+/).slice(0, 2).map((w: string) => w[0]).join("").toUpperCase()}
-                </div>
+                <PhotoAvatar photoUrl={a.candidate.photoUrl} name={a.candidate.fullName || "?"}
+                  size="w-10 h-10" rounded="rounded-lg" textSize="text-xs" className="mb-2" />
                 <p className="text-sm font-bold text-slate-900">{a.candidate.fullName}</p>
                 <Badge variant="outline" className={`text-[10px] mt-1 ${a.matchScore >= 80 ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-amber-50 text-amber-700 border-amber-200"}`}>
                   {a.matchScore}% match

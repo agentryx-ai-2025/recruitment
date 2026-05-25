@@ -12,6 +12,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Loader2, Filter, Users, ArrowLeft, Briefcase, MapPin } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { PhotoAvatar } from "@/components/shared/PhotoAvatar";
 
 type Applicant = {
   applicationId: string;
@@ -262,9 +263,8 @@ export default function AgentApplicantsPage() {
                   <div className="flex items-start gap-4 flex-wrap">
                     <Link href={`/agent/candidates/${a.candidate.id}`}
                       className="flex items-center gap-3 min-w-0 flex-1 group cursor-pointer">
-                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-700 text-white text-xs font-bold flex items-center justify-center shrink-0">
-                        {(a.candidate.fullName || "?").split(/\s+/).slice(0, 2).map((w) => w[0]).join("").toUpperCase()}
-                      </div>
+                      <PhotoAvatar photoUrl={a.candidate.photoUrl} name={a.candidate.fullName || "?"}
+                        size="w-10 h-10" rounded="rounded-xl" textSize="text-xs" />
                       <div className="min-w-0">
                         <p className="text-sm font-bold text-slate-900 group-hover:text-blue-700 truncate">{a.candidate.fullName}</p>
                         <p className="text-xs text-slate-500 truncate flex items-center gap-1">

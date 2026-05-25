@@ -20,6 +20,7 @@ import { ApplicantManager } from "@/components/agent/applicant-manager";
 import { DriveCreationForm } from "@/components/agent/drive-form";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Mail, Phone, GraduationCap, Award } from "lucide-react";
+import { PhotoAvatar } from "@/components/shared/PhotoAvatar";
 
 async function fetchJson(url: string) {
   const res = await fetch(url);
@@ -657,13 +658,8 @@ function CandidatesContent({ candidates, candidateTotal, loading, searchSkill, s
             <div key={c.id} onClick={() => setLocation(`/agent/candidates/${c.id}`)}
               className="border border-slate-100 rounded-xl p-4 flex items-start justify-between hover:shadow-md hover:border-slate-300 transition-all cursor-pointer group">
               <div className="flex items-start gap-3 min-w-0 flex-1">
-                {c.photoUrl ? (
-                  <img src={c.photoUrl} alt={c.fullName || ""}
-                    className="w-9 h-9 rounded-xl object-cover flex-shrink-0 shadow bg-slate-100"
-                    onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
-                ) : (
-                  <InitialsAvatar name={c.fullName || "?"} size="w-9 h-9" />
-                )}
+                <PhotoAvatar photoUrl={c.photoUrl} name={c.fullName || "?"}
+                  size="w-9 h-9" rounded="rounded-xl" textSize="text-xs" className="shadow" />
                 <div className="min-w-0">
                   <h4 className="font-semibold text-slate-900 text-sm truncate group-hover:text-blue-700 transition-colors">{c.fullName}</h4>
                   <p className="text-xs text-slate-500 truncate">{c.email}</p>
@@ -702,7 +698,8 @@ function CandidateDetailDialog({ candidate, onClose }: { candidate: any; onClose
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <div className="flex items-start gap-4">
-            <InitialsAvatar name={candidate.fullName || "?"} size="w-14 h-14" />
+            <PhotoAvatar photoUrl={candidate.photoUrl} name={candidate.fullName || "?"}
+              size="w-14 h-14" rounded="rounded-xl" textSize="text-base" />
             <div className="flex-1 min-w-0">
               <DialogTitle className="text-xl font-bold text-slate-900">{candidate.fullName || "Candidate"}</DialogTitle>
               <DialogDescription asChild>

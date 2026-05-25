@@ -12,6 +12,7 @@ import {
   Globe, Star, Award, Loader2, Download, CheckCircle, Shield, ShieldAlert,
   Plane, Heart, BookOpen, Save,
 } from "lucide-react";
+import { PhotoAvatar } from "@/components/shared/PhotoAvatar";
 
 async function fetchJson(url: string) {
   const res = await fetch(url);
@@ -58,9 +59,8 @@ export default function AgentCandidateDetailPage() {
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
         className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 md:p-8">
         <div className="flex items-start gap-5 flex-wrap">
-          <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-700 text-white font-bold text-3xl flex items-center justify-center shrink-0">
-            {initials}
-          </div>
+          <PhotoAvatar photoUrl={c.photoUrl} name={c.fullName || "?"}
+            size="w-20 h-20" rounded="rounded-2xl" textSize="text-3xl" />
           <div className="flex-1 min-w-[240px]">
             <h1 className="text-2xl font-bold text-slate-900">{c.fullName}</h1>
             <div className="flex flex-wrap items-center gap-4 text-sm text-slate-500 mt-2">
