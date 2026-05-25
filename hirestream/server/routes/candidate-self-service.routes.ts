@@ -18,7 +18,7 @@ import {
 import { eq, and, desc } from "drizzle-orm";
 import PDFDocument from "pdfkit";
 import { logger } from "../config/logger.config";
-import { upload, verifyUploadedFile, UPLOAD_DIR, HS_PHOTOS_DIR } from "../middleware/upload.middleware";
+import { upload, verifyUploadedFile, handleUploadErrors, UPLOAD_DIR, HS_PHOTOS_DIR } from "../middleware/upload.middleware";
 import fsNode from "fs";
 import pathNode from "path";
 
@@ -338,5 +338,12 @@ router.get("/placements/:id/offer-letter.pdf", async (req, res, next) => {
   // Keeping a candidate-facing URL for discoverability.
   res.redirect(`/api/v1/agent/placements/${req.params.id}/offer-letter.pdf`);
 });
+
+// Catch multer-specific errors (LIMIT_FILE_SIZE → 413; file-filter type
+// rejection → 400) before they hit the global handler as 500s. Same pattern
+// used in document.routes.ts. Without this, the photo upload returned a
+// generic 500 with code:"LIMIT_FILE_SIZE" instead of the friendly 413 with
+// "File too large. Limit is 5 MB." text.
+router.use(handleUploadErrors);
 
 export default router;

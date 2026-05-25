@@ -344,13 +344,20 @@ function PhotoUploadRow({ photoUrl }: { photoUrl: string | null | undefined }) {
   const [uploading, setUploading] = useState(false);
   const inputRef = React.useRef<HTMLInputElement>(null);
 
+  // Server enforces 5 MB (env.MAX_FILE_SIZE_MB default). The previous client
+  // check at 10 MB let oversized photos through to the server, which returned
+  // an opaque 500 → toast just said "Upload failed" with no reason. Aligned
+  // here + surface the server's actual error.message (which now arrives as
+  // a clean 413 with text like "File too large. Limit is 5 MB.").
+  const MAX_PHOTO_MB = 5;
+
   const onPick = async (file: File) => {
     if (!file.type.startsWith("image/")) {
-      toast({ title: "Invalid file", description: "Please upload a JPG or PNG image." });
+      toast({ title: "Invalid file", description: "Please upload a JPG or PNG image.", variant: "destructive" });
       return;
     }
-    if (file.size > 10 * 1024 * 1024) {
-      toast({ title: "File too large", description: "Max photo size is 10 MB." });
+    if (file.size > MAX_PHOTO_MB * 1024 * 1024) {
+      toast({ title: "File too large", description: `Max photo size is ${MAX_PHOTO_MB} MB.`, variant: "destructive" });
       return;
     }
     setUploading(true);
@@ -360,12 +367,14 @@ function PhotoUploadRow({ photoUrl }: { photoUrl: string | null | undefined }) {
       const r = await fetch("/api/v1/me/photo", { method: "POST", body: fd });
       if (!r.ok) {
         const j = await r.json().catch(() => ({}));
-        throw new Error(j?.message || "Upload failed");
+        // Server uses two shapes: { error: { message } } and { message }.
+        // Pick whichever is present so the toast actually tells the user why.
+        throw new Error(j?.error?.message || j?.message || `Upload failed (HTTP ${r.status})`);
       }
       toast({ title: "Photo updated" });
       queryClient.invalidateQueries({ queryKey: ["/api/v1/candidates/profile"] });
     } catch (err: any) {
-      toast({ title: "Upload failed", description: err.message });
+      toast({ title: "Upload failed", description: err.message, variant: "destructive" });
     } finally {
       setUploading(false);
       if (inputRef.current) inputRef.current.value = "";
