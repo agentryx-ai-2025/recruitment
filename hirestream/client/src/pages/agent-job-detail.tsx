@@ -17,6 +17,7 @@ import {
   GitCompareArrows,
 } from "lucide-react";
 import { JobPoster } from "@/components/agent/job-poster";
+import { RecordOutcomeModal } from "@/components/shared/RecordOutcomeModal";
 
 async function fetchJson(url: string) {
   const res = await fetch(url);
@@ -53,6 +54,7 @@ export default function AgentJobDetailPage() {
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [interviewFor, setInterviewFor] = useState<{ applicationId: string; candidateName: string } | null>(null);
+  const [outcomeFor, setOutcomeFor] = useState<{ applicationId: string; candidateName: string } | null>(null);
   const [editOpen, setEditOpen] = useState(false);
   const [descOpen, setDescOpen] = useState(false);
   const [compareOpen, setCompareOpen] = useState(false);
@@ -599,13 +601,18 @@ export default function AgentJobDetailPage() {
                       </Button>
                     )}
                     {a.status === "interview_scheduled" && (
-                      <Button size="sm" disabled={isBusy}
-                        onClick={() => updateStatus.mutate({ applicationId: a.applicationId, status: "selected" })}
-                        className="gap-1 bg-emerald-600 hover:bg-emerald-700 text-white">
-                        <CheckCircle className="w-3.5 h-3.5" /> Mark Selected
-                      </Button>
+                      <>
+                        <Badge variant="outline" className="bg-cyan-50 text-cyan-700 border-cyan-200 text-[11px] gap-1">
+                          <Clock className="w-3 h-3" /> Interview Scheduled
+                        </Badge>
+                        <Button size="sm" disabled={isBusy}
+                          onClick={() => setOutcomeFor({ applicationId: a.applicationId, candidateName: a.candidate.fullName })}
+                          className="gap-1 bg-emerald-600 hover:bg-emerald-700 text-white">
+                          <CheckCircle className="w-3.5 h-3.5" /> Record Outcome
+                        </Button>
+                      </>
                     )}
-                    {!["rejected", "selected", "placed"].includes(a.status) && (
+                    {!["rejected", "selected", "placed", "interview_scheduled"].includes(a.status) && (
                       <Button size="sm" variant="outline" disabled={isBusy}
                         onClick={() => {
                           const feedback = window.prompt("Feedback for candidate (optional):") || "";
@@ -635,6 +642,18 @@ export default function AgentJobDetailPage() {
         onScheduled={() => {
           qc.invalidateQueries({ queryKey: [`/api/v1/jobs/${id}/applicants`] });
           setInterviewFor(null);
+        }}
+      />
+
+      {/* Interview outcome modal (v0.4.13.0) */}
+      <RecordOutcomeModal
+        open={!!outcomeFor}
+        onClose={() => setOutcomeFor(null)}
+        applicationId={outcomeFor?.applicationId ?? ""}
+        candidateName={outcomeFor?.candidateName ?? ""}
+        onRecorded={() => {
+          qc.invalidateQueries({ queryKey: [`/api/v1/jobs/${id}/applicants`] });
+          setOutcomeFor(null);
         }}
       />
     </div>

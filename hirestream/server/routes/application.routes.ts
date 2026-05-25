@@ -2,7 +2,7 @@ import { Router } from "express";
 import { protect } from "../middleware/auth.middleware";
 import { storage } from "../storage";
 import { logger } from "../config/logger.config";
-import { applications, candidates, jobs } from "@shared/schema";
+import { applications, candidates, jobs, interviews } from "@shared/schema";
 import { eq, and, desc, inArray, ne } from "drizzle-orm";
 import { notify } from "../services/notification.service";
 import { getSetting } from "../services/settings.service";
@@ -424,6 +424,120 @@ function calculateScoreBreakdown(candidate: any, job: any) {
     country: { score: countryScore, max: 20, detail: countryDetail },
   };
 }
+
+// ── Record Interview Outcome ────────────────────────────────────────
+// FRS §2.7 / §6: interviews can be conducted by agent or employer
+// depending on the deployment. This endpoint replaces the confusing
+// "Mark Selected" one-tap action with a deliberate pass/fail capture
+// that also writes the interviews row (previously the table was being
+// scheduled-into but never recorded against).
+//
+// On pass  → application transitions to "selected"
+// On fail  → application transitions to "rejected" (notes → rejectionFeedback)
+//
+// Gated by the `interview.conducted_by` setting:
+//   agent_only     → only agent (and admins) may record
+//   employer_only  → only employer (and admins) may record
+//   either         → agent OR employer (and admins) may record
+router.post("/:id/interview-outcome", protect, async (req, res, next) => {
+  try {
+    const db = storage.db;
+    if (!db) return res.status(500).json({ success: false, error: { code: 500, message: "Database not available" } });
+
+    const user = req.user as any;
+    const { result, notes, rating } = req.body ?? {};
+
+    if (!["pass", "fail"].includes(result)) {
+      return res.status(400).json({ success: false, error: { code: 400, message: "result must be 'pass' or 'fail'" } });
+    }
+    if (rating !== undefined && rating !== null) {
+      const n = Number(rating);
+      if (!Number.isInteger(n) || n < 1 || n > 5) {
+        return res.status(400).json({ success: false, error: { code: 400, message: "rating must be an integer 1..5" } });
+      }
+    }
+
+    const [app] = await db.select().from(applications).where(eq(applications.id, req.params.id)).limit(1);
+    if (!app) return res.status(404).json({ success: false, error: { code: 404, message: "Application not found" } });
+    if (app.status !== "interview_scheduled") {
+      return res.status(400).json({ success: false, error: { code: 400, message: `Cannot record outcome — application is "${app.status}", not "interview_scheduled".` } });
+    }
+
+    const [job] = await db.select().from(jobs).where(eq(jobs.id, app.jobId!)).limit(1);
+    if (!job) return res.status(404).json({ success: false, error: { code: 404, message: "Job not found" } });
+
+    const isAdmin = user.role === "admin" || user.role === "superadmin";
+    const conductedBy: string = await getSetting("interview.conducted_by");
+
+    // Role gate per setting
+    if (!isAdmin) {
+      const ownsAsAgent = user.role === "agent" && job.agentId === user.id;
+      // Employer "owns" the job directly, or via parent requisition for derivative jobs (FRS §2.2)
+      let ownsAsEmployer = user.role === "employer" && job.employerId === user.id;
+      if (!ownsAsEmployer && user.role === "employer" && job.parentRequisitionId) {
+        const [parent] = await db.select({ employerId: jobs.employerId }).from(jobs)
+          .where(eq(jobs.id, job.parentRequisitionId)).limit(1);
+        ownsAsEmployer = !!parent && parent.employerId === user.id;
+      }
+      const allowAgent    = conductedBy === "agent_only"    || conductedBy === "either";
+      const allowEmployer = conductedBy === "employer_only" || conductedBy === "either";
+      const ok = (ownsAsAgent && allowAgent) || (ownsAsEmployer && allowEmployer);
+      if (!ok) {
+        return res.status(403).json({
+          success: false,
+          error: { code: 403, message: `Not authorized to record this interview outcome (policy: ${conductedBy}).` },
+        });
+      }
+    }
+
+    // Write interviews row — schema has notes/rating/result/conductedBy
+    // already. scheduledAt is NOT NULL so back-fill with now() if missing.
+    await db.insert(interviews).values({
+      applicationId: app.id,
+      scheduledAt: new Date(),
+      result: result === "pass" ? "selected" : "rejected",
+      notes: notes || null,
+      rating: rating ? Number(rating) : null,
+      conductedBy: user.id,
+    });
+
+    const newStatus = result === "pass" ? "selected" : "rejected";
+    const updates: any = { status: newStatus };
+    if (newStatus === "rejected" && notes) updates.rejectionFeedback = notes;
+    const [updated] = await db.update(applications).set(updates).where(eq(applications.id, app.id)).returning();
+
+    // Audit
+    try {
+      const { logTransition } = await import("../services/audit-transitions.service");
+      await logTransition({
+        actorUserId: user.id, actorRole: user.role,
+        entityType: "application", entityId: app.id, action: "interview_outcome",
+        fromState: "interview_scheduled", toState: newStatus,
+        reason: notes,
+        ipAddress: req.ip,
+        extra: { result, rating: rating ?? null, policy: conductedBy },
+      });
+    } catch (e: any) { logger.warn(`audit on interview-outcome failed: ${e?.message}`); }
+
+    // Fire notification event
+    const autoNotify: boolean = await getSetting("notifications.auto_on_status_change");
+    if (autoNotify) {
+      try {
+        const { fireEvent, resolveParticipantsFromApplication } = await import("../services/event-notifications.service");
+        const ctx = await resolveParticipantsFromApplication(app.id);
+        ctx.actorUserId = user.id;
+        ctx.actorRole = user.role;
+        const eventKey = newStatus === "selected" ? "application.selected"
+                       : user.role === "employer" ? "application.employer_rejected"
+                       : "application.rejected";
+        await fireEvent(eventKey as any, ctx);
+      } catch (e: any) { logger.warn(`fireEvent on interview-outcome failed: ${e?.message}`); }
+    }
+
+    logger.info(`Application ${app.id}: interview_scheduled → ${newStatus} (interview outcome by ${user.role} ${user.id})`);
+    res.json({ success: true, data: updated });
+  } catch (err) { next(err); }
+});
 
 // ── Candidate Withdraw Application ──────────────────────────────────
 router.post("/:id/withdraw", protect, async (req, res, next) => {

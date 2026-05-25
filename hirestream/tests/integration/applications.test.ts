@@ -2,7 +2,7 @@ import { describe, beforeAll, beforeEach, it, expect } from '@jest/globals';
 import request from 'supertest';
 import type { Express } from 'express';
 import { createTestApp, truncateAllTables, getDb } from '../helpers';
-import { recruitmentAgents } from '../../shared/schema';
+import { recruitmentAgents, applications, interviews } from '../../shared/schema';
 import { eq } from 'drizzle-orm';
 
 let app: Express;
@@ -211,6 +211,104 @@ describe('GET /api/v1/applications/recommendations/for-me', () => {
       .get('/api/v1/applications/recommendations/for-me')
       .set('Cookie', agentCookie);
 
+    expect(res.status).toBe(403);
+  });
+});
+
+// ── Interview Outcome (v0.4.13.0) ───────────────────────────────────
+// Replaces the v0.4.12-era "Mark Selected" one-tap with a deliberate
+// pass/fail + notes capture that also writes the interviews row.
+describe('POST /api/v1/applications/:id/interview-outcome', () => {
+  async function setupScheduledInterview(): Promise<string> {
+    const applyRes = await request(app).post(`/api/v1/jobs/${jobId}/apply`).set('Cookie', candidateCookie);
+    const appId = applyRes.body.data.id;
+    for (const status of ['reviewed', 'shortlisted', 'interview_scheduled']) {
+      const r = await request(app)
+        .patch(`/api/v1/applications/${appId}/status`)
+        .set('Cookie', agentCookie)
+        .send({ status });
+      expect(r.status).toBe(200);
+    }
+    return appId;
+  }
+
+  it('pass → transitions application to selected and writes interviews row', async () => {
+    const appId = await setupScheduledInterview();
+
+    const res = await request(app)
+      .post(`/api/v1/applications/${appId}/interview-outcome`)
+      .set('Cookie', agentCookie)
+      .send({ result: 'pass', notes: 'Strong communicator', rating: 4 });
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data.status).toBe('selected');
+
+    const db = getDb();
+    const [appRow] = await db.select().from(applications).where(eq(applications.id, appId)).limit(1);
+    expect((appRow as any).status).toBe('selected');
+
+    const ivRows = await db.select().from(interviews).where(eq(interviews.applicationId, appId));
+    expect(ivRows.length).toBe(1);
+    expect((ivRows[0] as any).result).toBe('selected');
+    expect((ivRows[0] as any).notes).toBe('Strong communicator');
+    expect((ivRows[0] as any).rating).toBe(4);
+  });
+
+  it('fail → transitions to rejected and stores notes as rejectionFeedback', async () => {
+    const appId = await setupScheduledInterview();
+
+    const res = await request(app)
+      .post(`/api/v1/applications/${appId}/interview-outcome`)
+      .set('Cookie', agentCookie)
+      .send({ result: 'fail', notes: 'Not a fit for the role' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.status).toBe('rejected');
+    expect(res.body.data.rejectionFeedback).toBe('Not a fit for the role');
+
+    const db = getDb();
+    const ivRows = await db.select().from(interviews).where(eq(interviews.applicationId, appId));
+    expect(ivRows.length).toBe(1);
+    expect((ivRows[0] as any).result).toBe('rejected');
+  });
+
+  it('rejects an outcome before the interview is scheduled (status guard)', async () => {
+    const applyRes = await request(app).post(`/api/v1/jobs/${jobId}/apply`).set('Cookie', candidateCookie);
+    const appId = applyRes.body.data.id;
+
+    const res = await request(app)
+      .post(`/api/v1/applications/${appId}/interview-outcome`)
+      .set('Cookie', agentCookie)
+      .send({ result: 'pass' });
+
+    expect(res.status).toBe(400);
+  });
+
+  it('rejects invalid result values (400)', async () => {
+    const appId = await setupScheduledInterview();
+    const res = await request(app)
+      .post(`/api/v1/applications/${appId}/interview-outcome`)
+      .set('Cookie', agentCookie)
+      .send({ result: 'maybe' });
+    expect(res.status).toBe(400);
+  });
+
+  it('rejects out-of-range rating (400)', async () => {
+    const appId = await setupScheduledInterview();
+    const res = await request(app)
+      .post(`/api/v1/applications/${appId}/interview-outcome`)
+      .set('Cookie', agentCookie)
+      .send({ result: 'pass', rating: 9 });
+    expect(res.status).toBe(400);
+  });
+
+  it('rejects a candidate trying to self-record (403)', async () => {
+    const appId = await setupScheduledInterview();
+    const res = await request(app)
+      .post(`/api/v1/applications/${appId}/interview-outcome`)
+      .set('Cookie', candidateCookie)
+      .send({ result: 'pass' });
     expect(res.status).toBe(403);
   });
 });

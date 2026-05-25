@@ -381,6 +381,16 @@ export const SETTING_SPECS: SettingSpec[] = [
     min: 1,
     max: 14,
   },
+  // ── Interview lifecycle ──────────────────────────────────────────────
+  {
+    key: "interview.conducted_by",
+    category: "pipeline",
+    label: "Who conducts interviews",
+    description: "Per FRS §2.7 / §6 — interviews can be conducted by the agent (pre-screen flow), the employer (post-shortlist gate), or either depending on the deployment. Drives which role's UI shows the 'Record Outcome' action on an interview_scheduled application. Default 'either' matches the FRS ambiguity — switch to 'employer_only' for a strict employer-led pipeline.",
+    type: "string",
+    default: "either",
+    options: ["agent_only", "employer_only", "either"],
+  },
 ];
 
 const defaultsByKey = new Map(SETTING_SPECS.map((s) => [s.key, s.default]));

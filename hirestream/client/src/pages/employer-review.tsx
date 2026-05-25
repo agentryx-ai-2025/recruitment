@@ -14,6 +14,7 @@ import {
   ArrowRight, Briefcase, MapPin, Calendar, AlertCircle, Eye, Award,
   Layers, ChevronRight, Send,
 } from "lucide-react";
+import { RecordOutcomeModal } from "@/components/shared/RecordOutcomeModal";
 
 async function fetchJson(url: string) {
   const res = await fetch(url);
@@ -36,6 +37,7 @@ export default function EmployerReviewPage() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [compareOpen, setCompareOpen] = useState(false);
   const [requestMoreOpen, setRequestMoreOpen] = useState(false);
+  const [outcomeFor, setOutcomeFor] = useState<{ applicationId: string; candidateName: string } | null>(null);
   // Which bucket is showing. Default "awaiting" so the employer lands on the
   // work-that-needs-them-now slice instead of a heap.
   type Bucket = "awaiting" | "approved" | "interview" | "selected" | "all";
@@ -102,17 +104,6 @@ export default function EmployerReviewPage() {
       return r.json();
     },
     onSuccess: () => { toast({ title: "Replacement requested", description: "Agency will send alternative candidates." }); qc.invalidateQueries({ queryKey: [`/api/v1/employer/requisitions/${id}/applicants`] }); },
-  });
-
-  const selectCandidate = useMutation({
-    mutationFn: async (applicationId: string) => {
-      const r = await fetch(`/api/v1/applications/${applicationId}/status`, {
-        method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status: "selected" }),
-      });
-      if (!r.ok) throw new Error("Failed");
-      return r.json();
-    },
-    onSuccess: () => { toast({ title: "Candidate selected", description: "Offer can now be issued." }); qc.invalidateQueries({ queryKey: [`/api/v1/employer/requisitions/${id}/applicants`] }); },
   });
 
   const reject = useMutation({
@@ -288,7 +279,9 @@ export default function EmployerReviewPage() {
                   if (!reason) return;
                   requestReplacement.mutate({ applicationId: a.applicationId, reason });
                 }}
-                onSelect={() => selectCandidate.mutate(a.applicationId)}
+                onRecordOutcome={() =>
+                  setOutcomeFor({ applicationId: a.applicationId, candidateName: a.candidate?.fullName ?? "" })
+                }
                 onReject={() => {
                   const fb = window.prompt("Reason / feedback (optional):") || "";
                   reject.mutate({ applicationId: a.applicationId, feedback: fb });
@@ -305,6 +298,20 @@ export default function EmployerReviewPage() {
       <RequestMoreModal open={requestMoreOpen} onClose={() => setRequestMoreOpen(false)}
         jobId={id} jobTitle={job.title}
         onDone={() => { setRequestMoreOpen(false); toast({ title: "Request sent to agency" }); }} />
+
+      {/* Record Interview Outcome (v0.4.13.0) — server enforces
+          interview.conducted_by policy; this lets the employer record
+          pass/fail with notes + rating instead of one-tap select. */}
+      <RecordOutcomeModal
+        open={!!outcomeFor}
+        onClose={() => setOutcomeFor(null)}
+        applicationId={outcomeFor?.applicationId ?? ""}
+        candidateName={outcomeFor?.candidateName ?? ""}
+        onRecorded={() => {
+          qc.invalidateQueries({ queryKey: [`/api/v1/employer/requisitions/${id}/applicants`] });
+          setOutcomeFor(null);
+        }}
+      />
     </div>
   );
 }
@@ -365,7 +372,7 @@ function HeroStat({ label, value, spotlight, active, onClick }: {
   return <div className={`rounded-xl p-3 backdrop-blur ${base}`}>{content}</div>;
 }
 
-function CandidateReviewCard({ app, selected, onToggleSelect, onApprove, onRequestReplacement, onSelect, onReject }: any) {
+function CandidateReviewCard({ app, selected, onToggleSelect, onApprove, onRequestReplacement, onRecordOutcome, onReject }: any) {
   const c = app.candidate;
   const decisionBadge = app.employerDecision === "approved_for_interview"
     ? { label: "Approved by you", cls: "bg-emerald-50 text-emerald-700 border-emerald-200" }
@@ -451,9 +458,14 @@ function CandidateReviewCard({ app, selected, onToggleSelect, onApprove, onReque
         )}
 
         {app.status === "interview_scheduled" && (
-          <Button size="sm" onClick={onSelect} className="bg-emerald-600 hover:bg-emerald-700 text-white">
-            <Award className="w-3.5 h-3.5 mr-1" /> Select this candidate
-          </Button>
+          <>
+            <Badge variant="outline" className="bg-cyan-50 text-cyan-700 border-cyan-200 gap-1">
+              <Calendar className="w-3.5 h-3.5" /> Interview Scheduled
+            </Badge>
+            <Button size="sm" onClick={onRecordOutcome} className="bg-emerald-600 hover:bg-emerald-700 text-white">
+              <Award className="w-3.5 h-3.5 mr-1" /> Record Outcome
+            </Button>
+          </>
         )}
 
         {app.status === "selected" && (
@@ -462,7 +474,7 @@ function CandidateReviewCard({ app, selected, onToggleSelect, onApprove, onReque
           </Badge>
         )}
 
-        {["shortlisted", "interview_scheduled"].includes(app.status) && (
+        {app.status === "shortlisted" && (
           <Button size="sm" variant="outline" onClick={onReject} className="border-red-200 text-red-700 hover:bg-red-50 ml-auto">
             <XCircle className="w-3.5 h-3.5 mr-1" /> Reject
           </Button>
