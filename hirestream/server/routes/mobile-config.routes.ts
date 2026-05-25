@@ -54,25 +54,67 @@ router.get("/config", (_req, res) => {
 
 // ── GET /profile ────────────────────────────────────────────────────
 // Returns the authenticated user's profile for the mobile Profile screen.
-router.get("/profile", (req: any, res) => {
+//
+// HIST: the original implementation read req.user.fullName, but `users`
+// doesn't have a fullName column — the candidate's name lives on
+// `candidates.full_name`. The endpoint silently fell back to username
+// (email) and the mobile UI never displayed the real name. Fixed in
+// v0.4.11.0 — joins the role-specific table to return canonical data.
+router.get("/profile", async (req: any, res) => {
   if (!req.user) {
     return res.status(401).json({ success: false, error: { code: 401, message: "Not authenticated" } });
   }
-  res.json({
-    success: true,
-    data: {
-      id: req.user.id,
-      email: req.user.email,
-      username: req.user.username,
-      fullName: req.user.fullName || req.user.username,
-      role: req.user.role,
-      phoneNumber: req.user.phoneNumber || null,
-      preferredLanguage: req.user.preferredLanguage || "en",
-      aadhaarVerified: req.user.aadhaarVerified || false,
-      twoFactorEnabled: req.user.twoFactorEnabled || false,
-      isActive: req.user.isActive,
-    },
-  });
+  try {
+    const { storage } = await import("../storage");
+    const db = storage.db;
+    if (!db) return res.status(500).json({ success: false, error: { code: 500, message: "Database not available" } });
+
+    // For candidates, the displayable identity (name, phone, location, skills)
+    // lives on the candidates row, NOT on users. Join + merge so the client
+    // sees one flat object.
+    let candidateExtras: any = {};
+    if (req.user.role === "candidate") {
+      const { candidates } = await import("@shared/schema");
+      const { eq } = await import("drizzle-orm");
+      const [c] = await db.select().from(candidates).where(eq(candidates.userId, req.user.id)).limit(1);
+      if (c) {
+        candidateExtras = {
+          fullName: c.fullName,
+          phoneNumber: c.phone,
+          location: c.location,
+          experience: c.experience,
+          skills: c.skills,
+          preferredCountries: c.preferredCountries,
+          photoUrl: c.photoUrl,
+        };
+      }
+    }
+
+    res.json({
+      success: true,
+      data: {
+        id: req.user.id,
+        email: req.user.email,
+        username: req.user.username,
+        role: req.user.role,
+        preferredLanguage: req.user.preferredLanguage || "en",
+        aadhaarVerified: req.user.aadhaarVerified || false,
+        twoFactorEnabled: req.user.twoFactorEnabled || false,
+        isActive: req.user.isActive,
+        // Candidate-specific fields (empty object for non-candidates so the
+        // mobile client doesn't crash on undefined access).
+        fullName: candidateExtras.fullName || req.user.username,
+        phoneNumber: candidateExtras.phoneNumber || req.user.phoneNumber || null,
+        location: candidateExtras.location || null,
+        experience: candidateExtras.experience ?? null,
+        skills: candidateExtras.skills || [],
+        preferredCountries: candidateExtras.preferredCountries || [],
+        photoUrl: candidateExtras.photoUrl || null,
+      },
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: { code: 500, message: err.message || "Internal error" } });
+  }
 });
 
 // ── GET /notifications ──────────────────────────────────────────────
@@ -141,34 +183,90 @@ router.get("/notifications", async (req: any, res) => {
 });
 // ── PATCH /profile ──────────────────────────────────────────────────
 // Update the authenticated user's profile fields.
+//
+// Each field is routed to the correct table:
+//   fullName / phoneNumber / location → candidates table (for candidate role)
+//   preferredLanguage                  → users table (universal)
+//
+// HIST: until v0.4.11.0 this endpoint ran `UPDATE users SET fullName = …`
+// against a column that doesn't exist. Drizzle silently no-op'd, the
+// endpoint returned success, and the mobile UI showed "Saved" while the
+// DB row never changed. Fixed by routing each field to its canonical table.
 router.patch("/profile", async (req: any, res) => {
   if (!req.user) {
     return res.status(401).json({ success: false, error: { code: 401, message: "Not authenticated" } });
   }
 
   try {
-    const allowedFields = ["fullName", "phoneNumber", "preferredLanguage"];
-    const updates: Record<string, any> = {};
-    for (const field of allowedFields) {
-      if (req.body[field] !== undefined) {
-        updates[field] = req.body[field];
-      }
-    }
-
-    if (Object.keys(updates).length === 0) {
-      return res.status(400).json({ success: false, error: { code: 400, message: "No valid fields to update" } });
-    }
-
-    // Import storage to update user
     const { storage } = await import("../storage");
     const db = storage.db;
     if (!db) return res.status(500).json({ success: false, error: { code: 500, message: "Database not available" } });
-    const { users } = await import("@shared/schema");
+    const { users, candidates } = await import("@shared/schema");
     const { eq } = await import("drizzle-orm");
 
-    await db.update(users).set(updates).where(eq(users.id, req.user.id));
+    // Split the inbound payload into user-table fields vs candidate-table
+    // fields. Whitelisted to avoid accidental writes (no role, no id).
+    const userUpdates: Record<string, any> = {};
+    const candidateUpdates: Record<string, any> = {};
 
-    res.json({ success: true, data: { ...req.user, ...updates } });
+    if (typeof req.body.preferredLanguage === "string") {
+      userUpdates.preferredLanguage = req.body.preferredLanguage;
+    }
+
+    if (req.user.role === "candidate") {
+      if (typeof req.body.fullName === "string" && req.body.fullName.trim().length >= 2) {
+        candidateUpdates.fullName = req.body.fullName.trim();
+      }
+      if (typeof req.body.phoneNumber === "string") {
+        // Same regex as the web profile route (HTIS BUG-002) — digits only,
+        // optional +country / spaces / dashes. Empty string clears the field.
+        const phone = req.body.phoneNumber.trim();
+        if (phone === "" || /^\+?[0-9][0-9\s\-]{5,18}[0-9]$/.test(phone)) {
+          candidateUpdates.phone = phone || null;
+        } else {
+          return res.status(400).json({ success: false, error: { code: 400, message: "Phone must be digits only (optionally with +country code, spaces, or dashes). Example: +91 9876543210" } });
+        }
+      }
+      if (typeof req.body.location === "string") {
+        candidateUpdates.location = req.body.location.trim();
+      }
+    }
+
+    if (Object.keys(userUpdates).length === 0 && Object.keys(candidateUpdates).length === 0) {
+      return res.status(400).json({ success: false, error: { code: 400, message: "No valid fields to update" } });
+    }
+
+    if (Object.keys(userUpdates).length > 0) {
+      await db.update(users).set(userUpdates).where(eq(users.id, req.user.id));
+    }
+    if (Object.keys(candidateUpdates).length > 0) {
+      // Update the candidate row in place. Don't create one if missing —
+      // the registration flow already creates it, and we don't want silent
+      // row-creation here.
+      await db.update(candidates).set(candidateUpdates).where(eq(candidates.userId, req.user.id));
+    }
+
+    // Re-read so the client sees the canonical post-update state (including
+    // any default fills / trims) — no more "looks saved but isn't" UX.
+    let candidateRow: any = null;
+    if (req.user.role === "candidate") {
+      const [c] = await db.select().from(candidates).where(eq(candidates.userId, req.user.id)).limit(1);
+      candidateRow = c;
+    }
+
+    res.json({
+      success: true,
+      data: {
+        id: req.user.id,
+        email: req.user.email,
+        username: req.user.username,
+        role: req.user.role,
+        preferredLanguage: userUpdates.preferredLanguage ?? req.user.preferredLanguage ?? "en",
+        fullName: candidateRow?.fullName ?? req.user.username,
+        phoneNumber: candidateRow?.phone ?? null,
+        location: candidateRow?.location ?? null,
+      },
+    });
   } catch (err: any) {
     res.status(500).json({ success: false, error: { code: 500, message: err.message || "Internal error" } });
   }
