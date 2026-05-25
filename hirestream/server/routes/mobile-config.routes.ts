@@ -319,8 +319,15 @@ router.patch("/notifications/:id/read", async (req: any, res) => {
 });
 
 // ── DELETE /account ─────────────────────────────────────────────────
-// Permanently delete the authenticated user's account.
-// Required by Google Play Store and Apple App Store policies.
+// Permanently delete the authenticated user's account. Required by
+// Play Store + App Store policies.
+//
+// HIST: v0.4.12.0 fix — the previous version called
+//   `UPDATE users SET fullName = "Deleted User", phoneNumber = null`
+// but `users` has neither column. Drizzle silently no-op'd those two
+// fields, so the candidate's real name + phone survived on the
+// `candidates` row after "deletion". This was a real PII / Play Store
+// compliance issue. Now: anonymize both users AND the role-specific row.
 router.delete("/account", async (req: any, res) => {
   if (!req.user) {
     return res.status(401).json({ success: false, error: { code: 401, message: "Not authenticated" } });
@@ -330,17 +337,39 @@ router.delete("/account", async (req: any, res) => {
     const { storage } = await import("../storage");
     const db = storage.db;
     if (!db) return res.status(500).json({ success: false, error: { code: 500, message: "Database not available" } });
-    const { users } = await import("@shared/schema");
+    const { users, candidates } = await import("@shared/schema");
     const { eq } = await import("drizzle-orm");
 
-    // Soft-delete: set isActive to false and anonymize PII
+    // Soft-delete the users row — only fields that actually exist on that
+    // table. (No fullName / phoneNumber columns there — those live on the
+    // role-specific tables.)
     await db.update(users).set({
       isActive: false,
       email: `deleted-${req.user.id}@hirestream.deleted`,
       username: `deleted-${req.user.id}`,
-      fullName: "Deleted User",
-      phoneNumber: null,
     }).where(eq(users.id, req.user.id));
+
+    // Anonymize the candidate row if one exists. We null out every PII
+    // field but keep the row + its FK chain (applications, education,
+    // experience, documents, placements) so audit history isn't broken.
+    // The candidate's name becomes "Deleted Candidate" so any historical
+    // display surface (admin views, audit trail) reads coherently.
+    if (req.user.role === "candidate") {
+      await db.update(candidates).set({
+        fullName: "Deleted Candidate",
+        email: `deleted-${req.user.id}@hirestream.deleted`,
+        phone: null,
+        location: null,
+        addressLine1: null,
+        addressLine2: null,
+        city: null,
+        pinCode: null,
+        passportNumber: null,
+        photoUrl: null,
+        skills: [],
+        preferredCountries: [],
+      }).where(eq(candidates.userId, req.user.id));
+    }
 
     res.json({ success: true, data: { message: "Account deleted successfully" } });
   } catch (err: any) {
