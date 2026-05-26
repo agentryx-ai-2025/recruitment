@@ -28,6 +28,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { colors, spacing, radius, fontSize, fontWeight } from "../theme";
 import { useAuth } from "../auth";
 import { api } from "../api";
+import { APP_VERSION, APP_BUILD } from "../config";
 
 interface SettingsScreenProps {
   onBack: () => void;
@@ -198,7 +199,7 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
             resizeMode="contain"
           />
           <Text style={styles.appName}>HireStream Mobile</Text>
-          <Text style={styles.appVersion}>Version 1.0.0 · Build 1</Text>
+          <Text style={styles.appVersion}>Version {APP_VERSION} · Build {APP_BUILD}</Text>
           <Text style={styles.appCopyright}>
             © 2026 HPSEDC, Shimla. All rights reserved.
           </Text>

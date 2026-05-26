@@ -28,6 +28,7 @@ import * as ImagePicker from "expo-image-picker";
 import { colors, spacing, radius, fontSize, fontWeight } from "../theme";
 import { useAuth } from "../auth";
 import { api, uploadFile } from "../api";
+import { APP_VERSION, APP_BUILD } from "../config";
 import { SkeletonProfile } from "../components/SkeletonLoader";
 
 interface ProfileScreenProps {
@@ -258,7 +259,7 @@ export default function ProfileScreen({ onBack, onNavigateSettings, onNavigateDo
               <Text style={styles.sectionTitle}>App Information</Text>
               <View style={styles.infoRow}>
                 <Text style={styles.infoLabel}>Version</Text>
-                <Text style={styles.infoValue}>1.0.0</Text>
+                <Text style={styles.infoValue}>{APP_VERSION} (build {APP_BUILD})</Text>
               </View>
               <View style={[styles.infoRow, styles.infoRowBorder]}>
                 <Text style={styles.infoLabel}>Platform</Text>

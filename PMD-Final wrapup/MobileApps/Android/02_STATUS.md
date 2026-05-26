@@ -2,9 +2,22 @@
 
 > **For any agent / engineer reading this:** this file is your context-pickup point. Read it first. It should reflect reality within the last 24 hours of work. If it doesn't, fix it before doing anything else.
 
-**Last updated:** 2026-05-25 · **Updated by:** Claude + Subhash · **Build version:** dev-0.4.1 (no mobile-app code change; backend portal at v0.4.7.0)
+**Last updated:** 2026-05-26 · **Updated by:** Claude + Subhash · **Build version:** dev-0.4.14 (mobile timeline vocabulary fix; backend portal at v0.4.14.0)
 
-> **Backend-side updates that affect mobile (May 21–25):** the portal shipped v0.4.1.0 → v0.4.7.0. Most relevant for mobile: the `/api/v1/me/photo` endpoint now returns clean **413** "File too large. Limit is 5 MB." (was opaque 500 — mobile error UI should re-test); the `PATCH /applications/:id/status` IDOR was patched (agents now correctly get 403 when actioning other-agency apps); workflow integrity tightened so employer-posted jobs are always `agents_only` (mobile candidate browse should never see them); upload error responses across `/api/v1/candidates/documents` are now 400/413, never 500. No mobile-side code changes were required — but a mobile QA pass against the live `hirestream-stg.agentryx.dev` is worth doing before the next mobile build.
+## 📱 Tester onboarding — single source of truth
+
+**Expo Go URL:** `exps://hirestream-mobile.agentryx.dev`
+(or `exp://hirestream-mobile.agentryx.dev` — both routes work through the nginx + SSL layer that already exists for this subdomain)
+
+Open Expo Go → "Enter URL manually" → paste the URL → Connect. Bundle downloads on first launch (~8.6 MB) then hot-reloads with every code change on the dev box.
+
+This branded URL is **the production-equivalent delivery channel right now** because:
+- Play Store listing not yet live (D3 unresolved)
+- APK side-loading is friction for HPSEDC testers
+- Expo Go gives them the LATEST source bundle every time they re-open the app — zero install/uninstall cycles
+- Every source change committed by an engineer goes live to every tester's Expo Go in seconds (Metro hot-reload + Expo Go manifest re-fetch on launch)
+
+> **Backend-side updates that affect mobile (May 26):** portal shipped v0.4.13.0 → v0.4.14.0. v0.4.13 introduced the `interview.conducted_by` setting + new POST `/api/v1/applications/:id/interview-outcome` endpoint replacing the confusing "Mark Selected" one-tap. v0.4.14 closed the HPSEDC UAT report's two open issues: **(a) Mobile timeline milestone lock** — `STAGES` array in `ApplicationDetailScreen.tsx` and `STATUS_CONFIG` in `MyApplicationsScreen.tsx` were using stage keys (`applied/screening/interviewing/offered/accepted`) that don't exist in the database, so `findIndex` returned -1 and every dot stayed grey. Rewrote both maps to use the real status keys (`submitted/reviewed/shortlisted/interview_scheduled/selected/placed`). Also fixed the MyApplications tab buckets which were silently dropping `interview_scheduled` rows from every tab. **(b) Placement offer letter block** — server side: applications transitioning to `selected` now auto-insert a placement row (defaults country/salary from parent job) via the new `PlacementAutoCreate` service; new `PATCH /api/v1/agent/placements/:id` lets employer/agent refine country/salary/startDate; employer placements list now matches derivative jobs via parent requisition (FRS §2.2). All fixes committed in main @ `b355b2b`.
 
 ---
 
@@ -38,6 +51,7 @@
 
 | Date | Feature | Build | Notes |
 |---|---|---|---|
+| 2026-05-26 | **v0.4.14 — UAT hotfix** — mobile timeline status vocabulary + branded URL live | dev-0.4.14 / hirestream@0.4.14.0 | Closes HPSEDC UAT report Issue 1 (timeline grey-dot bug) and Issue 2 (placement auto-create + employer derivative scope). Mobile screens now use real DB status keys. Branded Expo Go URL `exps://hirestream-mobile.agentryx.dev` is the canonical tester onboarding path. |
 | 2026-05-25 | _(no mobile change)_ — Backend portal at v0.4.7.0 | hirestream@0.4.7.0 | Photo upload returns clean 413 (was 500), IDOR patched, employer-public jobs blocked, photo avatar consistent across listings. Worth a mobile QA pass before next mobile build — see `PMD-Final wrapup/ContextTL/01_Baseline_Context_v0.4.7.md` |
 | 2026-05-12 | Environment Sync (DEV/STG) | dev-0.4.1 | Pointed mobile app to `hirestream.agentryx.dev` so mobile & portal share the same 100% synced DB |
 | 2026-05-12 | Universal Login (Email/Username) | hirestream@1.1.1 | Updated backend `getUserByUsername` to universally accept either email or username |

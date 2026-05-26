@@ -22,6 +22,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { colors, spacing, radius, fontSize, fontWeight } from "../theme";
 import { api } from "../api";
+import { APP_VERSION } from "../config";
 import { SkeletonApplicationCard } from "../components/SkeletonLoader";
 
 interface Application {
@@ -194,6 +195,8 @@ export default function MyApplicationsScreen({ onBack, onSelectApplication }: My
           />
           <Text style={styles.headerTitle}>My Applications</Text>
         </View>
+        {/* Tiny build tag so we can verify which bundle is loaded at a glance */}
+        <Text style={styles.headerVersion}>v{APP_VERSION}</Text>
       </View>
 
       {/* Tabs */}
@@ -264,13 +267,14 @@ export default function MyApplicationsScreen({ onBack, onSelectApplication }: My
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   header: {
-    flexDirection: "row", alignItems: "center",
+    flexDirection: "row", alignItems: "center", justifyContent: "space-between",
     paddingHorizontal: spacing.xl, paddingBottom: spacing.lg,
     backgroundColor: colors.primaryDark,
   },
   headerLeft: { flexDirection: "row", alignItems: "center" },
   headerLogo: { width: 48, height: 48, borderRadius: 24, marginRight: spacing.md },
   headerTitle: { fontSize: fontSize.lg, fontWeight: fontWeight.bold, color: "#ffffff" },
+  headerVersion: { fontSize: fontSize.xs, color: "rgba(255,255,255,0.55)", fontWeight: fontWeight.medium, letterSpacing: 0.3 },
   tabBar: {
     flexDirection: "row", backgroundColor: colors.surface,
     paddingHorizontal: spacing.lg, paddingBottom: spacing.sm,

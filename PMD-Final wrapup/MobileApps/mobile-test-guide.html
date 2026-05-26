@@ -289,9 +289,18 @@
     <span class="header-icon">🌐</span>
     <div>
       <h1>HireStream Mobile App — Quick Testing Guide</h1>
-      <div class="sub">HPSEDC Overseas Placement Portal · Android & iOS · v1.0</div>
+      <div class="sub">HPSEDC Overseas Placement Portal · Android & iOS · v0.4.14</div>
     </div>
     <span class="badge">HTIS Testing</span>
+  </div>
+
+  <div style="background:#ecfdf5; border:1.5px solid #6ee7b7; border-radius:8px; padding:10px 14px; margin-bottom:14px;">
+    <div style="font-size:10px; font-weight:700; color:#065f46; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:4px;">✅ What's new in v0.4.14 (closes the UAT report)</div>
+    <div style="font-size:10.5px; color:#064e3b; line-height:1.5;">
+      <strong>Issue 1 fixed</strong> — Application Detail timeline now lights up (Applied → Under Review → Shortlisted → Interview → Offered → Accepted) with the current stage highlighted, instead of staying grey. Re-verify by opening any in-flight application.<br>
+      <strong>Issue 2 fixed</strong> — Selecting a candidate on the employer side now auto-creates a placement so the offer letter / appointment letter actions are immediately usable. Re-verify on the web portal's <em>Offers &amp; Placements</em> tab.<br>
+      <strong>How to confirm latest build:</strong> open the <em>Applications</em> tab — the top-right of the dark blue header shows a small <code class="mono" style="background:#fff; padding:1px 4px; border-radius:3px; color:#065f46;">v0.4.14.0</code> tag. If you see an older version, run the force-refresh on page 3.
+    </div>
   </div>
 
   <h2 style="color:#f59e0b;"><span class="num" style="background:#f59e0b;">1</span> Getting Started — Open the Verify Portal</h2>
@@ -322,7 +331,7 @@
     <div style="border: 3px solid #7c3aed; border-radius: 8px; padding: 10px 14px; background: #f5f3ff; position: relative;">
       <div style="position:absolute; top:-8px; right:10px; background:#dc2626; color:white; font-size:8px; font-weight:700; padding:2px 10px; border-radius:10px;">👈 CLICK THIS ONE</div>
       <div style="display:inline-block; background:#e0e7ff; color:#3730a3; font-size:8px; font-weight:700; padding:2px 8px; border-radius:10px; margin-bottom:6px;">STEP 2</div>
-      <div style="font-size:12px; font-weight:700; color:#1e293b;">HireStream Mobile — Android/iOS App v1.0</div>
+      <div style="font-size:12px; font-weight:700; color:#1e293b;">HireStream Mobile — Android/iOS App v0.4.14</div>
       <div style="font-size:9px; color:#64748b; margin-top:3px;">Android mobile application for HireStream. React Native + Expo.</div>
       <div style="font-size:9px; color:#dc2626; margin-top:4px; font-weight:600;">🔧 47 need fixing</div>
     </div>
@@ -331,7 +340,7 @@
   <div class="steps" style="margin-top: 6px;">
     <div class="step">
       <span class="step-num" style="background:#f59e0b;">3</span>
-      <div class="step-text"><strong>Click the second card</strong> — "HireStream Mobile — Android/iOS App v1.0" to open the mobile testing project.</div>
+      <div class="step-text"><strong>Click the second card</strong> — "HireStream Mobile — Android/iOS App v0.4.14" to open the mobile testing project.</div>
     </div>
   </div>
 
@@ -440,6 +449,10 @@
         <div class="step">
           <span class="step-num green">5</span>
           <div class="step-text"><strong style="color:#059669;">Login</strong> — username <code class="mono" style="background:#ecfdf5; padding:1px 4px; border-radius:3px; color:#065f46;">mobiletest</code> · password <code class="mono" style="background:#ecfdf5; padding:1px 4px; border-radius:3px; color:#065f46;">Mobile@123</code></div>
+        </div>
+        <div class="step">
+          <span class="step-num green">6</span>
+          <div class="step-text"><strong style="color:#059669;">Confirm latest build</strong> — open <strong>Applications</strong> tab. Look in the <strong>top-right corner of the dark blue header</strong> for the build tag. You should see <code class="mono" style="background:#ecfdf5; padding:1px 4px; border-radius:3px; color:#065f46;">v0.4.14.0</code>. If you don't see it (or see an older version), use the force-refresh procedure on page 3.</div>
         </div>
       </div>
     </div>
@@ -612,6 +625,10 @@
       <span class="trouble-a">Force-close Expo Go and reopen it. Ensure you're on WiFi, not cellular data.</span>
     </div>
     <div class="trouble-item">
+      <span class="trouble-q">Old build / stale screen?</span>
+      <span class="trouble-a"><strong>Force-refresh the bundle:</strong> Open Expo Go → <strong>long-press</strong> HireStream in the recent projects list → tap <strong>"Remove from list"</strong> → "Enter URL manually" → paste <code class="mono">exps://hirestream-mobile.agentryx.dev</code> → Connect. Fresh download (~30s). Confirm the build tag in the Applications header now reads <code class="mono">v0.4.14.0</code> or later.</span>
+    </div>
+    <div class="trouble-item">
       <span class="trouble-q">Login fails?</span>
       <span class="trouble-a">Usernames are <strong>case-sensitive lowercase</strong>. Use <code class="mono">mobiletest</code> not <code class="mono">MobileTest</code>.</span>
     </div>
@@ -642,7 +659,7 @@
       <h3>📋 How to sign off requirements</h3>
       <div class="steps" style="margin:4px 0;">
         <div class="step"><span class="step-num" style="background:#f59e0b; width:16px; height:16px; font-size:8px;">1</span><div class="step-text" style="font-size:10px;">Go to <strong>verify-stg.agentryx.dev</strong></div></div>
-        <div class="step"><span class="step-num" style="background:#f59e0b; width:16px; height:16px; font-size:8px;">2</span><div class="step-text" style="font-size:10px;">Open <strong>HireStream Mobile v1.0</strong> project</div></div>
+        <div class="step"><span class="step-num" style="background:#f59e0b; width:16px; height:16px; font-size:8px;">2</span><div class="step-text" style="font-size:10px;">Open <strong>HireStream Mobile v0.4.14</strong> project</div></div>
         <div class="step"><span class="step-num" style="background:#f59e0b; width:16px; height:16px; font-size:8px;">3</span><div class="step-text" style="font-size:10px;">Click a <strong>role card</strong> (Candidate, Cross-cutting)</div></div>
         <div class="step"><span class="step-num" style="background:#f59e0b; width:16px; height:16px; font-size:8px;">4</span><div class="step-text" style="font-size:10px;">Click the <strong>signoff circle</strong> → Pass / Partial / Fail</div></div>
       </div>

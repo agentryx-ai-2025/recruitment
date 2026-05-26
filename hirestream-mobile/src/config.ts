@@ -12,7 +12,14 @@
 export const API_BASE_URL = "https://hirestream-stg.agentryx.dev";
 
 export const APP_NAME = "HireStream";
-export const APP_VERSION = "1.0.0";
+
+// Single source of truth for mobile build identification. Bump this on
+// every code change so testers (and us) can confirm at a glance which
+// bundle is actually running on the device — Expo Go silently caches
+// old bundles, and without a visible version we cannot tell new from old.
+// Format: matches the backend portal version (0.M.N.PATCH).
+export const APP_VERSION = "0.4.14.0";
+export const APP_BUILD = 14;
 
 // Token storage keys
 export const STORAGE_KEYS = {
