@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation, Link } from "wouter";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { JobCreationForm } from "@/components/employer/job-creation-form";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -645,6 +646,8 @@ function EmployerPlacements() {
   const { toast } = useToast();
   const [editing, setEditing] = useState<string | null>(null);
   const [letterUrl, setLetterUrl] = useState("");
+  // v0.4.14: edit details (country/salary/startDate) dialog state
+  const [editDetailsFor, setEditDetailsFor] = useState<any | null>(null);
 
   const { data: res, isLoading } = useQuery({
     queryKey: ["/api/v1/agent/placements"],
@@ -753,6 +756,10 @@ function EmployerPlacements() {
                       className="inline-flex items-center gap-1 text-xs font-medium px-3 py-1.5 rounded border border-indigo-200 bg-white hover:border-indigo-500 text-indigo-700">
                       <Download className="w-3.5 h-3.5" /> Download template PDF
                     </a>
+                    <Button size="sm" variant="outline" onClick={() => setEditDetailsFor(r)}
+                      title="Edit country, salary, and start date">
+                      <Edit className="w-3.5 h-3.5 mr-1" /> Edit details
+                    </Button>
                     <Button size="sm" variant="outline" onClick={() => { setEditing(r.placement.id); setLetterUrl(r.placement.appointmentLetterUrl || ""); }}>
                       <Edit className="w-3.5 h-3.5 mr-1" /> Set URL
                     </Button>
@@ -800,7 +807,91 @@ function EmployerPlacements() {
           ))}
         </div>
       )}
+
+      {/* v0.4.14: edit country/salary/startDate on an auto-created placement */}
+      <PlacementDetailsModal
+        row={editDetailsFor}
+        onClose={() => setEditDetailsFor(null)}
+        onSaved={() => {
+          setEditDetailsFor(null);
+          qc.invalidateQueries({ queryKey: ["/api/v1/agent/placements"] });
+          toast({ title: "Placement updated" });
+        }}
+      />
     </div>
+  );
+}
+
+function PlacementDetailsModal({ row, onClose, onSaved }: {
+  row: any | null; onClose: () => void; onSaved: () => void;
+}) {
+  const { toast } = useToast();
+  const [country, setCountry] = useState("");
+  const [salary, setSalary] = useState("");
+  const [startDate, setStartDate] = useState("");
+
+  // Reset inputs when the dialog opens onto a new placement
+  useEffect(() => {
+    if (row) {
+      setCountry(row.placement?.country || "");
+      setSalary(row.placement?.salary || "");
+      setStartDate(row.placement?.startDate ? new Date(row.placement.startDate).toISOString().split("T")[0] : "");
+    }
+  }, [row?.placement?.id]);
+
+  const save = useMutation({
+    mutationFn: async () => {
+      const body: any = { country: country.trim(), salary: salary.trim() || null };
+      body.startDate = startDate || null;
+      const r = await fetch(`/api/v1/agent/placements/${row.placement.id}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!r.ok) {
+        const e = await r.json().catch(() => ({} as any));
+        throw new Error(e?.message || "Save failed");
+      }
+      return r.json();
+    },
+    onSuccess: onSaved,
+    onError: (e: any) => toast({ title: "Couldn't save", description: e.message, variant: "destructive" }),
+  });
+
+  return (
+    <Dialog open={!!row} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2"><Edit className="w-5 h-5 text-indigo-600" /> Edit placement details</DialogTitle>
+          <DialogDescription>
+            {row?.candidate?.fullName ? <>for <span className="font-semibold text-slate-900">{row.candidate.fullName}</span></> : null}
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-3 py-2">
+          <div>
+            <label className="text-xs font-semibold text-slate-600">Destination country</label>
+            <Input value={country} onChange={(e) => setCountry(e.target.value)}
+              placeholder="UAE / Saudi Arabia / Germany …" className="mt-1 h-10 text-sm" />
+          </div>
+          <div>
+            <label className="text-xs font-semibold text-slate-600">Salary (with currency)</label>
+            <Input value={salary} onChange={(e) => setSalary(e.target.value)}
+              placeholder="e.g. AED 8,000 / month" className="mt-1 h-10 text-sm" />
+          </div>
+          <div>
+            <label className="text-xs font-semibold text-slate-600">Start date</label>
+            <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)}
+              min={new Date().toISOString().split("T")[0]} className="mt-1 h-10 text-sm" />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="ghost" onClick={onClose}>Cancel</Button>
+          <Button disabled={!country.trim() || save.isPending} onClick={() => save.mutate()}
+            className="bg-indigo-600 hover:bg-indigo-700 text-white">
+            {save.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "Save"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 

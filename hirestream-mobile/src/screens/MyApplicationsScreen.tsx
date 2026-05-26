@@ -2,9 +2,9 @@
  * My Applications Screen — F3.3
  *
  * Shows all applications by the current user, grouped by status:
- * - Active (applied, shortlisted, interviewing)
- * - Offers (offered placements)
- * - Closed (rejected, withdrawn, completed)
+ * - Active   (submitted, reviewed, shortlisted, interview_scheduled)
+ * - Offers   (selected — offer issued, awaiting candidate response)
+ * - Closed   (placed, rejected, withdrawn, completed)
  *
  * Features:
  * - Pull-to-refresh
@@ -51,15 +51,20 @@ interface MyApplicationsScreenProps {
   onSelectApplication?: (app: any) => void;
 }
 
+// Keys MUST match server application.status values (see STATUS_ORDER in
+// server/routes/application.routes.ts). Drift caused the v0.4.13 UAT
+// "milestone lock" defect — interview_scheduled rows showed no chip
+// because the map didn't list that key.
 const STATUS_CONFIG: Record<string, { icon: keyof typeof Ionicons.glyphMap; color: string; bg: string; label: string }> = {
-  applied: { icon: "paper-plane", color: colors.info, bg: colors.infoBg, label: "Applied" },
-  screening: { icon: "eye", color: colors.info, bg: colors.infoBg, label: "Under Review" },
-  shortlisted: { icon: "star", color: colors.primary, bg: colors.primaryFaded, label: "Shortlisted" },
-  interviewing: { icon: "chatbubbles", color: colors.warning, bg: colors.warningBg, label: "Interview" },
-  offered: { icon: "gift", color: colors.success, bg: colors.successBg, label: "Offer" },
-  accepted: { icon: "checkmark-circle", color: colors.success, bg: colors.successBg, label: "Accepted" },
-  rejected: { icon: "close-circle", color: colors.error, bg: colors.errorBg, label: "Rejected" },
-  withdrawn: { icon: "exit", color: colors.textTertiary, bg: colors.background, label: "Withdrawn" },
+  submitted:           { icon: "paper-plane",      color: colors.info,         bg: colors.infoBg,       label: "Applied" },
+  reviewed:            { icon: "eye",              color: colors.info,         bg: colors.infoBg,       label: "Under Review" },
+  shortlisted:         { icon: "star",             color: colors.primary,      bg: colors.primaryFaded, label: "Shortlisted" },
+  interview_scheduled: { icon: "chatbubbles",      color: colors.warning,      bg: colors.warningBg,    label: "Interview" },
+  selected:            { icon: "gift",             color: colors.success,      bg: colors.successBg,    label: "Offer" },
+  placed:              { icon: "checkmark-circle", color: colors.success,      bg: colors.successBg,    label: "Placed" },
+  rejected:            { icon: "close-circle",     color: colors.error,        bg: colors.errorBg,      label: "Rejected" },
+  withdrawn:           { icon: "exit",             color: colors.textTertiary, bg: colors.background,   label: "Withdrawn" },
+  completed:           { icon: "checkmark-done",   color: colors.textTertiary, bg: colors.background,   label: "Completed" },
 };
 
 export default function MyApplicationsScreen({ onBack, onSelectApplication }: MyApplicationsScreenProps) {
@@ -86,10 +91,15 @@ export default function MyApplicationsScreen({ onBack, onSelectApplication }: My
     setRefreshing(false);
   }, [fetchApplications]);
 
-  // Group applications
-  const activeStatuses = ["submitted", "applied", "screening", "shortlisted", "interviewing", "reviewed"];
-  const offerStatuses = ["offered", "selected"];
-  const closedStatuses = ["accepted", "rejected", "withdrawn", "completed", "placed"];
+  // Tab buckets. Every server-emitted status MUST land in exactly one
+  // bucket — otherwise rows silently vanish from the screen (the v0.4.13
+  // defect where interview_scheduled rows were nowhere).
+  // submitted/reviewed/shortlisted/interview_scheduled → still working through pipeline
+  // selected → offer issued, awaiting candidate accept/decline
+  // placed/rejected/withdrawn/completed → closed
+  const activeStatuses = ["submitted", "reviewed", "shortlisted", "interview_scheduled"];
+  const offerStatuses = ["selected"];
+  const closedStatuses = ["placed", "rejected", "withdrawn", "completed"];
 
   const filtered = applications.filter((a) => {
     if (activeTab === "active") return activeStatuses.includes(a.status);
@@ -103,7 +113,7 @@ export default function MyApplicationsScreen({ onBack, onSelectApplication }: My
   };
 
   const renderApplicationCard = ({ item: app }: { item: Application }) => {
-    const config = STATUS_CONFIG[app.status] || STATUS_CONFIG.applied;
+    const config = STATUS_CONFIG[app.status] || STATUS_CONFIG.submitted;
     const ageDays = getAgingDays(app.appliedAt || app.createdAt);
     const isStale = ageDays >= 14;
     const isAging = ageDays >= 7 && ageDays < 14;
@@ -117,7 +127,7 @@ export default function MyApplicationsScreen({ onBack, onSelectApplication }: My
             <Text style={[styles.statusChipText, { color: config.color }]}>{config.label}</Text>
           </View>
           <View style={styles.agingRow}>
-            {app.status === "offered" && (
+            {app.status === "selected" && (
               <View style={styles.actionPill}>
                 <Ionicons name="flash" size={12} color={colors.warning} />
                 <Text style={styles.actionPillText}>Awaiting your action</Text>

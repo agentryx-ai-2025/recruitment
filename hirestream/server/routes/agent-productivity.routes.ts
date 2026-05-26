@@ -19,6 +19,7 @@ import {
   savedSegments, placements, users, recruitmentAgents, auditLog,
 } from "@shared/schema";
 import { eq, and, desc, isNull, or, sql, inArray } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import PDFDocument from "pdfkit";
 import { logger } from "../config/logger.config";
 import { getSetting } from "../services/settings.service";
@@ -416,6 +417,73 @@ router.get("/placements/:id/offer-letter.pdf", async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// ── Edit placement details (v0.4.14.0) ──────────────────────────────
+// Auto-created placements get defaults from the parent job (country,
+// salary). This endpoint lets the employer / agent refine country,
+// salary, and startDate before the candidate accepts. Ownership is
+// enforced via the parent job — same model as application status.
+router.patch("/placements/:id", async (req, res, next) => {
+  try {
+    const db = storage.db;
+    if (!db) return res.status(500).json({ success: false });
+    const user = (req as any).user;
+    if (!["employer", "agent", "admin", "superadmin"].includes(user.role)) {
+      return res.status(403).json({ success: false, message: "Forbidden" });
+    }
+
+    const { country, salary, startDate } = req.body ?? {};
+    const updates: any = {};
+    if (country !== undefined) {
+      if (typeof country !== "string" || !country.trim()) {
+        return res.status(400).json({ success: false, message: "country must be a non-empty string" });
+      }
+      updates.country = country.trim();
+    }
+    if (salary !== undefined) updates.salary = salary || null;
+    if (startDate !== undefined) {
+      if (startDate === null || startDate === "") {
+        updates.startDate = null;
+      } else {
+        const d = new Date(startDate);
+        if (Number.isNaN(d.getTime())) {
+          return res.status(400).json({ success: false, message: "startDate must be a valid date" });
+        }
+        updates.startDate = d;
+      }
+    }
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({ success: false, message: "No editable fields supplied (country/salary/startDate)" });
+    }
+
+    // Ownership check — placement is owned via its application's job.
+    const [row] = await db
+      .select({ placement: placements, job: jobs })
+      .from(placements)
+      .innerJoin(applications, eq(placements.applicationId, applications.id))
+      .innerJoin(jobs, eq(applications.jobId, jobs.id))
+      .where(eq(placements.id, req.params.id))
+      .limit(1);
+    if (!row) return res.status(404).json({ success: false, message: "Placement not found" });
+
+    const isAdmin = user.role === "admin" || user.role === "superadmin";
+    if (!isAdmin) {
+      const owns = (user.role === "agent" && row.job.agentId === user.id)
+                 || (user.role === "employer" && row.job.employerId === user.id);
+      if (!owns) {
+        return res.status(403).json({ success: false, message: "You can only edit placements on your own jobs." });
+      }
+    }
+
+    const [updated] = await db.update(placements)
+      .set(updates)
+      .where(eq(placements.id, req.params.id))
+      .returning();
+
+    logger.info(`placement ${req.params.id} edited by ${user.role} ${user.id}: ${JSON.stringify(updates)}`);
+    res.json({ success: true, data: updated });
+  } catch (err) { next(err); }
+});
+
 // ── Upload appointment letter URL to a placement (FRS 3.5) ───────────
 // Minimal endpoint: expects a URL string (employer uploads elsewhere and stores link).
 // For full file upload, a multer-backed endpoint would be added later.
@@ -436,6 +504,10 @@ router.patch("/placements/:id/appointment-letter", async (req, res, next) => {
 });
 
 // ── My placements (employer/agent, scoped to their jobs) ─────────────
+// v0.4.14: employer scope was missing derivative jobs (where employer_id
+// is NULL because the agent picked up the requisition). Now also matches
+// placements whose job's parent requisition is owned by the employer —
+// same ownership pattern as application status PATCH (FRS §2.2).
 router.get("/placements", async (req, res, next) => {
   try {
     if (!storage.db) return res.status(500).json({ success: false });
@@ -443,17 +515,39 @@ router.get("/placements", async (req, res, next) => {
     if (!["employer", "agent", "admin", "superadmin"].includes(user.role)) {
       return res.status(403).json({ success: false, message: "Forbidden" });
     }
+
+    if (user.role === "admin" || user.role === "superadmin") {
+      const rows = await storage.db
+        .select({ placement: placements, application: applications, candidate: candidates, job: jobs })
+        .from(placements)
+        .innerJoin(applications, eq(placements.applicationId, applications.id))
+        .innerJoin(candidates, eq(applications.candidateId, candidates.id))
+        .innerJoin(jobs, eq(applications.jobId, jobs.id));
+      return res.json({ success: true, data: rows });
+    }
+
+    if (user.role === "agent") {
+      const rows = await storage.db
+        .select({ placement: placements, application: applications, candidate: candidates, job: jobs })
+        .from(placements)
+        .innerJoin(applications, eq(placements.applicationId, applications.id))
+        .innerJoin(candidates, eq(applications.candidateId, candidates.id))
+        .innerJoin(jobs, eq(applications.jobId, jobs.id))
+        .where(eq(jobs.agentId, user.id));
+      return res.json({ success: true, data: rows });
+    }
+
+    // Employer: direct ownership OR derivative job whose parent requisition is theirs.
+    // Use a single query with a self-join on the parent requisition.
+    const parentJobs = alias(jobs, "parent_jobs");
     const rows = await storage.db
       .select({ placement: placements, application: applications, candidate: candidates, job: jobs })
       .from(placements)
       .innerJoin(applications, eq(placements.applicationId, applications.id))
       .innerJoin(candidates, eq(applications.candidateId, candidates.id))
       .innerJoin(jobs, eq(applications.jobId, jobs.id))
-      .where(user.role === "admin" || user.role === "superadmin"
-        ? undefined as any
-        : user.role === "employer"
-          ? eq(jobs.employerId, user.id)
-          : eq(jobs.agentId, user.id));
+      .leftJoin(parentJobs, eq(jobs.parentRequisitionId, parentJobs.id))
+      .where(or(eq(jobs.employerId, user.id), eq(parentJobs.employerId, user.id)));
     res.json({ success: true, data: rows });
   } catch (err) { next(err); }
 });

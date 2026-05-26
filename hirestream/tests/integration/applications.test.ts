@@ -2,7 +2,7 @@ import { describe, beforeAll, beforeEach, it, expect } from '@jest/globals';
 import request from 'supertest';
 import type { Express } from 'express';
 import { createTestApp, truncateAllTables, getDb } from '../helpers';
-import { recruitmentAgents, applications, interviews } from '../../shared/schema';
+import { recruitmentAgents, applications, interviews, placements } from '../../shared/schema';
 import { eq } from 'drizzle-orm';
 
 let app: Express;
@@ -310,5 +310,196 @@ describe('POST /api/v1/applications/:id/interview-outcome', () => {
       .set('Cookie', candidateCookie)
       .send({ result: 'pass' });
     expect(res.status).toBe(403);
+  });
+
+  it('v0.4.14: pass auto-creates a placement row (employer can issue offer immediately)', async () => {
+    const appId = await setupScheduledInterview();
+    const db = getDb();
+    // No placement before
+    const before = await db.select().from(placements).where(eq(placements.applicationId, appId));
+    expect(before.length).toBe(0);
+
+    const res = await request(app)
+      .post(`/api/v1/applications/${appId}/interview-outcome`)
+      .set('Cookie', agentCookie)
+      .send({ result: 'pass' });
+    expect(res.status).toBe(200);
+
+    const after = await db.select().from(placements).where(eq(placements.applicationId, appId));
+    expect(after.length).toBe(1);
+    // Defaults pulled from the parent job
+    expect((after[0] as any).country).toBe('UAE');
+    expect((after[0] as any).status).toBe('offered');
+  });
+});
+
+// ── Placement auto-create + edit (v0.4.14.0) ────────────────────────
+describe('Placement auto-create on status → selected', () => {
+  async function applyAndAdvanceTo(status: string): Promise<string> {
+    const applyRes = await request(app).post(`/api/v1/jobs/${jobId}/apply`).set('Cookie', candidateCookie);
+    const appId = applyRes.body.data.id;
+    const path = ['reviewed', 'shortlisted', 'interview_scheduled', 'selected'];
+    for (const s of path) {
+      const r = await request(app)
+        .patch(`/api/v1/applications/${appId}/status`)
+        .set('Cookie', agentCookie)
+        .send({ status: s });
+      expect(r.status).toBe(200);
+      if (s === status) break;
+    }
+    return appId;
+  }
+
+  it('PATCH /:id/status → selected auto-creates placement with job defaults', async () => {
+    const appId = await applyAndAdvanceTo('selected');
+    const db = getDb();
+    const rows = await db.select().from(placements).where(eq(placements.applicationId, appId));
+    expect(rows.length).toBe(1);
+    expect((rows[0] as any).country).toBe('UAE');
+    expect((rows[0] as any).status).toBe('offered');
+  });
+
+  it('is idempotent — does not double-create if status set to selected twice', async () => {
+    const appId = await applyAndAdvanceTo('selected');
+    // Toggle: rejected → selected again (admins or fall-back can do this)
+    await request(app).patch(`/api/v1/applications/${appId}/status`)
+      .set('Cookie', agentCookie).send({ status: 'rejected', rejectionFeedback: 'oops' });
+    await request(app).patch(`/api/v1/applications/${appId}/status`)
+      .set('Cookie', agentCookie).send({ status: 'selected' });
+
+    const db = getDb();
+    const rows = await db.select().from(placements).where(eq(placements.applicationId, appId));
+    expect(rows.length).toBe(1); // still exactly one
+  });
+
+  it('bulk-status → selected auto-creates a placement per row', async () => {
+    // Create a second candidate + application
+    const c2 = await request(app).post('/api/v1/auth/register')
+      .send({ email: 'cand2-pl@test.com', password: 'Test@123', role: 'candidate' });
+    const c2Cookie = c2.headers['set-cookie'] as unknown as string[];
+    await request(app).patch('/api/v1/candidates/profile').set('Cookie', c2Cookie)
+      .send({ fullName: 'Two', email: 'cand2-pl@test.com', skills: ['React'] });
+
+    const a1 = await request(app).post(`/api/v1/jobs/${jobId}/apply`).set('Cookie', candidateCookie);
+    const a2 = await request(app).post(`/api/v1/jobs/${jobId}/apply`).set('Cookie', c2Cookie);
+
+    const res = await request(app).patch('/api/v1/applications/bulk-status')
+      .set('Cookie', agentCookie)
+      .send({ ids: [a1.body.data.id, a2.body.data.id], status: 'selected' });
+    expect(res.status).toBe(200);
+
+    const db = getDb();
+    const p1 = await db.select().from(placements).where(eq(placements.applicationId, a1.body.data.id));
+    const p2 = await db.select().from(placements).where(eq(placements.applicationId, a2.body.data.id));
+    expect(p1.length).toBe(1);
+    expect(p2.length).toBe(1);
+  });
+});
+
+describe('PATCH /api/v1/agent/placements/:id (edit details)', () => {
+  async function makeSelectedPlacement(): Promise<string> {
+    const applyRes = await request(app).post(`/api/v1/jobs/${jobId}/apply`).set('Cookie', candidateCookie);
+    const appId = applyRes.body.data.id;
+    for (const s of ['reviewed', 'shortlisted', 'interview_scheduled', 'selected']) {
+      await request(app).patch(`/api/v1/applications/${appId}/status`)
+        .set('Cookie', agentCookie).send({ status: s });
+    }
+    const db = getDb();
+    const [p] = await db.select().from(placements).where(eq(placements.applicationId, appId));
+    return (p as any).id;
+  }
+
+  it('agent owner can edit country/salary/startDate', async () => {
+    const placementId = await makeSelectedPlacement();
+    const res = await request(app)
+      .patch(`/api/v1/agent/placements/${placementId}`)
+      .set('Cookie', agentCookie)
+      .send({ country: 'Saudi Arabia', salary: 'SAR 12,000 / month', startDate: '2026-07-15' });
+    expect(res.status).toBe(200);
+    expect(res.body.data.country).toBe('Saudi Arabia');
+    expect(res.body.data.salary).toBe('SAR 12,000 / month');
+    expect(res.body.data.startDate).toBeTruthy();
+  });
+
+  it('rejects empty country (400)', async () => {
+    const placementId = await makeSelectedPlacement();
+    const res = await request(app)
+      .patch(`/api/v1/agent/placements/${placementId}`)
+      .set('Cookie', agentCookie)
+      .send({ country: '   ' });
+    expect(res.status).toBe(400);
+  });
+
+  it('rejects invalid startDate (400)', async () => {
+    const placementId = await makeSelectedPlacement();
+    const res = await request(app)
+      .patch(`/api/v1/agent/placements/${placementId}`)
+      .set('Cookie', agentCookie)
+      .send({ startDate: 'not-a-date' });
+    expect(res.status).toBe(400);
+  });
+
+  it('rejects empty body (400)', async () => {
+    const placementId = await makeSelectedPlacement();
+    const res = await request(app)
+      .patch(`/api/v1/agent/placements/${placementId}`)
+      .set('Cookie', agentCookie)
+      .send({});
+    expect(res.status).toBe(400);
+  });
+
+  it('rejects a candidate trying to edit (403)', async () => {
+    const placementId = await makeSelectedPlacement();
+    const res = await request(app)
+      .patch(`/api/v1/agent/placements/${placementId}`)
+      .set('Cookie', candidateCookie)
+      .send({ country: 'Hack' });
+    expect(res.status).toBe(403);
+  });
+});
+
+// ── Employer placements scope (v0.4.14.0) ───────────────────────────
+// Confirms the employer also sees placements on derivative jobs (jobs
+// picked up by an agent off the employer's requisition). Before the fix
+// the employer Placements tab only listed direct-employer jobs and
+// missed every requisition-derived placement.
+describe('GET /api/v1/agent/placements — employer derivative scope', () => {
+  it('employer sees placements created on a derivative job from their requisition', async () => {
+    const db = getDb();
+
+    // Register an employer + post a requisition
+    const empReg = await request(app).post('/api/v1/auth/register')
+      .send({ email: 'emp-pl@test.com', password: 'Test@123', role: 'employer' });
+    const empCookie = empReg.headers['set-cookie'] as unknown as string[];
+
+    const reqRes = await request(app).post('/api/v1/jobs')
+      .set('Cookie', empCookie)
+      .send({ title: 'Reactor', company: 'EmpCo', location: 'Dubai', country: 'UAE', skills: ['React'], experience: 1 });
+    const requisitionId = reqRes.body.data.id;
+
+    // Agent picks up the requisition → derivative job (employer_id NULL on the derivative)
+    const derivRes = await request(app).post('/api/v1/jobs')
+      .set('Cookie', agentCookie)
+      .send({
+        title: 'Reactor (Picked)', company: 'EmpCo', location: 'Dubai', country: 'UAE',
+        skills: ['React'], experience: 1, parentRequisitionId: requisitionId,
+      });
+    const derivJobId = derivRes.body.data.id;
+
+    // Candidate applies to the derivative, agent walks them to selected
+    const applyRes = await request(app).post(`/api/v1/jobs/${derivJobId}/apply`).set('Cookie', candidateCookie);
+    const appId = applyRes.body.data.id;
+    for (const s of ['reviewed', 'shortlisted', 'interview_scheduled', 'selected']) {
+      await request(app).patch(`/api/v1/applications/${appId}/status`).set('Cookie', agentCookie).send({ status: s });
+    }
+
+    // Placement should exist (auto-create) and be visible to the employer
+    const placementRows = await db.select().from(placements).where(eq(placements.applicationId, appId));
+    expect(placementRows.length).toBe(1);
+
+    const list = await request(app).get('/api/v1/agent/placements').set('Cookie', empCookie);
+    expect(list.status).toBe(200);
+    const ids = (list.body.data ?? []).map((r: any) => r.placement.id);
+    expect(ids).toContain((placementRows[0] as any).id);
   });
 });

@@ -100,6 +100,17 @@ router.patch("/:id/status", protect, async (req, res, next) => {
     if (rejectionFeedback !== undefined) updates.rejectionFeedback = rejectionFeedback || null;
     const [updated] = await db.update(applications).set(updates).where(eq(applications.id, app.id)).returning();
 
+    // v0.4.14: auto-create a placement row when transitioning to selected.
+    // Without this the employer's "issue offer from Placements tab" CTA
+    // pointed nowhere — see PlacementAutoCreate service header for the
+    // UAT context. Idempotent; safe even if a row already exists.
+    if (status === "selected") {
+      try {
+        const { ensurePlacementForApplication } = await import("../services/placement-autocreate.service");
+        await ensurePlacementForApplication(app.id);
+      } catch (e: any) { logger.warn(`placement auto-create on status change failed: ${e?.message}`); }
+    }
+
     // PWS §8: audit every application state transition
     try {
       const { logTransition } = await import("../services/audit-transitions.service");
@@ -221,6 +232,15 @@ router.patch("/bulk-status", protect, async (req, res, next) => {
       .set({ status })
       .where(inArray(applications.id, ownedAppIds))
       .returning();
+
+    // v0.4.14: bulk-select also needs placement auto-create. Same idempotent
+    // helper as the single-status path.
+    if (status === "selected" && updated.length > 0) {
+      try {
+        const { ensurePlacementForApplication } = await import("../services/placement-autocreate.service");
+        await Promise.all(updated.map((u: any) => ensurePlacementForApplication(u.id)));
+      } catch (e: any) { logger.warn(`bulk placement auto-create failed: ${e?.message}`); }
+    }
 
     // Create notifications for each updated candidate
     const statusLabels: Record<string, string> = {
@@ -505,6 +525,14 @@ router.post("/:id/interview-outcome", protect, async (req, res, next) => {
     const updates: any = { status: newStatus };
     if (newStatus === "rejected" && notes) updates.rejectionFeedback = notes;
     const [updated] = await db.update(applications).set(updates).where(eq(applications.id, app.id)).returning();
+
+    // v0.4.14: pass → selected also auto-creates a placement. Idempotent.
+    if (newStatus === "selected") {
+      try {
+        const { ensurePlacementForApplication } = await import("../services/placement-autocreate.service");
+        await ensurePlacementForApplication(app.id);
+      } catch (e: any) { logger.warn(`placement auto-create on interview-outcome failed: ${e?.message}`); }
+    }
 
     // Audit
     try {

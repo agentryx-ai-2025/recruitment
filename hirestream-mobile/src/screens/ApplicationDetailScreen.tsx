@@ -31,13 +31,18 @@ interface ApplicationDetailProps {
   onWithdrawn?: () => void;
 }
 
+// Stage keys MUST match the server's application.status values exactly
+// (see hirestream/server/routes/application.routes.ts STATUS_ORDER). When
+// these drift from the real vocabulary, findIndex returns -1 and every
+// dot stays grey even though notifications are firing — that was the
+// v0.4.13 UAT defect. Labels are user-facing and can be friendlier.
 const STAGES = [
-  { key: "applied", label: "Applied", icon: "paper-plane" as const },
-  { key: "screening", label: "Under Review", icon: "eye" as const },
-  { key: "shortlisted", label: "Shortlisted", icon: "star" as const },
-  { key: "interviewing", label: "Interview", icon: "chatbubbles" as const },
-  { key: "offered", label: "Offered", icon: "gift" as const },
-  { key: "accepted", label: "Accepted", icon: "checkmark-circle" as const },
+  { key: "submitted",           label: "Applied",      icon: "paper-plane" as const },
+  { key: "reviewed",            label: "Under Review", icon: "eye" as const },
+  { key: "shortlisted",         label: "Shortlisted",  icon: "star" as const },
+  { key: "interview_scheduled", label: "Interview",    icon: "chatbubbles" as const },
+  { key: "selected",            label: "Offered",      icon: "gift" as const },
+  { key: "placed",              label: "Accepted",     icon: "checkmark-circle" as const },
 ];
 
 const TERMINAL_STAGES = ["rejected", "withdrawn", "completed"];
@@ -209,8 +214,8 @@ export default function ApplicationDetailScreen({
           )}
         </View>
 
-        {/* Offer action */}
-        {app.status === "offered" && (
+        {/* Offer action — server status is "selected" (offer issued, awaiting candidate) */}
+        {app.status === "selected" && (
           <View style={styles.offerCard}>
             <Ionicons name="flash" size={24} color={colors.warning} />
             <Text style={styles.offerTitle}>⚡ Awaiting Your Action</Text>
@@ -221,7 +226,7 @@ export default function ApplicationDetailScreen({
         )}
 
         {/* Withdraw */}
-        {!isTerminal && app.status !== "offered" && (
+        {!isTerminal && app.status !== "selected" && app.status !== "placed" && (
           <TouchableOpacity style={styles.withdrawBtn} onPress={handleWithdraw} activeOpacity={0.8}>
             <Ionicons name="exit-outline" size={18} color={colors.error} />
             <Text style={styles.withdrawText}>Withdraw Application</Text>
