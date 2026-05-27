@@ -3,6 +3,7 @@ import { useLocation, Link } from "wouter";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { ReportsBI } from "@/components/shared/ReportsBI";
 import { JobCreationForm } from "@/components/employer/job-creation-form";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -16,7 +17,7 @@ import {
   Calendar, Loader2, Building, Eye, Edit, MapPin, FileText,
   ChevronRight, User, Star, AlertCircle, Bell, LayoutDashboard,
   Activity, ArrowRight, CheckCircle, TrendingUp, Globe, Download, Heart,
-  Copy, Trash2, PauseCircle, PlayCircle,
+  Copy, Trash2, PauseCircle, PlayCircle, ClipboardList, Route,
 } from "lucide-react";
 
 async function fetchJson(url: string) {
@@ -84,13 +85,18 @@ export default function EmployerDashboard() {
     );
   }
 
-  const navItems = [
-    { key: "overview",   label: "Dashboard",  icon: LayoutDashboard, count: null },
-    { key: "jobs",       label: "My Jobs",    icon: Briefcase,       count: myJobs.length },
-    { key: "active",     label: "Active",     icon: CheckCircle,     count: activeJobs.length },
-    { key: "placements", label: "Offers & Placements", icon: Handshake, count: null },
-    { key: "reports",    label: "Reports",    icon: TrendingUp,      count: null },
-    { key: "activity",   label: "Activity",   icon: Activity,        count: notifications.length },
+  // v0.4.30: parity with agent. "Active" entry dropped — it was a
+  // redundant subset of "My Jobs" filtered to status=active. "All
+  // Applicants" / "Applications Pipeline" added so the employer has a
+  // cross-requisition candidate view (same component as agent's
+  // /agent/applicants, endpoint now scopes by role).
+  const navItems: { key: string; label: string; icon: any; count: number | null; href?: string | null }[] = [
+    { key: "overview",     label: "Dashboard",            icon: LayoutDashboard, count: null,                 href: null },
+    { key: "jobs",         label: "My Jobs",              icon: Briefcase,       count: myJobs.length,        href: null },
+    { key: "applicants",   label: "Applications Pipeline", icon: ClipboardList,  count: null,                 href: "/employer/applicants" },
+    { key: "placements",   label: "Offers & Placements",  icon: Handshake,       count: null,                 href: null },
+    { key: "reports",      label: "Reports",              icon: TrendingUp,      count: null,                 href: null },
+    { key: "activity",     label: "Activity",             icon: Activity,        count: notifications.length, href: null },
   ];
 
   return (
@@ -129,25 +135,32 @@ export default function EmployerDashboard() {
 
           {/* Navigation */}
           <nav className="bg-white rounded-xl border border-slate-200 p-1.5 shadow-sm">
-            {navItems.map(item => (
-              <button
-                key={item.key}
-                onClick={() => setActiveView(item.key)}
-                className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-all ${
-                  activeView === item.key
-                    ? "bg-blue-50 text-blue-700 font-semibold"
-                    : "text-slate-600 hover:bg-slate-50"
-                }`}
-              >
-                <item.icon className="w-4 h-4 flex-shrink-0" />
-                <span className="flex-1 text-left truncate">{item.label}</span>
-                {item.count !== null && item.count > 0 && (
-                  <span className={`text-[11px] font-semibold tabular-nums ${
-                    activeView === item.key ? "text-blue-600" : "text-slate-400"
-                  }`}>{item.count}</span>
-                )}
-              </button>
-            ))}
+            {navItems.map(item => {
+              const baseClass = `w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-all ${
+                activeView === item.key
+                  ? "bg-blue-50 text-blue-700 font-semibold"
+                  : "text-slate-600 hover:bg-slate-50"
+              }`;
+              const inner = (
+                <>
+                  <item.icon className="w-4 h-4 flex-shrink-0" />
+                  <span className="flex-1 text-left truncate">{item.label}</span>
+                  {item.count !== null && item.count > 0 && (
+                    <span className={`text-[11px] font-semibold tabular-nums ${
+                      activeView === item.key ? "text-blue-600" : "text-slate-400"
+                    }`}>{item.count}</span>
+                  )}
+                </>
+              );
+              // v0.4.30: items with `href` are external routes (Link),
+              // others are in-page tab switches (button).
+              if (item.href) {
+                return <Link key={item.key} href={item.href} className={baseClass}>{inner}</Link>;
+              }
+              return (
+                <button key={item.key} onClick={() => setActiveView(item.key)} className={baseClass}>{inner}</button>
+              );
+            })}
           </nav>
 
           {/* Quick Stats */}
@@ -192,9 +205,8 @@ export default function EmployerDashboard() {
                 />
               )}
               {activeView === "jobs" && <JobsContent jobs={myJobs} title="All Job Postings" statusFilter={jobStatusFilter} setStatusFilter={setJobStatusFilter} />}
-              {activeView === "active" && <JobsContent jobs={activeJobs} title="Active Job Postings" statusFilter="active" setStatusFilter={setJobStatusFilter} lockStatus />}
               {activeView === "placements" && <EmployerPlacements />}
-              {activeView === "reports" && <EmployerReports />}
+              {activeView === "reports" && <ReportsBI />}
               {activeView === "activity" && <ActivityContent notifications={notifications} />}
             </motion.div>
           </AnimatePresence>
@@ -248,16 +260,32 @@ function StatCard({ icon: Icon, color, lightBg, value, label, subtitle, onClick 
 
 // ── Overview ──
 function OverviewContent({ myJobs, activeJobs, closedJobs, notifications, setActiveView }: any) {
+  // v0.4.30: people-side metric for the 4th tile (was "Track
+  // Placements — —" placeholder). Counts candidates currently in any
+  // active pipeline stage across the employer's requisitions.
+  const { data: applicantsRes } = useQuery({
+    queryKey: ["/api/v1/agent/applicants"],
+    queryFn: () => fetchJson("/api/v1/agent/applicants"),
+  });
+  const applicants: any[] = applicantsRes?.data ?? [];
+  const inPipeline = applicants.filter((a) =>
+    ["submitted", "reviewed", "shortlisted", "interview_scheduled", "selected"].includes(a.status)
+  ).length;
+
   return (
     <motion.div variants={stagger} initial="initial" animate="animate" className="space-y-5">
       {/* Hero: Awaiting your decision — the employer's primary metric */}
       <AwaitingDecisionHero setActiveView={setActiveView} />
 
+      {/* v0.4.30: Applications Pipeline strip — same 6 stages the agent
+          and candidate see, scoped to the employer's requisitions. */}
+      <EmployerPipelineStrip applicants={applicants} />
+
       <motion.div variants={fadeUp} className="grid grid-cols-2 xl:grid-cols-4 gap-3">
         <StatCard icon={Briefcase} color="text-blue-600" lightBg="bg-blue-50" value={activeJobs.length} label="Open requisitions" subtitle={`${myJobs.length} total posted`} onClick={() => setActiveView("jobs")} />
-        <StatCard icon={UserCheck} color="text-emerald-600" lightBg="bg-emerald-50" value={myJobs.length} label="Total Posts" subtitle={`${closedJobs.length} closed`} onClick={() => setActiveView("jobs")} />
+        <StatCard icon={UserCheck} color="text-emerald-600" lightBg="bg-emerald-50" value={applicants.length} label="Total applicants" subtitle={`${inPipeline} in active pipeline`} onClick={() => { window.location.href = "/employer/applicants"; }} />
         <StatCard icon={Bell} color="text-orange-600" lightBg="bg-orange-50" value={notifications.length} label="Updates" subtitle="New notifications" onClick={() => setActiveView("activity")} />
-        <StatCard icon={Handshake} color="text-purple-600" lightBg="bg-purple-50" value="—" label="Track Placements" subtitle="Offers + welfare status" onClick={() => setActiveView("placements")} />
+        <StatCard icon={Handshake} color="text-purple-600" lightBg="bg-purple-50" value={myJobs.length === 0 ? "—" : applicants.filter(a => ["selected", "placed"].includes(a.status)).length} label="Offers & Placements" subtitle="Selected + Placed" onClick={() => setActiveView("placements")} />
       </motion.div>
 
       {/* Requisitions with progress bars */}
@@ -895,96 +923,53 @@ function PlacementDetailsModal({ row, onClose, onSaved }: {
   );
 }
 
-// ── Employer Reports (reuses agent reports endpoint scoped to employer's jobs) ──
-function EmployerReports() {
-  const { data: res, isLoading } = useQuery({
-    queryKey: ["/api/v1/agent/reports"],
-    queryFn: () => fetchJson("/api/v1/agent/reports"),
-  });
-  if (isLoading) return <div className="p-10 text-center"><Loader2 className="w-6 h-6 animate-spin text-blue-600 inline" /></div>;
-  const d = res?.data ?? { jobs: { total: 0, active: 0 }, applicants: { total: 0, funnel: {}, conversionPct: 0 }, placements: { total: 0, avgTimeToPlaceDays: 0, topCountries: [] }, trend: [] };
-  const maxTrend = Math.max(1, ...d.trend.map((t: any) => t.count));
+// ── Applications Pipeline strip (v0.4.30) ────────────────────────────
+// Six-stage horizontal pill row, same shape as the candidate and agent
+// versions. Counts the employer's applicants in each stage. Clicking a
+// pill deep-links to /employer/applicants pre-filtered.
+const EMPLOYER_PIPELINE = [
+  { key: "submitted",           label: "Submitted",  bg: "bg-blue-50",    text: "text-blue-700",    dot: "bg-blue-500" },
+  { key: "reviewed",            label: "Reviewed",   bg: "bg-amber-50",   text: "text-amber-700",   dot: "bg-amber-500" },
+  { key: "shortlisted",         label: "Shortlisted",bg: "bg-purple-50",  text: "text-purple-700",  dot: "bg-purple-500" },
+  { key: "interview_scheduled", label: "Interview",  bg: "bg-cyan-50",    text: "text-cyan-700",    dot: "bg-cyan-500" },
+  { key: "selected",            label: "Selected",   bg: "bg-emerald-50", text: "text-emerald-700", dot: "bg-emerald-500" },
+  { key: "placed",              label: "Placed",     bg: "bg-green-50",   text: "text-green-700",   dot: "bg-green-600" },
+] as const;
 
-  const Card = ({ label, value, subtitle }: any) => (
-    <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
-      <p className="text-[10px] uppercase tracking-wide text-slate-500 font-semibold">{label}</p>
-      <p className="text-2xl font-bold text-slate-900 tabular-nums mt-1">{value}</p>
-      {subtitle && <p className="text-[11px] text-slate-400 mt-1">{subtitle}</p>}
-    </div>
-  );
-
+function EmployerPipelineStrip({ applicants }: { applicants: any[] }) {
+  if (!applicants || applicants.length === 0) return null;
+  const counts: Record<string, number> = {};
+  for (const s of EMPLOYER_PIPELINE) counts[s.key] = 0;
+  for (const a of applicants) {
+    if (a.status && counts[a.status] !== undefined) counts[a.status]++;
+  }
   return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Card label="Jobs (active)" value={`${d.jobs.active} / ${d.jobs.total}`} subtitle="Active of total posted" />
-        <Card label="Applicants" value={d.applicants.total} subtitle="Across your jobs" />
-        <Card label="Placements" value={d.placements.total} subtitle="Successful placements" />
-        <Card label="Conversion" value={`${d.applicants.conversionPct}%`} subtitle="Applied → Placed" />
-      </div>
-
-      <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
-        <h3 className="text-sm font-bold text-slate-900 mb-3 flex items-center gap-2">
-          <TrendingUp className="w-4 h-4 text-indigo-600" /> Applicant funnel
+    <motion.div variants={fadeUp} className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+          <Route className="w-4 h-4 text-indigo-600" /> Applications Pipeline
+          <span className="text-[11px] font-normal text-slate-500">{applicants.length} application{applicants.length !== 1 ? "s" : ""} across your requisitions</span>
         </h3>
-        <div className="grid grid-cols-3 md:grid-cols-7 gap-2">
-          {[
-            { k: "submitted", label: "Submitted", color: "bg-blue-100 text-blue-700" },
-            { k: "reviewed", label: "Reviewed", color: "bg-amber-100 text-amber-700" },
-            { k: "shortlisted", label: "Shortlisted", color: "bg-purple-100 text-purple-700" },
-            { k: "interview_scheduled", label: "Interview", color: "bg-cyan-100 text-cyan-700" },
-            { k: "selected", label: "Selected", color: "bg-emerald-100 text-emerald-700" },
-            { k: "placed", label: "Placed", color: "bg-green-100 text-green-700" },
-            { k: "rejected", label: "Rejected", color: "bg-red-100 text-red-700" },
-          ].map((s) => (
-            <div key={s.k} className={`${s.color} rounded-lg px-3 py-3`}>
-              <div className="text-[10px] font-medium opacity-90">{s.label}</div>
-              <div className="text-xl font-bold tabular-nums">{d.applicants.funnel?.[s.k] ?? 0}</div>
-            </div>
-          ))}
-        </div>
       </div>
-
-      <div className="grid md:grid-cols-2 gap-4">
-        <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
-          <h3 className="text-sm font-bold text-slate-900 mb-3 flex items-center gap-2">
-            <Clock className="w-4 h-4 text-cyan-600" /> Time to placement
-          </h3>
-          <div className="flex items-baseline gap-2">
-            <span className="text-4xl font-bold text-slate-900 tabular-nums">{d.placements.avgTimeToPlaceDays}</span>
-            <span className="text-slate-500 text-sm">days average</span>
-          </div>
-        </div>
-        <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
-          <h3 className="text-sm font-bold text-slate-900 mb-3 flex items-center gap-2">
-            <Globe className="w-4 h-4 text-amber-600" /> Top destinations
-          </h3>
-          {d.placements.topCountries.length === 0
-            ? <p className="text-xs text-slate-400">No placements yet.</p>
-            : <div className="space-y-2">{d.placements.topCountries.map((c: any) => (
-                <div key={c.country} className="flex items-center justify-between text-sm">
-                  <span className="text-slate-700">{c.country}</span><span className="font-bold">{c.count}</span>
+      <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+        {EMPLOYER_PIPELINE.map((s, i) => {
+          const count = counts[s.key];
+          const isEmpty = count === 0;
+          return (
+            <Link key={s.key} href={`/employer/applicants?status=${encodeURIComponent(s.key)}`}>
+              <a className={`block rounded-lg px-3 py-2.5 text-left transition border cursor-pointer ${isEmpty ? "bg-slate-50 text-slate-400 border-slate-100" : `${s.bg} ${s.text} border-transparent hover:ring-2 hover:ring-slate-300`}`}
+                 title={isEmpty ? `No applications in ${s.label} stage` : `View ${count} application${count === 1 ? "" : "s"} in ${s.label}`}>
+                <div className="flex items-center gap-1.5">
+                  <span className={`w-1.5 h-1.5 rounded-full ${isEmpty ? "bg-slate-200" : s.dot}`} />
+                  <span className="text-[10px] uppercase font-bold opacity-80">{i + 1}. {s.label}</span>
                 </div>
-              ))}</div>}
-        </div>
+                <div className="text-2xl font-bold tabular-nums mt-1">{count}</div>
+              </a>
+            </Link>
+          );
+        })}
       </div>
-
-      <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
-        <h3 className="text-sm font-bold text-slate-900 mb-3 flex items-center gap-2">
-          <Activity className="w-4 h-4 text-blue-600" /> Applications over time
-        </h3>
-        {d.trend.length === 0
-          ? <p className="text-xs text-slate-400">Not enough data yet.</p>
-          : <div className="flex items-end gap-2 h-32">
-              {d.trend.map((t: any) => (
-                <div key={t.month} className="flex-1 flex flex-col items-center">
-                  <div className="w-full bg-gradient-to-t from-blue-500 to-indigo-500 rounded-t"
-                    style={{ height: `${(t.count / maxTrend) * 100}%`, minHeight: "4px" }} title={`${t.month}: ${t.count}`} />
-                  <span className="text-[10px] text-slate-400 mt-1">{t.month.slice(5)}</span>
-                </div>
-              ))}
-            </div>}
-      </div>
-    </div>
+    </motion.div>
   );
 }
 

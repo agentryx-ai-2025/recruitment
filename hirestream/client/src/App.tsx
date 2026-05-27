@@ -129,6 +129,11 @@ function Router() {
         <Route path="/agent/applicants">
           <PageLayout><AgentApplicantsPage /></PageLayout>
         </Route>
+        {/* v0.4.30: employer mirrors /agent/applicants — same component,
+            endpoint is role-aware so it scopes to the employer's jobs. */}
+        <Route path="/employer/applicants">
+          <PageLayout><AgentApplicantsPage /></PageLayout>
+        </Route>
         <Route path="/agent/drives/:id">
           <PageLayout><AgentDriveDetailPage /></PageLayout>
         </Route>

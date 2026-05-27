@@ -982,19 +982,40 @@ router.get("/applicants", async (req, res, next) => {
   try {
     const userRole = (req.user as any)?.role;
     const userId = (req.user as any)?.id;
-    if (userRole !== "agent" && userRole !== "admin" && userRole !== "superadmin") {
-      return res.status(403).json({ success: false, error: { code: 403, message: "Agents only" } });
+    // v0.4.30: extended to employer role. Employer sees applicants on
+    // jobs they posted directly AND on derivative jobs an agent picked
+    // up from their requisition (FRS §2.2 ownership).
+    if (!["agent", "employer", "admin", "superadmin"].includes(userRole)) {
+      return res.status(403).json({ success: false, error: { code: 403, message: "Agents and employers only" } });
     }
     const db = storage.db;
     if (!db) return res.status(500).json({ success: false });
 
-    // All jobs the agent owns (derivative + direct agent-posted). Pull company
-    // + priority too so the UI can filter by those dimensions without a second
-    // round-trip.
-    const myJobs = await db.select({
-      id: jobs.id, title: jobs.title, country: jobs.country,
-      company: jobs.company, priority: jobs.priority,
-    }).from(jobs).where(eq(jobs.agentId, userId));
+    // Scope per role
+    let myJobs: any[];
+    if (userRole === "agent") {
+      myJobs = await db.select({
+        id: jobs.id, title: jobs.title, country: jobs.country,
+        company: jobs.company, priority: jobs.priority,
+      }).from(jobs).where(eq(jobs.agentId, userId));
+    } else if (userRole === "employer") {
+      // Direct ownership: jobs.employerId === userId
+      // Derivative ownership: agent-picked-up job whose parent requisition's employerId === userId
+      const parentJobs = alias(jobs, "parent_jobs_applicants");
+      myJobs = await db.select({
+        id: jobs.id, title: jobs.title, country: jobs.country,
+        company: jobs.company, priority: jobs.priority,
+      })
+      .from(jobs)
+      .leftJoin(parentJobs, eq(jobs.parentRequisitionId, parentJobs.id))
+      .where(or(eq(jobs.employerId, userId), eq(parentJobs.employerId, userId)));
+    } else {
+      // admin / superadmin → all jobs
+      myJobs = await db.select({
+        id: jobs.id, title: jobs.title, country: jobs.country,
+        company: jobs.company, priority: jobs.priority,
+      }).from(jobs);
+    }
     if (myJobs.length === 0) {
       return res.json({ success: true, data: [], jobCount: 0 });
     }
