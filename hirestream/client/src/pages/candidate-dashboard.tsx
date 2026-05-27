@@ -454,6 +454,14 @@ function OverviewView({ appCount, shortlisted, docs, savedCount, completion, app
           everything to find the most actionable item in their life. */}
       <OffersBanner applications={applications} setActiveView={setActiveView} />
 
+      {/* v0.4.29: Candidate Application Pipeline — same 6 stages the
+          agent sees, with candidate-friendly labels. User noticed the
+          stat cards below mix pipeline stages (Shortlisted, Offers)
+          with non-pipeline things (Recommended jobs, Documents) and
+          asked for honest pipeline visibility. Each pill is clickable
+          and filters the My Applications view via the intent system. */}
+      <CandidatePipelineStrip applications={applications} setActiveView={setActiveView} />
+
       {/* Stat Cards — compact, aligned, info-rich
           v0.4.16: added Offers card. UAT feedback: even with the hero
           banner at the top, candidates wanted a stat-grid summary of
@@ -1108,13 +1116,18 @@ function ApplicationsView({ applications, initialIntent }: { applications: any[]
   // v0.4.20: initial filter state honors the `intent` hint passed from
   // the Overview stat cards so each card lands the user on the rows the
   // card was about — instead of always dumping them on the same list.
-  //   intent="in_progress" → status filter = "shortlisted" (clicking
-  //       the Shortlisted card; user can broaden via dropdown if they
-  //       want interview_scheduled / selected rows too)
-  //   intent="offers" → enable the awaiting-action quick filter
-  //   intent="all" → no pre-filter (clicking the Applications card)
+  //   intent="in_progress" → status filter = "shortlisted"
+  //   intent="offers"      → enable the awaiting-action quick filter
+  //   intent="all"         → no pre-filter
+  //   intent="status:<key>" → set status filter to that specific status
+  //       (v0.4.29 — used by the new candidate Pipeline strip pills so
+  //        clicking "Interview" lands directly on interview_scheduled)
   //   no intent → existing auto-awaiting behavior (landing fresh)
-  const [statusFilter, setStatusFilter] = useState(initialIntent === "in_progress" ? "shortlisted" : "all");
+  const initialStatus =
+    initialIntent === "in_progress" ? "shortlisted"
+    : initialIntent && initialIntent.startsWith("status:") ? initialIntent.slice(7)
+    : "all";
+  const [statusFilter, setStatusFilter] = useState(initialStatus);
   // Quick-filter: "Awaiting your action" — apps where the next move is on the
   // candidate (offer awaiting accept/decline). Default ON once we detect an
   // offer; candidates need to see the decision first. They can click it off to
@@ -2620,6 +2633,66 @@ function UpcomingInterviews({ applications, setActiveView }: { applications: any
             </a>
           </div>
         ))}
+      </div>
+    </motion.div>
+  );
+}
+
+// ── Candidate Application Pipeline strip (v0.4.29) ───────────────────
+// Six-stage horizontal pill row mirroring the agent's Applications
+// Pipeline view, with candidate-friendly labels (Applied, Under
+// Review, Shortlisted, Interview, Offer, Accepted). Each pill shows
+// the count of THE CANDIDATE'S applications in that status, and
+// clicking pre-filters the My Applications view via the intent
+// system (status:<key>).
+//
+// Why both this AND the stat cards below: the stat cards include
+// non-pipeline things (Recommended jobs, Documents) so they're not a
+// faithful pipeline view. This strip is honest about stage
+// distribution; the cards stay for "action items I should attend to".
+const PIPELINE_STAGES = [
+  { key: "submitted",           label: "Applied",      intent: "status:submitted",           ring: "ring-blue-500",    bg: "bg-blue-50",    text: "text-blue-700",    dot: "bg-blue-500" },
+  { key: "reviewed",            label: "Under Review", intent: "status:reviewed",            ring: "ring-amber-500",   bg: "bg-amber-50",   text: "text-amber-700",   dot: "bg-amber-500" },
+  { key: "shortlisted",         label: "Shortlisted",  intent: "status:shortlisted",         ring: "ring-purple-500",  bg: "bg-purple-50",  text: "text-purple-700",  dot: "bg-purple-500" },
+  { key: "interview_scheduled", label: "Interview",    intent: "status:interview_scheduled", ring: "ring-cyan-500",    bg: "bg-cyan-50",    text: "text-cyan-700",    dot: "bg-cyan-500" },
+  { key: "selected",            label: "Offer",        intent: "offers",                     ring: "ring-emerald-500", bg: "bg-emerald-50", text: "text-emerald-700", dot: "bg-emerald-500" },
+  { key: "placed",              label: "Accepted",     intent: "status:placed",              ring: "ring-green-600",   bg: "bg-green-50",   text: "text-green-700",   dot: "bg-green-600" },
+] as const;
+
+function CandidatePipelineStrip({ applications, setActiveView }: { applications: any[]; setActiveView: (v: string, intent?: string) => void }) {
+  if (!applications || applications.length === 0) return null;
+  const counts: Record<string, number> = {};
+  for (const s of PIPELINE_STAGES) counts[s.key] = 0;
+  for (const a of applications) {
+    if (a.status && counts[a.status] !== undefined) counts[a.status]++;
+  }
+  return (
+    <motion.div variants={fadeUp} className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+          <Route className="w-4 h-4 text-indigo-600" /> Your Application Pipeline
+          <span className="text-[11px] font-normal text-slate-500">{applications.length} application{applications.length !== 1 ? "s" : ""} total</span>
+        </h3>
+      </div>
+      <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+        {PIPELINE_STAGES.map((s, i) => {
+          const count = counts[s.key];
+          const isEmpty = count === 0;
+          return (
+            <button
+              key={s.key}
+              onClick={() => setActiveView("applications", s.intent)}
+              className={`relative rounded-lg px-3 py-2.5 text-left transition border ${isEmpty ? "bg-slate-50 text-slate-400 border-slate-100" : `${s.bg} ${s.text} border-transparent hover:ring-2 hover:${s.ring}`}`}
+              title={isEmpty ? `No applications in ${s.label} stage` : `View ${count} application${count === 1 ? "" : "s"} in ${s.label}`}
+            >
+              <div className="flex items-center gap-1.5">
+                <span className={`w-1.5 h-1.5 rounded-full ${isEmpty ? "bg-slate-200" : s.dot}`} />
+                <span className="text-[10px] uppercase font-bold opacity-80">{i + 1}. {s.label}</span>
+              </div>
+              <div className="text-2xl font-bold tabular-nums mt-1">{count}</div>
+            </button>
+          );
+        })}
       </div>
     </motion.div>
   );
