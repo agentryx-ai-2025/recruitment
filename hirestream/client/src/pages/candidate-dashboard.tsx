@@ -1116,7 +1116,16 @@ function renderAppCard(app: any, selectedApp: any, setSelectedApp: (a: any) => v
           );
         })}
       </div>
-      <p className="text-[10px] text-slate-400 mt-1.5 capitalize font-medium">{app.status?.replace(/_/g, " ")} · {app.appliedAt ? new Date(app.appliedAt).toLocaleDateString("en-IN") : ""}</p>
+      {/* v0.4.34.1: card meta line. When the app is in an interview-
+          scheduled state AND a real interviews row exists, show the actual
+          interview date. Otherwise fall back to "Applied <date>" so the
+          label doesn't lie about what the date represents. */}
+      <p className="text-[10px] text-slate-400 mt-1.5 capitalize font-medium">
+        {app.status === "interview_scheduled" && app.nextInterview?.scheduledAt
+          ? <>Interview on {new Date(app.nextInterview.scheduledAt).toLocaleDateString("en-IN")}</>
+          : <>{app.status?.replace(/_/g, " ")}{" · "}Applied {app.appliedAt ? new Date(app.appliedAt).toLocaleDateString("en-IN") : ""}</>
+        }
+      </p>
     </div>
   );
 }

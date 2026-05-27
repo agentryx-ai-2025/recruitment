@@ -399,7 +399,7 @@ router.post("/:driveId/interviews", protect, async (req, res, next) => {
     if (!db) return res.status(500).json({ success: false, error: { code: 500, message: "Database not available" } });
 
     const user = req.user as any;
-    const { applicationId, scheduledAt, location, mode } = req.body;
+    const { applicationId, scheduledAt, location, mode, interviewerName, meetingLink } = req.body;
 
     if (!applicationId || !scheduledAt) {
       return res.status(400).json({ success: false, error: { code: 400, message: "applicationId and scheduledAt are required" } });
@@ -418,6 +418,10 @@ router.post("/:driveId/interviews", protect, async (req, res, next) => {
       scheduledAt: new Date(scheduledAt),
       location: location || null,
       mode: mode || "in_person",
+      // v0.4.34.1: capture interviewer + meeting link so candidate panel
+      // can render them. Both optional.
+      interviewerName: interviewerName ? String(interviewerName).slice(0, 200) : null,
+      meetingLink: meetingLink ? String(meetingLink).slice(0, 500) : null,
       conductedBy: user.id,
     }).returning();
 

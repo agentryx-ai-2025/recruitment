@@ -37,6 +37,11 @@ export function ScheduleInterviewModal({
   const [time, setTime] = useState("10:00");
   const [location, setLocation] = useState("");
   const [mode, setMode] = useState("in_person");
+  // v0.4.34.1 (Phase 4 follow-up): capture interviewer + meeting link
+  // so the candidate panel shows "Sarah Mitchell — zoom.us/j/…" instead
+  // of just a date pill.
+  const [interviewerName, setInterviewerName] = useState("");
+  const [meetingLink, setMeetingLink] = useState("");
 
   const { data: drivesRes } = useQuery({
     queryKey: ["/api/v1/drives/my"],
@@ -50,7 +55,11 @@ export function ScheduleInterviewModal({
       const scheduledAt = new Date(`${date}T${time}`).toISOString();
       const res = await fetch(`/api/v1/drives/${driveId || "none"}/interviews`, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ applicationId, scheduledAt, location, mode }),
+        body: JSON.stringify({
+          applicationId, scheduledAt, location, mode,
+          interviewerName: interviewerName.trim() || undefined,
+          meetingLink: meetingLink.trim() || undefined,
+        }),
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({} as any));
@@ -61,7 +70,7 @@ export function ScheduleInterviewModal({
     onSuccess: () => {
       toast({ title: "Interview scheduled", description: `${candidateName} has been notified.` });
       onScheduled();
-      setDate(""); setLocation(""); setDriveId("none");
+      setDate(""); setLocation(""); setDriveId("none"); setInterviewerName(""); setMeetingLink("");
     },
     onError: (e: any) => toast({ title: "Failed", description: e.message, variant: "destructive" }),
   });
@@ -98,10 +107,28 @@ export function ScheduleInterviewModal({
             </Select>
           </div>
           <div>
-            <label className="text-xs font-semibold text-slate-600">Location / Link</label>
+            <label className="text-xs font-semibold text-slate-600">
+              {mode === "virtual" ? "Address / Notes" : "Location"}
+            </label>
             <Input value={location} onChange={(e) => setLocation(e.target.value)}
-              placeholder={mode === "virtual" ? "https://meet.google.com/..." : "Hotel Clarkes, Shimla"}
+              placeholder={mode === "virtual" ? "Optional notes (e.g. 'Use Chrome')" : "Hotel Clarkes, Shimla"}
               className="mt-1 h-10 text-sm" />
+          </div>
+          {mode === "virtual" && (
+            <div>
+              <label className="text-xs font-semibold text-slate-600">Meeting link <span className="text-red-500">*</span></label>
+              <Input value={meetingLink} onChange={(e) => setMeetingLink(e.target.value)}
+                placeholder="https://zoom.us/j/... or https://meet.google.com/..."
+                className="mt-1 h-10 text-sm" />
+              <p className="text-[10px] text-slate-400 mt-1">Candidate sees this as a clickable link on their dashboard.</p>
+            </div>
+          )}
+          <div>
+            <label className="text-xs font-semibold text-slate-600">Interviewer name <span className="text-slate-400 font-normal">(optional but recommended)</span></label>
+            <Input value={interviewerName} onChange={(e) => setInterviewerName(e.target.value)}
+              placeholder="e.g. Sarah Mitchell, Senior Recruiter"
+              className="mt-1 h-10 text-sm" />
+            <p className="text-[10px] text-slate-400 mt-1">Shown to the candidate so they know who they'll meet.</p>
           </div>
           <div>
             <label className="text-xs font-semibold text-slate-600">Drive (optional)</label>
