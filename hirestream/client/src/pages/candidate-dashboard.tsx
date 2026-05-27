@@ -1374,6 +1374,35 @@ function ApplicationsView({ applications, initialIntent }: { applications: any[]
                 </div>
               )}
 
+              {/* v0.4.33.2: Selected but no offer issued yet — bridge state.
+                  The agent has marked the candidate "selected" but hasn't
+                  generated a placement / offer letter. Without this banner,
+                  the candidate sees "Selected" with no action and assumes
+                  the portal is broken (real user feedback). */}
+              {selectedApp.status === "selected"
+                && (!selectedApp.placement || selectedApp.placement.status !== "offered")
+                && (selectedApp.placement?.status !== "accepted")
+                && (
+                <div className="mt-5 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200/60 rounded-xl p-5">
+                  <div className="flex items-start gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center flex-shrink-0">
+                      <Award className="w-5 h-5 text-blue-600" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-bold text-slate-900">You've been selected 🎯</p>
+                      <p className="text-xs text-slate-600 mt-1 leading-relaxed">
+                        {selectedApp.company || "The agency"} has shortlisted you for this role.
+                        They're now preparing your formal offer letter (salary, joining date, visa-sponsorship terms).
+                        <strong> Accept / Decline buttons will appear here once the offer is issued.</strong>
+                      </p>
+                      <p className="text-[11px] text-slate-500 mt-2">
+                        This usually takes 2–5 business days. The agency will reach out by email or phone if anything's needed from you in the meantime.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Offer Received — Accept / Decline (FRS 1.26, 1.27) */}
               {selectedApp.placement && selectedApp.placement.status === "offered" && (
                 <div className="mt-5 bg-gradient-to-r from-emerald-50 to-green-50 border border-emerald-200/60 rounded-xl p-5">
