@@ -39,6 +39,12 @@ async function seed() {
     { username: "aramco_hr",        email: "recruiting@aramco.sa",          role: "employer",   password: "test123" },
     { username: "nhs_london_hr",    email: "recruiting@royallondon.nhs.uk", role: "employer",   password: "test123" },
     { username: "siemens_hr",       email: "recruiting@siemens.de",         role: "employer",   password: "test123" },
+    // v0.4.32 (Phase 2): unverified KYB demo accounts. Both have a row in
+    // their respective table but verified=false and no submitted-for-review
+    // timestamp, so they land on a fresh "untouched" amber banner and can
+    // walk through the full register → upload → submit → admin-review flow.
+    { username: "demo_agent_unverified",    email: "demo_agent_unverified@hirestream.dev",    role: "agent",    password: "test123" },
+    { username: "demo_employer_unverified", email: "demo_employer_unverified@hirestream.dev", role: "employer", password: "test123" },
   ];
   const userIds: Record<string, string> = {};
 
@@ -207,7 +213,16 @@ async function seed() {
     specializations: ["Manufacturing", "Care Work", "Language Teaching"],
     verified: false, rating: 3, placements: 14,
   }).returning();
-  console.log("Agencies: 4");
+  // v0.4.32 (Phase 2): unverified test agency — minimal stub, no KYB metadata
+  // yet, so the dashboard banner reads "Complete agency verification".
+  await db.insert(recruitmentAgents).values({
+    userId: userIds.demo_agent_unverified,
+    agencyName: "(pending verification)",
+    licenseNumber: "PENDING",
+    specializations: [],
+    verified: false, rating: 0, placements: 0,
+  });
+  console.log("Agencies: 5");
 
   // ── EMPLOYERS ───────────────────────────────────────────────────────
   await db.delete(employers);
@@ -227,7 +242,14 @@ async function seed() {
     userId: userIds.siemens_hr, companyName: "Siemens AG",
     industry: "Engineering", location: "Munich, Germany", verified: true, activeJobs: 2,
   }).returning();
-  console.log("Employers: 4");
+  // v0.4.32 (Phase 2): unverified test employer — stub row only, so banner
+  // and Post-Job gate are exercised cleanly.
+  await db.insert(employers).values({
+    userId: userIds.demo_employer_unverified,
+    companyName: "(pending verification)",
+    verified: false, activeJobs: 0,
+  });
+  console.log("Employers: 5");
 
   // Delete in FK-safe order before re-inserting jobs
   await db.delete(placements);

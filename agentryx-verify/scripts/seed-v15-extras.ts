@@ -520,6 +520,32 @@ const rows: Row[] = [
     testSteps: "Open Employer dashboard → Offers tab. Find a placement whose start date was > 35 days ago without a 30-day welfare check-in.",
     expectedResult: "Amber pulsing badge '⚠ Welfare overdue: 30-day' appears next to the placement status. Thresholds at 35 / 65 / 95 days post start." },
 
+  // ── v0.4.32 (Phase 2 — HPSEDC Item 1: Employer KYB workflow) ────────
+  { itemRef: "A3.32", section: 3, sectionTitle: SECTIONS[3],
+    description: "Employer verification banner — 3 states (untouched / submitted / rejected) gates the publish flow",
+    testSteps: "Log in as demo_employer_unverified. Confirm amber banner appears at top of dashboard with 'Complete verification' button. Submit form, refresh — banner flips to blue. Have admin reject — banner flips to red with the rejection reason inline.",
+    expectedResult: "Three visual states map 1:1 to employers.submittedForReviewAt + verified + rejectionReason columns. Verified employer sees no banner." },
+  { itemRef: "A3.33", section: 3, sectionTitle: SECTIONS[3],
+    description: "EmployerVerificationForm — 4 sections (Company, Address, Signatory, Documents) with structured fields for KYB",
+    testSteps: "Open the form. Fill legal company name, CIN, GSTIN, PAN, industry, primary operating location. Then address line 1/2, city, state, PIN, country (defaults to India). Then contact email/phone + signatory name/designation/ID type/ID number. Click Save details.",
+    expectedResult: "All fields persist via PATCH /api/v1/employer/profile. Reopening the dialog re-populates from API. companyName max 150 chars enforced; rest are bounded by maxLength on inputs." },
+  { itemRef: "A3.34", section: 3, sectionTitle: SECTIONS[3],
+    description: "7 employer doc slots + 'Other' catch-all (CIN, GST, PAN, Address proof, Signatory ID, Labour permission, Agreement)",
+    testSteps: "Upload one PDF into each slot. Try uploading a doc with type='wrong_type' via direct API call.",
+    expectedResult: "All 8 valid types succeed (201). Invalid type returns 400 with message listing allowed types. Each slot shows ✓ + filename + size + Remove button. CIN, PAN, Signatory ID are marked Required in the UI." },
+  { itemRef: "A3.35", section: 3, sectionTitle: SECTIONS[3],
+    description: "submit-for-review enforces required text fields + at least one doc",
+    testSteps: "1. Click Submit on an empty form. 2. Fill text fields but upload no docs, click Submit. 3. Upload a doc, click Submit.",
+    expectedResult: "1. 400 with message listing missing required fields (CIN / PAN / contact email / signatory name). 2. 400 with message 'Upload at least one verification document'. 3. 200, submittedForReviewAt set." },
+  { itemRef: "A3.36", section: 3, sectionTitle: SECTIONS[3],
+    description: "Publish-job gate — unverified employer cannot publish a requisition; drafts still allowed",
+    testSteps: "As unverified employer, click New Requisition. Fill form. Click 'Publish'. Then click 'Save as Draft'.",
+    expectedResult: "Publish returns 403 with message 'Your company must be verified before publishing requisitions'. Draft save succeeds and shows in My Jobs with status=draft. After admin approves, re-attempt publish — succeeds." },
+  { itemRef: "A3.37", section: 3, sectionTitle: SECTIONS[3],
+    description: "Setting `employer.require_verification_to_post` defaults ON; admin can toggle in System Config",
+    testSteps: "As superadmin, open Admin → System Config → Access. Find 'Require company verification to publish requisitions'. Toggle OFF.",
+    expectedResult: "Setting persists. With it OFF, unverified employer can publish (returns 201). Default in fresh seed is true (the HPSEDC-compliant posture)." },
+
   { itemRef: "P6.5", section: 6, sectionTitle: SECTIONS[6],
     description: "Server-side salary range filter on /api/v1/jobs (FRS 1.15 blocker fix)",
     testSteps: "GET /api/v1/jobs?minSalary=50000&maxSalary=100000",
@@ -529,6 +555,32 @@ const rows: Row[] = [
     description: "Clone-from-previous (requisition templates) via existing POST /jobs/:id/clone",
     testSteps: "Employer → Jobs → click Clone on any job.",
     expectedResult: "Creates a new draft copy the employer can edit. Existed since v0.7; verified in this sprint so FRS coverage is explicit." },
+
+  // ── v0.4.32 (Phase 2 — HPSEDC admin KYB review queue) ───────────────
+  { itemRef: "A4.36", section: 4, sectionTitle: SECTIONS[4],
+    description: "Admin Employers tab — new queue mirrors Agencies with KYB-aware UI",
+    testSteps: "Log in as superadmin. Admin → tabs row → click 'Employers' (between Agencies and Compliance).",
+    expectedResult: "Two-section layout: 'Awaiting review' (with amber badge count) on top, 'Verified companies' below. Each row expands inline. Rejected resubmissions sit in Awaiting with a red ribbon + previous rejection reason." },
+  { itemRef: "A4.37", section: 4, sectionTitle: SECTIONS[4],
+    description: "Expanded employer row shows full KYB details + per-doc table",
+    testSteps: "On the Employers tab, expand a submitted employer. Scan the rendered fields.",
+    expectedResult: "Sections show: Industry, CIN, GST, PAN, contact email/phone, authorised signatory (name + designation + ID type + ID number), registered address (concatenated). Uploaded documents table renders below with: filename, type label, current status badge, View button, review-note input, Approve / Reject buttons per row." },
+  { itemRef: "A4.38", section: 4, sectionTitle: SECTIONS[4],
+    description: "Per-document Approve / Reject with optional reviewNotes",
+    testSteps: "Approve one doc with notes 'Verified against MCA portal'. Reject another with 'Blurry image — re-upload at higher resolution.'",
+    expectedResult: "Status badge updates immediately. PATCH /api/v1/admin/employers/:id/documents/:docId persists status + reviewNotes. The employer sees the rejection note in their own document slot card." },
+  { itemRef: "A4.39", section: 4, sectionTitle: SECTIONS[4],
+    description: "Final approval requires admin enters a rejection reason for any negative decision",
+    testSteps: "1. At the bottom of an expanded row, click 'Reject with reason' with empty textarea. 2. Type a reason and click again.",
+    expectedResult: "1. Toast 'Reason required'; no API call. 2. PATCH /verify is called with {verified:false, rejectionReason:'…'}; employer receives in-app notification including the reason text. Approve path doesn't require any reason." },
+  { itemRef: "A4.40", section: 4, sectionTitle: SECTIONS[4],
+    description: "Admin Agencies tab now uses the same KYB review UI (was minimal Approve/Revoke list before v0.4.32)",
+    testSteps: "Admin → Agencies tab. Expand any pending agency. Verify same UI as Employers tab.",
+    expectedResult: "Identical row layout + per-doc approve/reject + reject-with-reason workflow. The legacy minimal AgencyApprovalList component is no longer mounted." },
+  { itemRef: "A4.41", section: 4, sectionTitle: SECTIONS[4],
+    description: "Verification result reaches the user as in-app notification with status-appropriate copy",
+    testSteps: "Approve an employer. Switch to that employer's account, open notifications bell.",
+    expectedResult: "New notification of type 'employer_verified' with success copy. Reject path produces notification with rejection reason embedded in message." },
 
   // ── Gap-closers for v0.8.3 / v0.8.4 / v0.8.5 (April 2026 regression audit) ──
   { itemRef: "A8.36", section: 8, sectionTitle: SECTIONS[8],
@@ -691,6 +743,28 @@ const rows: Row[] = [
     testSteps: "Agent dashboard → Candidates. Change Sort to 'Most experience'. Click 'Profile complete' chip. Toggle 'Open to outreach only' pill.",
     expectedResult: "Sort options: Newest (createdAt desc, default) / Oldest / Most experience (experience desc) / Complete profiles first. Profile-complete chips: All / Complete / Incomplete. Outreach-only pill: when pressed, hides candidates with `openToOutreach = false`. All filters compose; Clear resets all." },
 
+  // ── v0.4.32 (Phase 2 — HPSEDC Item 3: Agency KYB workflow) ───────────
+  { itemRef: "A2.53", section: 2, sectionTitle: SECTIONS[2],
+    description: "Agency verification banner — 3 states (untouched / submitted / rejected) drives the Complete Verification CTA",
+    testSteps: "Log in as demo_agent_unverified. Confirm amber banner shown with 'Complete verification' button. Submit the form, refresh — banner flips to blue 'under review'. Have admin reject — banner flips to red with reason shown.",
+    expectedResult: "Three visual states map 1:1 to recruitmentAgents.submittedForReviewAt + verified + rejectionReason columns. CTA opens the same dialog in all states. Approved state hides the banner entirely." },
+  { itemRef: "A2.54", section: 2, sectionTitle: SECTIONS[2],
+    description: "AgencyVerificationForm renders 4 sections (Agency info, Address, Signatory, Documents)",
+    testSteps: "Open 'Complete verification' dialog as an unverified agent. Fill agency name, MEA RA Licence number, MEA expiry, contact email/phone, address, signatory fields. Click Save details.",
+    expectedResult: "All fields persist to recruitment_agents row via PATCH /api/v1/agencies/me. Reopening the dialog re-populates from the API." },
+  { itemRef: "A2.55", section: 2, sectionTitle: SECTIONS[2],
+    description: "9 HPSEDC-mandated agency doc slots + 'Other' catch-all, each with persistent ✓ + per-doc status badge",
+    testSteps: "In the Documents section, upload a PDF into the MEA RA Licence slot. Confirm card flips emerald with ✓. Repeat for Incorporation, PAN, GST, Address Proof, Signatory ID, Labour Permission, Experience, Agreement. Try uploading an unrelated doc into 'Other'.",
+    expectedResult: "Each slot shows pending/approved/rejected badge. Replace + Add another preserves history. POST /api/v1/agencies/documents enforces type allow-list — server-side reject for bogus types." },
+  { itemRef: "A2.56", section: 2, sectionTitle: SECTIONS[2],
+    description: "submit-for-review requires MEA RA Licence; missing license returns 400 with explanatory error",
+    testSteps: "Upload only PAN + GST docs (no MEA license). Click 'Submit for review'. Confirm error toast names the missing license.",
+    expectedResult: "Server returns 400 with message mentioning 'MEA RA Licence'. Submit succeeds once the license doc is uploaded; submittedForReviewAt timestamp is set." },
+  { itemRef: "A2.57", section: 2, sectionTitle: SECTIONS[2],
+    description: "Approved docs become read-only — agent cannot delete an approved doc",
+    testSteps: "Have admin approve any doc. Re-login as agent and try to remove that doc.",
+    expectedResult: "Delete button is hidden in the UI for approved docs. Direct DELETE call returns 400 with message 'Cannot remove an approved document'." },
+
   // ── Section 9 — End-to-End Workflow Verification ────────────────────
   // These walk a reviewer through a complete Flow A or Flow B end-to-end.
   // Each single item is the full sequence; the expected result is a
@@ -792,6 +866,43 @@ const rows: Row[] = [
     description: "Cross-sprint regression: public status check still works end-to-end",
     testSteps: "Browse to /status-check without logging in. Enter a candidate's phone number (demo_candidate: whatever phone is on file). Receive OTP (dev logs to console in staging). Enter OTP + first 8 chars of their application id (read from DB).",
     expectedResult: "Status card renders with jobTitle, country, current stage label, and placement info if applicable. No session cookie issued — single read, rate-limited to 3 per 10 min per phone." },
+
+  // ── v0.4.32 (Phase 2 — E2E KYB lifecycle flows) ──────────────────────
+  { itemRef: "E9.11", section: 9, sectionTitle: SECTIONS[9],
+    description: "Flow C — Employer KYB lifecycle: register → submit → admin reject → fix → resubmit → approve → publish",
+    testSteps: [
+      "1. Register a fresh employer via /auth (role=employer). Confirm dashboard shows amber 'Complete verification' banner.",
+      "2. Open the verification dialog. Fill all 4 sections (Company, Address, Signatory). Upload PAN, GST, Signatory ID docs.",
+      "3. Click 'Submit for review'. Banner flips to blue 'under review'.",
+      "4. Log in as superadmin. Admin → Employers tab. Expand the new submission. Approve PAN, reject GST with note 'illegible scan'.",
+      "5. Click 'Reject with reason' at bottom with reason 'GST scan illegible — re-upload at higher resolution.'.",
+      "6. Re-login as employer. Banner is red with rejection reason inline. Open dialog — GST card shows rejected status + note.",
+      "7. Delete the rejected GST doc, re-upload a fresh one. Click Submit for review.",
+      "8. Re-login as superadmin. Approve all docs. Click 'Approve company'.",
+      "9. Re-login as employer. Banner is gone. Click New Requisition. Fill form. Click Publish.",
+    ].join("\n"),
+    expectedResult: "All 9 steps succeed. submittedForReviewAt + verifiedAt + rejectionReason flow through correctly. Each transition fires a notification visible to the employer. Final publish returns 201 (the verify-to-post gate is now satisfied)." },
+  { itemRef: "E9.12", section: 9, sectionTitle: SECTIONS[9],
+    description: "Flow D — Agency KYB lifecycle: register → upload MEA RA Licence → submit → admin approves → pick up requisition",
+    testSteps: [
+      "1. Register a fresh agent via /auth (role=agent). Use AgencyRegisterForm to create the agency stub.",
+      "2. Confirm amber 'Complete verification' banner on dashboard.",
+      "3. Open dialog. Fill Agency info (incl. MEA RA Licence number + expiry). Address + Signatory. Upload all 9 mandated docs.",
+      "4. Try clicking 'Submit for review' BEFORE uploading the MEA RA Licence — confirm 400 error names the missing licence.",
+      "5. Upload the licence. Submit succeeds.",
+      "6. Log in as superadmin. Admin → Agencies tab. Expand the new submission. Approve.",
+      "7. Re-login as agent. Banner cleared. Open Requisitions tab. Pick up any open requisition.",
+    ].join("\n"),
+    expectedResult: "All steps succeed. The MEA RA Licence guard prevents premature submission; once present, the full lifecycle runs cleanly. Picking up the requisition succeeds (gate at job.routes.ts 40-48 is satisfied)." },
+  { itemRef: "E9.13", section: 9, sectionTitle: SECTIONS[9],
+    description: "Flow E — Negative path: verified employer revoked mid-life cannot publish new jobs",
+    testSteps: [
+      "1. Start with a verified employer who has 2 active jobs.",
+      "2. Admin → Employers → Revoke. Confirm verified=false.",
+      "3. Employer attempts to publish a new requisition.",
+      "4. Employer can still edit existing active jobs (PUT not blocked by the gate).",
+    ].join("\n"),
+    expectedResult: "New publish returns 403 with the verify-to-post message. Existing active jobs stay alive — the gate only blocks the publish step, not subsequent edits. This matches the FRS principle that verification controls market entry, not retroactive removal of existing jobs." },
 ];
 
 async function main() {
@@ -801,7 +912,7 @@ async function main() {
     [project] = await db.insert(projects).values({
       slug,
       name: "HireStream — Beyond-FRS Enhancements (v1.5)",
-      buildRef: "v1.6.8",
+      buildRef: "v1.9.0",
       contractor: "HTIS",
       client: "HPSEDC",
       description:
@@ -812,7 +923,7 @@ async function main() {
     // Update name/description in case reviewers see the old one
     await db.update(projects).set({
       name: "HireStream — Beyond-FRS Enhancements (v1.5)",
-      buildRef: "v1.6.8",
+      buildRef: "v1.9.0",
       description:
         "Value-add features delivered above the contracted FRS scope. Organised by stakeholder role so each reviewer can sign off the sections relevant to their domain.",
     }).where(eq(projects.id, project.id));
