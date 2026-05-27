@@ -1143,6 +1143,7 @@ function AgentPipelineFunnel({ allJobs, setActiveView }: { allJobs: any[]; setAc
   for (const a of all) counts[a.status] = (counts[a.status] || 0) + 1;
   const total = all.length;
   const rejected = all.filter((a) => a.status === "rejected").length;
+  const withdrawn = all.filter((a) => a.status === "withdrawn").length;
 
   if (allJobs.length === 0) return null;
 
@@ -1151,7 +1152,15 @@ function AgentPipelineFunnel({ allJobs, setActiveView }: { allJobs: any[]; setAc
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
           <TrendingUp className="w-4 h-4 text-indigo-600" /> Applicant Pipeline
-          <Badge variant="outline" className="ml-1 text-[10px]">{total} total{rejected > 0 ? ` · ${rejected} rejected` : ""}</Badge>
+          {/* v0.4.24: label now includes withdrawn so the math
+              reconciles. Active stages (submitted→placed) + rejected
+              + withdrawn = total. The empty tail of the bar above is
+              precisely rejected + withdrawn. */}
+          <Badge variant="outline" className="ml-1 text-[10px]">
+            {total} total
+            {rejected > 0 && ` · ${rejected} rejected`}
+            {withdrawn > 0 && ` · ${withdrawn} withdrawn`}
+          </Badge>
         </h3>
         <Button variant="ghost" size="sm" onClick={() => setActiveView("jobs")} className="text-xs text-blue-600 font-semibold">
           Manage Jobs <ArrowRight className="w-3.5 h-3.5 ml-1" />
