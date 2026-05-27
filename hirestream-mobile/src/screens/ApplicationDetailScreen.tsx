@@ -19,11 +19,13 @@ import {
   Platform,
   Image,
   Alert,
+  Linking,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { colors, spacing, radius, fontSize, fontWeight } from "../theme";
 import { api } from "../api";
+import { API_BASE_URL } from "../config";
 
 interface ApplicationDetailProps {
   application: any;
@@ -214,14 +216,39 @@ export default function ApplicationDetailScreen({
           )}
         </View>
 
-        {/* Offer action — server status is "selected" (offer issued, awaiting candidate) */}
+        {/* Offer action — server status is "selected" (offer issued, awaiting candidate)
+            v0.4.15: added View offer letter (PDF) + Open web portal buttons so
+            candidates can review the offer terms on-device before switching to
+            web for the formal accept/decline. Acceptance stays on web because
+            it's a legally binding commitment that triggers visa processing — the
+            web portal is the system of record for that signature. */}
         {app.status === "selected" && (
           <View style={styles.offerCard}>
             <Ionicons name="flash" size={24} color={colors.warning} />
             <Text style={styles.offerTitle}>⚡ Awaiting Your Action</Text>
             <Text style={styles.offerText}>
-              You have received an offer for this position. Please review and respond on the web portal.
+              You have received a placement offer. Review the offer letter below, then accept or decline on the web portal — the visa process starts immediately after you accept.
             </Text>
+
+            {app.placement?.id && (
+              <TouchableOpacity
+                style={styles.offerSecondaryBtn}
+                activeOpacity={0.8}
+                onPress={() => Linking.openURL(`${API_BASE_URL}/api/v1/me/placements/${app.placement.id}/offer-letter.pdf`)}
+              >
+                <Ionicons name="document-text-outline" size={16} color={colors.primary} />
+                <Text style={styles.offerSecondaryText}>View offer letter (PDF)</Text>
+              </TouchableOpacity>
+            )}
+
+            <TouchableOpacity
+              style={styles.offerPrimaryBtn}
+              activeOpacity={0.85}
+              onPress={() => Linking.openURL(`${API_BASE_URL}/applications/${app.id}`)}
+            >
+              <Ionicons name="open-outline" size={16} color="#ffffff" />
+              <Text style={styles.offerPrimaryText}>Open Web Portal to Respond</Text>
+            </TouchableOpacity>
           </View>
         )}
 
@@ -346,7 +373,20 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   offerTitle: { fontSize: fontSize.md, fontWeight: fontWeight.bold, color: colors.text, marginTop: spacing.sm },
-  offerText: { fontSize: fontSize.sm, color: colors.textSecondary, textAlign: "center", marginTop: spacing.sm, lineHeight: 20 },
+  offerText: { fontSize: fontSize.sm, color: colors.textSecondary, textAlign: "center", marginTop: spacing.sm, lineHeight: 20, marginBottom: spacing.md },
+  offerPrimaryBtn: {
+    flexDirection: "row", alignItems: "center", justifyContent: "center",
+    backgroundColor: colors.primary, paddingVertical: 12, paddingHorizontal: spacing.lg,
+    borderRadius: radius.md, marginTop: spacing.sm, gap: spacing.sm,
+  },
+  offerPrimaryText: { color: "#ffffff", fontSize: fontSize.sm, fontWeight: fontWeight.semibold },
+  offerSecondaryBtn: {
+    flexDirection: "row", alignItems: "center", justifyContent: "center",
+    backgroundColor: "#ffffff", borderWidth: 1, borderColor: colors.primary,
+    paddingVertical: 10, paddingHorizontal: spacing.lg,
+    borderRadius: radius.md, gap: spacing.sm,
+  },
+  offerSecondaryText: { color: colors.primary, fontSize: fontSize.sm, fontWeight: fontWeight.semibold },
 
   // Withdraw
   withdrawBtn: {

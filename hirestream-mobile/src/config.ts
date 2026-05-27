@@ -18,8 +18,8 @@ export const APP_NAME = "HireStream";
 // bundle is actually running on the device — Expo Go silently caches
 // old bundles, and without a visible version we cannot tell new from old.
 // Format: matches the backend portal version (0.M.N.PATCH).
-export const APP_VERSION = "0.4.14.0";
-export const APP_BUILD = 14;
+export const APP_VERSION = "0.4.15.0";
+export const APP_BUILD = 15;
 
 // Token storage keys
 export const STORAGE_KEYS = {

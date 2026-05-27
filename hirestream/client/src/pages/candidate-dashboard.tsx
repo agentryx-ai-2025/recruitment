@@ -436,6 +436,12 @@ function OverviewView({ appCount, shortlisted, docs, savedCount, completion, app
   const [, setLocation] = useLocation();
   return (
     <motion.div variants={stagger} initial="initial" animate="animate" className="space-y-5">
+      {/* v0.4.15: Offers banner promoted to TOP of dashboard. Was previously
+          buried 6 elements down (below stats, journey, gaps, interviews,
+          prep tips, welfare) — UAT showed candidates had to scroll past
+          everything to find the most actionable item in their life. */}
+      <OffersBanner applications={applications} setActiveView={setActiveView} />
+
       {/* Stat Cards — compact, aligned, info-rich */}
       <motion.div variants={fadeUp} className="grid grid-cols-2 xl:grid-cols-4 gap-3">
         <StatCard icon={Briefcase} gradient="from-blue-500 to-blue-600" lightBg="bg-blue-50" lightText="text-blue-600" value={appCount} label="Applications" subtitle={appCount === 0 ? "Browse jobs to apply" : `${appCount} submitted`} onClick={() => setActiveView("applications")} />
@@ -460,9 +466,6 @@ function OverviewView({ appCount, shortlisted, docs, savedCount, completion, app
 
       {/* Welfare reply card (candidate with active placement) */}
       <WelfareReplyCard applications={applications} />
-
-      {/* Offers waiting for your response (FRS 1.26, 1.27) */}
-      <OffersBanner applications={applications} setActiveView={setActiveView} />
 
       {/* Recent Applications */}
       <motion.div variants={fadeUp} className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-sm">
@@ -2592,25 +2595,46 @@ function UpcomingInterviews({ applications, setActiveView }: { applications: any
 }
 
 // ── Offers Waiting Banner (FRS 1.26 / 1.27) ──────────────────────────
+// v0.4.15: promoted to top of dashboard. Bumped to a hero-card visual —
+// solid emerald gradient, larger CTA, single-glance offer summary — so
+// candidates land on the most important action of their journey first,
+// not after scrolling past stats and profile gaps.
 function OffersBanner({ applications, setActiveView }: { applications: any[]; setActiveView: (v: string) => void }) {
   const offers = (applications ?? []).filter((a) => a.placement?.status === "offered");
   if (offers.length === 0) return null;
+  const first = offers[0];
   return (
-    <motion.div variants={fadeUp} className="bg-gradient-to-r from-emerald-50 via-green-50 to-white rounded-2xl border border-emerald-200 p-5 shadow-sm flex items-center gap-4">
-      <div className="w-12 h-12 rounded-xl bg-emerald-100 flex items-center justify-center flex-shrink-0">
-        <Award className="w-6 h-6 text-emerald-600" />
+    <motion.div variants={fadeUp}
+      className="relative overflow-hidden bg-gradient-to-br from-emerald-500 via-emerald-600 to-green-700 rounded-2xl shadow-xl p-6 text-white">
+      <div className="absolute -right-8 -top-8 w-40 h-40 bg-white/10 rounded-full blur-2xl" aria-hidden />
+      <div className="absolute -left-6 -bottom-10 w-44 h-44 bg-emerald-300/20 rounded-full blur-2xl" aria-hidden />
+      <div className="relative flex items-center gap-4 flex-wrap">
+        <div className="w-14 h-14 rounded-2xl bg-white/15 backdrop-blur flex items-center justify-center flex-shrink-0 ring-1 ring-white/20">
+          <Award className="w-7 h-7 text-white" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-[10px] uppercase tracking-wider font-bold text-emerald-100 bg-white/10 px-2 py-0.5 rounded">⚡ Action required</span>
+          </div>
+          <p className="text-lg font-bold leading-tight">
+            {offers.length === 1
+              ? `You have an offer from ${first.company} 🎉`
+              : `You have ${offers.length} offers waiting for your response`}
+          </p>
+          {offers.length === 1 && (
+            <p className="text-sm text-emerald-50 mt-0.5">
+              {first.jobTitle}
+              {first.placement?.country ? ` · ${first.placement.country}` : ""}
+              {first.placement?.salary ? ` · ${first.placement.salary}` : ""}
+            </p>
+          )}
+          <p className="text-xs text-emerald-100/90 mt-1.5">Visa process starts once you accept. Review the full offer details before deciding.</p>
+        </div>
+        <Button size="lg" onClick={() => setActiveView("applications")}
+          className="bg-white text-emerald-700 hover:bg-emerald-50 font-bold shadow-md shrink-0">
+          Review &amp; Respond <ArrowRight className="w-5 h-5 ml-1.5" />
+        </Button>
       </div>
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-bold text-slate-900">
-          {offers.length === 1
-            ? `You have an offer from ${offers[0].company} 🎉`
-            : `You have ${offers.length} offers waiting for your response`}
-        </p>
-        <p className="text-xs text-slate-600 mt-0.5">Accept or decline from your applications. Visa process starts once you accept.</p>
-      </div>
-      <Button size="sm" onClick={() => setActiveView("applications")} className="bg-emerald-600 hover:bg-emerald-700 text-white shrink-0">
-        Review <ArrowRight className="w-4 h-4 ml-1.5" />
-      </Button>
     </motion.div>
   );
 }

@@ -289,17 +289,19 @@
     <span class="header-icon">🌐</span>
     <div>
       <h1>HireStream Mobile App — Quick Testing Guide</h1>
-      <div class="sub">HPSEDC Overseas Placement Portal · Android & iOS · v0.4.14</div>
+      <div class="sub">HPSEDC Overseas Placement Portal · Android & iOS · v0.4.15</div>
     </div>
     <span class="badge">HTIS Testing</span>
   </div>
 
   <div style="background:#ecfdf5; border:1.5px solid #6ee7b7; border-radius:8px; padding:10px 14px; margin-bottom:14px;">
-    <div style="font-size:10px; font-weight:700; color:#065f46; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:4px;">✅ What's new in v0.4.14 (closes the UAT report)</div>
+    <div style="font-size:10px; font-weight:700; color:#065f46; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:4px;">✅ What's new in v0.4.15 — Offer review UX</div>
     <div style="font-size:10.5px; color:#064e3b; line-height:1.5;">
-      <strong>Issue 1 fixed</strong> — Application Detail timeline now lights up (Applied → Under Review → Shortlisted → Interview → Offered → Accepted) with the current stage highlighted, instead of staying grey. Re-verify by opening any in-flight application.<br>
-      <strong>Issue 2 fixed</strong> — Selecting a candidate on the employer side now auto-creates a placement so the offer letter / appointment letter actions are immediately usable. Re-verify on the web portal's <em>Offers &amp; Placements</em> tab.<br>
-      <strong>How to confirm latest build:</strong> open the <em>Applications</em> tab — the top-right of the dark blue header shows a small <code class="mono" style="background:#fff; padding:1px 4px; border-radius:3px; color:#065f46;">v0.4.14.0</code> tag. If you see an older version, run the force-refresh on page 3.
+      <strong>Web — Dashboard offer banner promoted to top</strong> — when a candidate has an offer, the "You have an offer 🎉" banner now sits at the very top of the dashboard (was buried 6 cards down). Hero gradient, large "Review &amp; Respond" CTA, single-glance offer summary.<br>
+      <strong>Web — Accept / Decline now on Application Detail page</strong> — <code class="mono">/applications/:id</code> previously had no offer-response UI; candidates landing there from a notification or direct link were stuck. Now shows a full Accept / Decline card with destination, salary, start date, and "Download offer letter (PDF)" link.<br>
+      <strong>Mobile — Offer screen upgraded</strong> — the "Awaiting Your Action" callout for selected applications now has a <em>View offer letter (PDF)</em> button and an <em>Open Web Portal to Respond</em> deep link. Acceptance still happens on web (legal commitment + visa trigger), but candidates can read the offer terms on-device first.<br>
+      <strong>Carries over from v0.4.14:</strong> mobile timeline dots fill correctly (was all grey); placements auto-create on candidate selection so employers can issue offers immediately.<br>
+      <strong>How to confirm latest build:</strong> open the <em>Applications</em> tab — top-right of the dark blue header shows <code class="mono" style="background:#fff; padding:1px 4px; border-radius:3px; color:#065f46;">v0.4.15.0</code>. If you see an older version, run the force-refresh on page 3.
     </div>
   </div>
 
@@ -331,7 +333,7 @@
     <div style="border: 3px solid #7c3aed; border-radius: 8px; padding: 10px 14px; background: #f5f3ff; position: relative;">
       <div style="position:absolute; top:-8px; right:10px; background:#dc2626; color:white; font-size:8px; font-weight:700; padding:2px 10px; border-radius:10px;">👈 CLICK THIS ONE</div>
       <div style="display:inline-block; background:#e0e7ff; color:#3730a3; font-size:8px; font-weight:700; padding:2px 8px; border-radius:10px; margin-bottom:6px;">STEP 2</div>
-      <div style="font-size:12px; font-weight:700; color:#1e293b;">HireStream Mobile — Android/iOS App v0.4.14</div>
+      <div style="font-size:12px; font-weight:700; color:#1e293b;">HireStream Mobile — Android/iOS App v0.4.15</div>
       <div style="font-size:9px; color:#64748b; margin-top:3px;">Android mobile application for HireStream. React Native + Expo.</div>
       <div style="font-size:9px; color:#dc2626; margin-top:4px; font-weight:600;">🔧 47 need fixing</div>
     </div>
@@ -340,7 +342,7 @@
   <div class="steps" style="margin-top: 6px;">
     <div class="step">
       <span class="step-num" style="background:#f59e0b;">3</span>
-      <div class="step-text"><strong>Click the second card</strong> — "HireStream Mobile — Android/iOS App v0.4.14" to open the mobile testing project.</div>
+      <div class="step-text"><strong>Click the second card</strong> — "HireStream Mobile — Android/iOS App v0.4.15" to open the mobile testing project.</div>
     </div>
   </div>
 
@@ -452,7 +454,7 @@
         </div>
         <div class="step">
           <span class="step-num green">6</span>
-          <div class="step-text"><strong style="color:#059669;">Confirm latest build</strong> — open <strong>Applications</strong> tab. Look in the <strong>top-right corner of the dark blue header</strong> for the build tag. You should see <code class="mono" style="background:#ecfdf5; padding:1px 4px; border-radius:3px; color:#065f46;">v0.4.14.0</code>. If you don't see it (or see an older version), use the force-refresh procedure on page 3.</div>
+          <div class="step-text"><strong style="color:#059669;">Confirm latest build</strong> — open <strong>Applications</strong> tab. Look in the <strong>top-right corner of the dark blue header</strong> for the build tag. You should see <code class="mono" style="background:#ecfdf5; padding:1px 4px; border-radius:3px; color:#065f46;">v0.4.15.0</code>. If you don't see it (or see an older version), use the force-refresh procedure on page 3.</div>
         </div>
       </div>
     </div>
@@ -626,7 +628,7 @@
     </div>
     <div class="trouble-item">
       <span class="trouble-q">Old build / stale screen?</span>
-      <span class="trouble-a"><strong>Force-refresh the bundle:</strong> Open Expo Go → <strong>long-press</strong> HireStream in the recent projects list → tap <strong>"Remove from list"</strong> → "Enter URL manually" → paste <code class="mono">exps://hirestream-mobile.agentryx.dev</code> → Connect. Fresh download (~30s). Confirm the build tag in the Applications header now reads <code class="mono">v0.4.14.0</code> or later.</span>
+      <span class="trouble-a"><strong>Force-refresh the bundle:</strong> Open Expo Go → <strong>long-press</strong> HireStream in the recent projects list → tap <strong>"Remove from list"</strong> → "Enter URL manually" → paste <code class="mono">exps://hirestream-mobile.agentryx.dev</code> → Connect. Fresh download (~30s). Confirm the build tag in the Applications header now reads <code class="mono">v0.4.15.0</code> or later.</span>
     </div>
     <div class="trouble-item">
       <span class="trouble-q">Login fails?</span>
@@ -659,7 +661,7 @@
       <h3>📋 How to sign off requirements</h3>
       <div class="steps" style="margin:4px 0;">
         <div class="step"><span class="step-num" style="background:#f59e0b; width:16px; height:16px; font-size:8px;">1</span><div class="step-text" style="font-size:10px;">Go to <strong>verify-stg.agentryx.dev</strong></div></div>
-        <div class="step"><span class="step-num" style="background:#f59e0b; width:16px; height:16px; font-size:8px;">2</span><div class="step-text" style="font-size:10px;">Open <strong>HireStream Mobile v0.4.14</strong> project</div></div>
+        <div class="step"><span class="step-num" style="background:#f59e0b; width:16px; height:16px; font-size:8px;">2</span><div class="step-text" style="font-size:10px;">Open <strong>HireStream Mobile v0.4.15</strong> project</div></div>
         <div class="step"><span class="step-num" style="background:#f59e0b; width:16px; height:16px; font-size:8px;">3</span><div class="step-text" style="font-size:10px;">Click a <strong>role card</strong> (Candidate, Cross-cutting)</div></div>
         <div class="step"><span class="step-num" style="background:#f59e0b; width:16px; height:16px; font-size:8px;">4</span><div class="step-text" style="font-size:10px;">Click the <strong>signoff circle</strong> → Pass / Partial / Fail</div></div>
       </div>
