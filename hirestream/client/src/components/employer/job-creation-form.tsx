@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { CITIES_BY_COUNTRY, FIELD_LIMITS, JOB_CATEGORIES } from "@/lib/reference-data";
 import { SalaryRangePicker, EXPERIENCE_OPTIONS } from "@/components/shared/salary-range-picker";
+import { HiringCriteriaSection } from "@/components/shared/HiringCriteriaSection";
 
 const COUNTRIES = [
   { code: "Canada", flag: "🇨🇦" }, { code: "Australia", flag: "🇦🇺" },
@@ -43,6 +44,10 @@ interface JobFormData {
   targetHires: number; hiringDeadline: string;
   priority: "standard" | "urgent" | "critical";
   employerNotes: string;
+  // v0.4.33 (Phase 3): Matching Engine v2 — all optional.
+  qualificationRequired: string;
+  requiredIeltsBand: number | null;
+  languagesRequired: Record<string, string>;
 }
 
 interface JobCreationFormProps {
@@ -83,6 +88,9 @@ export function JobCreationForm({ editJob, trigger, controlledOpen, onOpenChange
     hiringDeadline: editJob?.hiringDeadline ? String(editJob.hiringDeadline).split("T")[0] : "",
     priority: (editJob?.priority as any) ?? "standard",
     employerNotes: editJob?.employerNotes ?? "",
+    qualificationRequired: editJob?.qualificationRequired ?? "",
+    requiredIeltsBand: editJob?.requiredIeltsBand !== undefined && editJob?.requiredIeltsBand !== null ? Number(editJob.requiredIeltsBand) : null,
+    languagesRequired: (editJob?.languagesRequired && typeof editJob.languagesRequired === "object") ? editJob.languagesRequired : {},
   });
 
   const mutation = useMutation({
@@ -130,6 +138,7 @@ export function JobCreationForm({ editJob, trigger, controlledOpen, onOpenChange
       title: "", company: "", location: "", country: "", category: "",
       salary: "", description: "", experience: 0, skills: [],
       targetHires: 1, hiringDeadline: "", priority: "standard", employerNotes: "",
+      qualificationRequired: "", requiredIeltsBand: null, languagesRequired: {},
     });
     setSkillInput("");
     setCityChoice("");
@@ -359,6 +368,17 @@ export function JobCreationForm({ editJob, trigger, controlledOpen, onOpenChange
               </div>
             </div>
           </Section>
+
+          {/* Hiring criteria — Phase 3 Matching v2 inputs */}
+          <HiringCriteriaSection
+            country={form.country}
+            qualification={form.qualificationRequired}
+            setQualification={(v) => setForm({ ...form, qualificationRequired: v })}
+            requiredIeltsBand={form.requiredIeltsBand}
+            setRequiredIeltsBand={(v) => setForm({ ...form, requiredIeltsBand: v })}
+            languagesRequired={form.languagesRequired}
+            setLanguagesRequired={(v) => setForm({ ...form, languagesRequired: v })}
+          />
 
           {/* ── Section: Description & skills ──────────────── */}
           <Section icon={FileText} color="text-emerald-600 bg-emerald-50" title="Description & skills" subtitle="Tell candidates what the role is and what skills you need">

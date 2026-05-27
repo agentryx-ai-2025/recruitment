@@ -18,7 +18,7 @@ export interface SettingSpec {
   category: SettingCategory;
   label: string;
   description: string;
-  type: "boolean" | "number" | "string" | "string_array";
+  type: "boolean" | "number" | "string" | "string_array" | "json";
   default: any;
   min?: number;
   max?: number;
@@ -130,6 +130,56 @@ export const SETTING_SPECS: SettingSpec[] = [
     default: 40,
     min: 0,
     max: 100,
+  },
+  {
+    // v0.4.33 (Phase 3): engine version selector. v2 is the 7-factor scorer;
+    // v1 is the legacy 3-factor for rollback. Admin Parameters Module
+    // surfaces this as a radio toggle.
+    key: "matching.engine_version",
+    category: "matching",
+    label: "Matching engine version",
+    description: "Switch between v2 (7-factor, default) and v1 (legacy 3-factor) without redeploying.",
+    type: "string",
+    default: "v2",
+  },
+  {
+    // v0.4.33 (Phase 3): JSON weight map with the 7 factor keys. Sum must
+    // equal 100. Admin UI enforces sum-to-100 on save; the engine renorm-
+    // alises defensively if the saved values drift.
+    key: "matching.weights",
+    category: "matching",
+    label: "Matching weights",
+    description: "Per-factor weights for the v2 engine. Must sum to 100. Defaults: skill 30, experience 20, qualification 10, country 15, language 10, category 10, salary 5.",
+    type: "json",
+    default: {
+      skill: 30, experience: 20, qualification: 10, country: 15,
+      language: 10, category: 10, salary: 5,
+    },
+  },
+  {
+    // v0.4.33 (Phase 3): missing-criteria policy per factor. Values are
+    // "full" | "half" | "zero". See HireStream_Matching_Engine.pdf §4 for
+    // the rationale behind each default.
+    key: "matching.policy",
+    category: "matching",
+    label: "Missing-criteria policy",
+    description: "How the engine treats each factor when the job-side or candidate-side input is missing. Values: full / half / zero per factor.",
+    type: "json",
+    default: {
+      skill: "zero", experience: "full", qualification: "full",
+      country: "full", language: "full", category: "full", salary: "full",
+    },
+  },
+  {
+    // v0.4.33 (Phase 3): show the explainability breakdown to candidates.
+    // Admin can hide if HPSEDC ever decides candidates shouldn't see the
+    // factor-level breakdown.
+    key: "matching.show_breakdown_to_candidate",
+    category: "matching",
+    label: "Show match breakdown to candidate",
+    description: "When ON, candidates see the 7-factor breakdown on Recommended Jobs and Application Detail. When OFF, only the total score is shown.",
+    type: "boolean",
+    default: true,
   },
   {
     key: "leaderboard.placement_weight",
@@ -462,11 +512,19 @@ export async function updateSetting(key: string, value: any, userId?: string): P
     if (spec.options && !spec.options.includes(v)) {
       return { ok: false, error: `Must be one of: ${spec.options.join(", ")}` };
     }
+  } else if (spec.type === "json") {
+    // v0.4.33 (Phase 3): JSON values must be plain objects/arrays; no
+    // class-validation here — caller-side schema applies (e.g. matching
+    // engine validates sum-to-100 on its admin endpoint before calling).
+    if (typeof v !== "object" || v === null) {
+      return { ok: false, error: "Must be an object" };
+    }
   }
 
   if (!storage.db) return { ok: false, error: "DB unavailable" };
 
   const existing = await storage.db.select().from(systemSettings).where(eq(systemSettings.key, key)).limit(1);
+  const previous = existing.length > 0 ? existing[0].value : null;
   if (existing.length > 0) {
     await storage.db.update(systemSettings).set({ value: v, updatedAt: new Date(), updatedBy: userId || null }).where(eq(systemSettings.key, key));
   } else {
@@ -475,6 +533,23 @@ export async function updateSetting(key: string, value: any, userId?: string): P
 
   cache.set(key, v);
   logger.info(`Setting updated: ${key} by ${userId || "system"}`);
+
+  // v0.4.33 (Phase 3): write to audit_log so the Matching Engine module
+  // (and any other reviewer) can trace who changed what + when. Keeps the
+  // audit trail simple — actor, key, before/after in details.
+  if (userId) {
+    try {
+      const { auditLog } = await import("@shared/schema");
+      await storage.db.insert(auditLog).values({
+        userId,
+        action: "update",
+        resourceType: "setting",
+        resourceId: key,
+        details: { key, before: previous, after: v } as any,
+      }).catch(() => { /* audit failures must never block the setting save */ });
+    } catch { /* audit-only path, swallow */ }
+  }
+
   return { ok: true };
 }
 

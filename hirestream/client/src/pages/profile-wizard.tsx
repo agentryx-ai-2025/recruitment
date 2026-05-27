@@ -17,7 +17,7 @@ import {
   Award, Sparkles, Shield, Star
 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { HP_DISTRICTS, INDIAN_STATES, DESTINATION_COUNTRIES, SKILL_CATEGORIES, ALL_SKILLS } from "@/lib/reference-data";
+import { HP_DISTRICTS, INDIAN_STATES, DESTINATION_COUNTRIES, SKILL_CATEGORIES, ALL_SKILLS, JOB_CATEGORIES, QUALIFICATION_LEVELS, jobCategoryLabel } from "@/lib/reference-data";
 
 async function fetchJson(url: string) {
   const res = await fetch(url);
@@ -685,7 +685,12 @@ function EducationStep({ onNext, onBack }: { onNext: () => void; onBack: () => v
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [adding, setAdding] = useState(false);
+  // v0.4.33 (Phase 3, HPSEDC Item 5): explicit education type so the
+  // wizard can group entries into Schooling / Higher-Ed / Certs and the
+  // matching engine knows what "Qualification" the candidate has.
+  const [type, setType] = useState("university");
   const [degree, setDegree] = useState(""); const [institution, setInstitution] = useState("");
+  const [board, setBoard] = useState(""); const [subject, setSubject] = useState("");
   const [year, setYear] = useState(""); const [percentage, setPercentage] = useState("");
 
   const { data: eduRes, isLoading } = useQuery({
@@ -696,7 +701,10 @@ function EducationStep({ onNext, onBack }: { onNext: () => void; onBack: () => v
     mutationFn: async () => {
       const res = await fetch("/api/v1/candidates/education", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ degree, institution, year: parseInt(year) || null, percentage }),
+        body: JSON.stringify({
+          degree, institution, year: parseInt(year) || null, percentage,
+          type, board: board || null, subject: subject || null,
+        }),
       });
       if (!res.ok) throw new Error("Failed"); return res.json();
     },
@@ -704,6 +712,7 @@ function EducationStep({ onNext, onBack }: { onNext: () => void; onBack: () => v
       queryClient.invalidateQueries({ queryKey: ["/api/v1/candidates/education"] });
       queryClient.invalidateQueries({ queryKey: ["/api/v1/candidates/profile/completion"] });
       setAdding(false); setDegree(""); setInstitution(""); setYear(""); setPercentage("");
+      setBoard(""); setSubject(""); setType("university");
       toast({ title: "Education added" });
     },
   });
@@ -742,8 +751,13 @@ function EducationStep({ onNext, onBack }: { onNext: () => void; onBack: () => v
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className="font-bold text-sm text-slate-900 truncate">{edu.degree}</p>
-                      <p className="text-xs text-slate-500 truncate">{edu.institution}</p>
-                      <div className="flex items-center gap-2 mt-1">
+                      <p className="text-xs text-slate-500 truncate">{edu.institution}{edu.board ? ` · ${edu.board}` : ""}{edu.subject ? ` · ${edu.subject}` : ""}</p>
+                      <div className="flex items-center gap-2 mt-1 flex-wrap">
+                        {edu.type && (
+                          <Badge variant="outline" className="text-[10px] bg-violet-50 text-violet-700 border-violet-200 px-1.5 py-0 capitalize">
+                            {String(edu.type).replace(/_/g, " ")}
+                          </Badge>
+                        )}
                         {edu.year && <Badge variant="outline" className="text-[10px] bg-white text-slate-600 border-slate-200 px-1.5 py-0">{edu.year}</Badge>}
                         {edu.percentage && <Badge variant="outline" className="text-[10px] bg-amber-50 text-amber-700 border-amber-200 px-1.5 py-0">{edu.percentage}%</Badge>}
                       </div>
@@ -772,15 +786,50 @@ function EducationStep({ onNext, onBack }: { onNext: () => void; onBack: () => v
                   <p className="text-sm font-bold text-violet-700 flex items-center gap-2">
                     <Plus className="w-4 h-4" /> New Education Record
                   </p>
+                  {/* Type picker — drives which optional fields show below */}
+                  <div className="flex flex-wrap gap-1.5">
+                    {[
+                      { v: "school",        label: "Schooling (10th / 12th)" },
+                      { v: "university",    label: "Higher Education (degree)" },
+                      { v: "diploma",       label: "Diploma" },
+                      { v: "certification", label: "Certification" },
+                      { v: "course",        label: "Skill Course" },
+                    ].map((opt) => (
+                      <button key={opt.v} type="button"
+                        onClick={() => setType(opt.v)}
+                        className={`text-[11px] px-2.5 py-1.5 rounded-md border transition ${
+                          type === opt.v
+                            ? "bg-violet-600 text-white border-violet-600"
+                            : "bg-white text-slate-600 border-slate-200 hover:border-violet-400"
+                        }`}>
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <FormField label="Degree / Qualification" required icon={Award}>
-                      <Input value={degree} onChange={e => setDegree(e.target.value)} placeholder="B.Tech, MBA, 12th..."
+                    <FormField label={type === "school" ? "Class / Level (e.g. 12th)" : "Degree / Qualification"} required icon={Award}>
+                      <Input value={degree} onChange={e => setDegree(e.target.value)}
+                        placeholder={type === "school" ? "10th, 12th, ..." : type === "diploma" ? "Polytechnic Diploma" : type === "certification" ? "AWS Solutions Architect" : "B.Tech, MBA, ..."}
                         className="pl-11 h-12 rounded-xl border-violet-200/80 bg-white" />
                     </FormField>
-                    <FormField label="Institution" required icon={Building}>
-                      <Input value={institution} onChange={e => setInstitution(e.target.value)} placeholder="University name..."
+                    <FormField label={type === "school" ? "School name" : "Institution"} required icon={Building}>
+                      <Input value={institution} onChange={e => setInstitution(e.target.value)}
+                        placeholder={type === "school" ? "DAV Public School, ..." : "University / Institute name"}
                         className="pl-11 h-12 rounded-xl border-violet-200/80 bg-white" />
                     </FormField>
+                    {type === "school" && (
+                      <FormField label="Board" icon={Award}>
+                        <Input value={board} onChange={e => setBoard(e.target.value)} placeholder="CBSE / ICSE / HPBSE / Cambridge"
+                          className="pl-11 h-12 rounded-xl border-violet-200/80 bg-white" />
+                      </FormField>
+                    )}
+                    {(type === "university" || type === "diploma" || type === "certification") && (
+                      <FormField label="Subject / Field" icon={Award}>
+                        <Input value={subject} onChange={e => setSubject(e.target.value)}
+                          placeholder={type === "certification" ? "Cloud / Networking / ..." : "Computer Science, Mechanical, ..."}
+                          className="pl-11 h-12 rounded-xl border-violet-200/80 bg-white" />
+                      </FormField>
+                    )}
                     <FormField label="Year of Passing" icon={Calendar}>
                       <Input type="number" value={year} onChange={e => setYear(e.target.value)} placeholder="2024"
                         className="pl-11 h-12 rounded-xl border-violet-200/80 bg-white" />
@@ -979,11 +1028,22 @@ function SkillsStep({ profile, onNext, onBack }: { profile: any; onNext: () => v
   const [skillSearch, setSkillSearch] = useState("");
   const [activeCategory, setActiveCategory] = useState(SKILL_CATEGORIES[0].category);
   const [customSkill, setCustomSkill] = useState("");
+  // v0.4.33 (Phase 3): Matching v2 candidate-side preferences.
+  const [qualificationLevel, setQualificationLevel] = useState<string>(profile.qualificationLevel || "");
+  const [preferredCategories, setPreferredCategories] = useState<string[]>(profile.preferredCategories || []);
+  const [preferredSalaryMin, setPreferredSalaryMin] = useState<string>(profile.preferredSalaryMin != null ? String(profile.preferredSalaryMin) : "");
+  const [preferredSalaryMax, setPreferredSalaryMax] = useState<string>(profile.preferredSalaryMax != null ? String(profile.preferredSalaryMax) : "");
+  const [preferredSalaryCurrency, setPreferredSalaryCurrency] = useState<string>(profile.preferredSalaryCurrency || "USD");
 
   useEffect(() => {
     if (profile.skills) setSelectedSkills(profile.skills);
     if (profile.preferredCountries) setSelectedCountries(profile.preferredCountries);
     if (profile.experience != null) setExperience(String(profile.experience));
+    if (profile.qualificationLevel) setQualificationLevel(profile.qualificationLevel);
+    if (profile.preferredCategories) setPreferredCategories(profile.preferredCategories);
+    if (profile.preferredSalaryMin != null) setPreferredSalaryMin(String(profile.preferredSalaryMin));
+    if (profile.preferredSalaryMax != null) setPreferredSalaryMax(String(profile.preferredSalaryMax));
+    if (profile.preferredSalaryCurrency) setPreferredSalaryCurrency(profile.preferredSalaryCurrency);
   }, [profile]);
 
   const toggleSkill = (skill: string) => {
@@ -1009,6 +1069,12 @@ function SkillsStep({ profile, onNext, onBack }: { profile: any; onNext: () => v
           experience: parseInt(experience) || 0,
           skills: selectedSkills,
           preferredCountries: selectedCountries,
+          // v0.4.33 (Phase 3) — Matching v2 candidate-side fields
+          qualificationLevel: qualificationLevel || null,
+          preferredCategories: preferredCategories.length ? preferredCategories : null,
+          preferredSalaryMin: preferredSalaryMin ? parseInt(preferredSalaryMin) : null,
+          preferredSalaryMax: preferredSalaryMax ? parseInt(preferredSalaryMax) : null,
+          preferredSalaryCurrency: preferredSalaryCurrency || null,
         }),
       });
       if (!res.ok) throw new Error("Failed"); return res.json();
@@ -1186,6 +1252,77 @@ function SkillsStep({ profile, onNext, onBack }: { profile: any; onNext: () => v
                 </button>
               );
             })}
+          </div>
+        </motion.div>
+
+        {/* v0.4.33 (Phase 3): Matching v2 candidate-side preferences.
+            Qualification level + preferred role categories + salary band.
+            All optional — the engine treats blanks as neutral per the
+            configurable missing-criteria policy. */}
+        <motion.div variants={fadeUp} className="bg-gradient-to-br from-indigo-50/80 to-violet-50/40 rounded-xl border border-indigo-100/60 p-5 space-y-4">
+          <p className="text-xs font-bold text-indigo-600 uppercase tracking-wider mb-1 flex items-center gap-2">
+            <Sparkles className="w-4 h-4" /> Job preferences <span className="text-[10px] font-medium text-indigo-400">(optional)</span>
+          </p>
+          <p className="text-xs text-indigo-500">These help the matching engine score jobs against your goals. You can leave anything blank.</p>
+
+          <div className="grid md:grid-cols-2 gap-3">
+            <div>
+              <label className="text-[11px] font-semibold text-slate-700 mb-1 block">Highest qualification</label>
+              <Select value={qualificationLevel || ""} onValueChange={(v) => setQualificationLevel(v === "_none" ? "" : v)}>
+                <SelectTrigger className="h-10"><SelectValue placeholder="Not specified" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="_none">Not specified</SelectItem>
+                  {QUALIFICATION_LEVELS.map((q) => (
+                    <SelectItem key={q.value} value={q.value}>{q.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <label className="text-[11px] font-semibold text-slate-700 mb-1 block">
+                Preferred salary band ({preferredSalaryCurrency})
+                <span className="text-[10px] text-slate-400 ml-1 font-normal">— annualised</span>
+              </label>
+              <div className="flex items-center gap-2">
+                <Input type="number" placeholder="Min" value={preferredSalaryMin}
+                  onChange={(e) => setPreferredSalaryMin(e.target.value)} className="h-10 text-sm" />
+                <span className="text-slate-400">→</span>
+                <Input type="number" placeholder="Max" value={preferredSalaryMax}
+                  onChange={(e) => setPreferredSalaryMax(e.target.value)} className="h-10 text-sm" />
+                <Select value={preferredSalaryCurrency} onValueChange={setPreferredSalaryCurrency}>
+                  <SelectTrigger className="h-10 w-20"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {["USD", "EUR", "GBP", "AUD", "CAD", "AED", "SAR", "INR"].map((c) => (
+                      <SelectItem key={c} value={c}>{c}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <label className="text-[11px] font-semibold text-slate-700 mb-2 block">Preferred role categories</label>
+            <div className="flex flex-wrap gap-1.5">
+              {JOB_CATEGORIES.map((c) => {
+                const active = preferredCategories.includes(c.key);
+                return (
+                  <button key={c.key} type="button"
+                    onClick={() => setPreferredCategories(active ? preferredCategories.filter((x) => x !== c.key) : [...preferredCategories, c.key])}
+                    className={`text-[11px] px-2.5 py-1 rounded-md border transition ${
+                      active
+                        ? "bg-indigo-600 text-white border-indigo-600"
+                        : "bg-white text-slate-600 border-slate-200 hover:border-indigo-400 hover:text-indigo-700"
+                    }`}>
+                    {active && <Check className="w-2.5 h-2.5 inline mr-1" />}{c.label}
+                  </button>
+                );
+              })}
+            </div>
+            <p className="text-[10px] text-slate-400 mt-2">
+              Recommended jobs from your preferred categories get full marks on the Category factor (10% weight by default).
+            </p>
           </div>
         </motion.div>
       </div>

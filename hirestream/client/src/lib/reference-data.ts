@@ -168,6 +168,45 @@ export const CITIES_BY_COUNTRY: Record<string, string[]> = {
 
 export const MAX_CUSTOM_CITY_LEN = 80;
 
+// v0.4.33 (Phase 3): mirror of IELTS_COUNTRIES on the server. Used by
+// the job-poster forms to decide whether to render an IELTS band field
+// (numeric 4.0–9.0) or a CEFR-level language picker.
+export const IELTS_COUNTRIES = new Set(["UK", "Australia", "New Zealand", "Canada", "Ireland", "USA"]);
+
+// v0.4.33 (Phase 3): qualification levels, ordered. Used by the job-
+// poster dropdown and the candidate wizard so both ends speak the same
+// vocabulary (server vs2 engine relies on these exact keys).
+export const QUALIFICATION_LEVELS: { value: string; label: string }[] = [
+  { value: "school",    label: "School (10th / 12th)" },
+  { value: "diploma",   label: "Diploma / Polytechnic" },
+  { value: "bachelor",  label: "Bachelor's degree" },
+  { value: "master",    label: "Master's degree" },
+  { value: "doctorate", label: "Doctorate / PhD" },
+];
+
+// v0.4.33 (Phase 3): CEFR levels for non-IELTS country language scoring.
+export const CEFR_LEVELS: { value: string; label: string }[] = [
+  { value: "A1", label: "A1 — Beginner" },
+  { value: "A2", label: "A2 — Elementary" },
+  { value: "B1", label: "B1 — Intermediate" },
+  { value: "B2", label: "B2 — Upper-intermediate" },
+  { value: "C1", label: "C1 — Advanced" },
+  { value: "C2", label: "C2 — Proficient / Native" },
+];
+
+// Common languages relevant to overseas placement.
+export const LANGUAGE_OPTIONS: { value: string; label: string }[] = [
+  { value: "english",   label: "English" },
+  { value: "arabic",    label: "Arabic" },
+  { value: "german",    label: "German" },
+  { value: "french",    label: "French" },
+  { value: "spanish",   label: "Spanish" },
+  { value: "japanese",  label: "Japanese" },
+  { value: "mandarin",  label: "Mandarin" },
+  { value: "portuguese",label: "Portuguese" },
+  { value: "hindi",     label: "Hindi" },
+];
+
 // ── Job categories ──────────────────────────────────────────────────
 // v0.4.31 (HPSEDC Item 8): client-side mirror of server's job-categories.seed.ts.
 // Keep these two lists in sync — the server is authoritative; this list only

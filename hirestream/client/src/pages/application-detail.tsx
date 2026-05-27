@@ -9,6 +9,7 @@ import {
   ArrowLeft, CheckCircle, XCircle, ClipboardList, MapPin, Loader2, Briefcase,
   Award, Download,
 } from "lucide-react";
+import { MatchBreakdownPanel } from "@/components/shared/MatchBreakdownPanel";
 
 async function fetchJson(url: string) {
   const res = await fetch(url);
@@ -286,6 +287,15 @@ export default function ApplicationDetailPage() {
             <p className="text-2xl font-bold text-slate-900">{app.appliedAt ? new Date(app.appliedAt).toLocaleDateString("en-IN") : "—"}</p>
           </div>
         </div>
+
+        {/* v0.4.33 (Phase 3): 7-factor match breakdown — explains why this
+            score, factor by factor. Collapsible so it doesn't dominate the
+            page when not needed. */}
+        {app.scoreBreakdown && (
+          <div className="mt-4">
+            <MatchBreakdownPanel breakdown={app.scoreBreakdown} collapsible={true} title="Why this score" />
+          </div>
+        )}
 
         {app.skills?.length > 0 && (
           <section className="mt-6">

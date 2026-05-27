@@ -890,8 +890,11 @@ router.post("/:id/apply", protect, async (req, res, next) => {
       });
     }
 
-    // Calculate real match score (placeholder — will be enhanced in Day 9)
-    const matchScore = calculateMatchScore(candidate, job);
+    // v0.4.33 (Phase 3): score via the shared v2 matching service so the
+    // recorded matchScore reflects the same weights/policy admins see in
+    // the Parameters Module — not a duplicate inline implementation.
+    const { calculateMatchScore: matchV2 } = await import("../services/matching.service");
+    const matchScore = await matchV2(candidate, job);
 
     const newApp = await db.insert(applications).values({
       candidateId: candidate.id,
@@ -932,36 +935,9 @@ router.post("/:id/apply", protect, async (req, res, next) => {
  * Basic match score calculator.
  * Skill overlap (50%) + Experience match (30%) + Country preference (20%)
  */
-function calculateMatchScore(candidate: any, job: any): number {
-  let score = 0;
-
-  // Skill match (50 points)
-  const candidateSkills = (candidate.skills || []).map((s: string) => s.toLowerCase());
-  const jobSkills = (job.skills || []).map((s: string) => s.toLowerCase());
-  if (jobSkills.length > 0) {
-    const overlap = candidateSkills.filter((s: string) => jobSkills.includes(s)).length;
-    score += Math.round((overlap / jobSkills.length) * 50);
-  } else {
-    score += 25; // No skills specified = partial match
-  }
-
-  // Experience match (30 points)
-  const required = job.experience || 0;
-  const has = candidate.experience || 0;
-  if (required === 0) {
-    score += 30; // No requirement = full match
-  } else {
-    score += Math.round(Math.min(has / required, 1) * 30);
-  }
-
-  // Country preference match (20 points)
-  const preferred = (candidate.preferredCountries || []).map((c: string) => c.toLowerCase());
-  if (preferred.length === 0 || preferred.includes(job.country?.toLowerCase())) {
-    score += 20;
-  }
-
-  return Math.min(100, Math.max(0, score));
-}
+// v0.4.33 (Phase 3): the legacy inline calculateMatchScore was retired
+// here. All scoring routes through server/services/matching.service.ts so
+// weights/policy/version come from settings.
 
 // ── Save/Unsave Job (toggle) ────────────────────────────────────────
 router.post("/:id/save", protect, async (req, res, next) => {

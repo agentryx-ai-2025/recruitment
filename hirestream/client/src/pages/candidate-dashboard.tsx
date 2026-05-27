@@ -18,6 +18,7 @@ import {
 import { ReportJobDialog } from "@/components/shared/report-job-dialog";
 import { PhotoAvatar } from "@/components/shared/PhotoAvatar";
 import { JOB_CATEGORIES, jobCategoryLabel } from "@/lib/reference-data";
+import { MatchBreakdownPanel } from "@/components/shared/MatchBreakdownPanel";
 
 async function fetchJson(url: string) {
   const res = await fetch(url);
@@ -860,25 +861,12 @@ function JobsView({ allJobs, appliedJobIds, savedJobIds, recommendations, comple
                 )}
               </div>
 
-              {/* Match Breakdown */}
+              {/* v0.4.33 (Phase 3): 7-factor match breakdown via the shared
+                  panel. Was 3 cards (skill/exp/country) — now renders whatever
+                  the v2 engine returns. v1 fallback hides zero-weight factors. */}
               {matchMap[selectedJob.id]?.breakdown && (
-                <div className="grid grid-cols-3 gap-3 mb-6">
-                  {[
-                    { label: "Skills", ...matchMap[selectedJob.id].breakdown.skill, gradient: "from-blue-500 to-blue-600", bg: "bg-blue-50" },
-                    { label: "Experience", ...matchMap[selectedJob.id].breakdown.experience, gradient: "from-emerald-500 to-emerald-600", bg: "bg-emerald-50" },
-                    { label: "Country", ...matchMap[selectedJob.id].breakdown.country, gradient: "from-purple-500 to-purple-600", bg: "bg-purple-50" },
-                  ].map(b => (
-                    <div key={b.label} className={`${b.bg} rounded-xl p-4 border border-slate-100`}>
-                      <div className="flex justify-between text-xs mb-2">
-                        <span className="text-slate-600 font-medium">{b.label}</span>
-                        <span className="font-bold tabular-nums">{b.score}/{b.max}</span>
-                      </div>
-                      <div className="w-full bg-white rounded-full h-2">
-                        <div className={`bg-gradient-to-r ${b.gradient} h-2 rounded-full transition-all`} style={{ width: `${b.max > 0 ? (b.score / b.max) * 100 : 0}%` }} />
-                      </div>
-                      <p className="text-[10px] text-slate-400 mt-1.5">{b.detail}</p>
-                    </div>
-                  ))}
+                <div className="mb-6">
+                  <MatchBreakdownPanel breakdown={matchMap[selectedJob.id].breakdown} collapsible={false} />
                 </div>
               )}
 

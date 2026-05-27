@@ -25,6 +25,7 @@ import contentRouter from "./routes/content.routes";
 import agentProductivityRouter from "./routes/agent-productivity.routes";
 import candidateSelfServiceRouter from "./routes/candidate-self-service.routes";
 import employerRouter from "./routes/employer.routes";
+import matchingRouter from "./routes/matching.routes";
 import adminOversightRouter from "./routes/admin-oversight.routes";
 import savedSearchesRouter from "./routes/saved-searches.routes";
 import publicStatusRouter from "./routes/public-status.routes";
@@ -100,6 +101,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/v1/public/status", publicStatusRouter);
   app.use("/api/v1/employer", employerRouter);
   app.use("/api/v1/admin/oversight", adminOversightRouter);
+  app.use("/api/v1/matching", matchingRouter);
 
   // ── Mobile API routes ───────────────────────────────────────────────
   app.use("/api/v1/mobile/auth", authLimiter, mobileAuthRouter);

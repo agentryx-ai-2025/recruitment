@@ -21,6 +21,7 @@ import superadminOpsRouter from '../server/routes/superadmin-ops.routes';
 import resumeParserRouter from '../server/routes/resume-parser.routes';
 import agentProductivityRouter from '../server/routes/agent-productivity.routes';
 import employerRouter from '../server/routes/employer.routes';
+import matchingRouter from '../server/routes/matching.routes';
 import mobileAuthRouter from '../server/routes/mobile-auth.routes';
 import mobilePushRouter from '../server/routes/mobile-push.routes';
 import mobileConfigRouter from '../server/routes/mobile-config.routes';
@@ -78,6 +79,7 @@ export function createTestApp(): express.Express {
   app.use('/api/v1/resume', resumeParserRouter);
   app.use('/api/v1/agent', agentProductivityRouter);
   app.use('/api/v1/employer', employerRouter);
+  app.use('/api/v1/matching', matchingRouter);
   // Mobile API routes
   app.use('/api/v1/mobile/auth', mobileAuthRouter);
   app.use('/api/v1/mobile/push', mobilePushRouter);

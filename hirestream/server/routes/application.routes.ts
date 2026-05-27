@@ -346,8 +346,10 @@ router.get("/:id", protect, async (req, res, next) => {
       }
     }
 
-    // Calculate score breakdown
-    const breakdown = calculateScoreBreakdown(candidate, job);
+    // v0.4.33 (Phase 3, Item 2): v2 7-factor breakdown via the shared
+    // matching service so weights + policy + version come from settings.
+    const { calculateMatchBreakdown } = await import("../services/matching.service");
+    const breakdown = await calculateMatchBreakdown(candidate, job);
 
     res.json({
       success: true,
@@ -403,15 +405,17 @@ router.get("/recommendations/for-me", protect, async (req, res, next) => {
       .where(eq(applications.candidateId, candidate.id));
     const appliedJobIds = new Set(appliedRows.map((r: any) => r.jobId));
 
-    // Score, filter out applied, then apply the (configurable) threshold
+    // v0.4.33 (Phase 3, Item 2): score via the v2 7-factor matching service.
+    // Threshold is the same `matching.recommendation_threshold_pct` setting
+    // the v1 engine already honoured.
     const threshold: number = await getSetting("matching.recommendation_threshold_pct");
-    const scored = activeJobs
-      .filter((job: any) => !appliedJobIds.has(job.id))
-      .map((job: any) => ({
-        ...job,
-        matchScore: calculateScore(candidate, job),
-        scoreBreakdown: calculateScoreBreakdown(candidate, job),
-      }))
+    const { calculateMatchBreakdown } = await import("../services/matching.service");
+    const unapplied = activeJobs.filter((job: any) => !appliedJobIds.has(job.id));
+    const scoredAll = await Promise.all(unapplied.map(async (job: any) => {
+      const bd = await calculateMatchBreakdown(candidate, job);
+      return { ...job, matchScore: bd.total, scoreBreakdown: bd };
+    }));
+    const scored = scoredAll
       .filter((j: any) => j.matchScore >= threshold)
       .sort((a: any, b: any) => b.matchScore - a.matchScore)
       .slice(0, 10);
@@ -422,60 +426,11 @@ router.get("/recommendations/for-me", protect, async (req, res, next) => {
   }
 });
 
-/**
- * Calculate match score: skill 50% + experience 30% + country 20%
- */
-function calculateScore(candidate: any, job: any): number {
-  const bd = calculateScoreBreakdown(candidate, job);
-  return bd.total;
-}
-
-function calculateScoreBreakdown(candidate: any, job: any) {
-  const candidateSkills = (candidate.skills || []).map((s: string) => s.toLowerCase());
-  const jobSkills = (job.skills || []).map((s: string) => s.toLowerCase());
-
-  // Skill match (50 points)
-  let skillScore = 25;
-  let skillDetail = "No skills specified on job";
-  if (jobSkills.length > 0) {
-    const overlap = candidateSkills.filter((s: string) => jobSkills.includes(s));
-    skillScore = Math.round((overlap.length / jobSkills.length) * 50);
-    skillDetail = `${overlap.length}/${jobSkills.length} skills match (${overlap.join(", ") || "none"})`;
-  }
-
-  // Experience match (30 points)
-  const required = job.experience || 0;
-  const has = candidate.experience || 0;
-  let expScore = 30;
-  let expDetail = "No experience required";
-  if (required > 0) {
-    expScore = Math.round(Math.min(has / required, 1) * 30);
-    expDetail = `${has}/${required} years (${has >= required ? "meets requirement" : "below requirement"})`;
-  }
-
-  // Country preference (20 points)
-  const preferred = (candidate.preferredCountries || []).map((c: string) => c.toLowerCase());
-  let countryScore = 20;
-  let countryDetail = "No country preference set";
-  if (preferred.length > 0) {
-    if (preferred.includes(job.country?.toLowerCase())) {
-      countryScore = 20;
-      countryDetail = `${job.country} is in preferred countries`;
-    } else {
-      countryScore = 0;
-      countryDetail = `${job.country} not in preferred countries (${preferred.join(", ")})`;
-    }
-  }
-
-  const total = Math.min(100, Math.max(0, skillScore + expScore + countryScore));
-
-  return {
-    total,
-    skill: { score: skillScore, max: 50, detail: skillDetail },
-    experience: { score: expScore, max: 30, detail: expDetail },
-    country: { score: countryScore, max: 20, detail: countryDetail },
-  };
-}
+// v0.4.33 (Phase 3): the v1 inline scorer was retired. All scoring now
+// flows through server/services/matching.service.ts so weights, policy,
+// and version come from settings (matching.weights, matching.policy,
+// matching.engine_version) and the admin Parameters Module can tune them
+// at runtime.
 
 // ── Record Interview Outcome ────────────────────────────────────────
 // FRS §2.7 / §6: interviews can be conducted by agent or employer

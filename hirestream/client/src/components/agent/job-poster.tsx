@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { CITIES_BY_COUNTRY, FIELD_LIMITS, JOB_CATEGORIES } from "@/lib/reference-data";
 import { SalaryRangePicker, EXPERIENCE_OPTIONS } from "@/components/shared/salary-range-picker";
+import { HiringCriteriaSection } from "@/components/shared/HiringCriteriaSection";
 
 const CATEGORY_KEYS = JOB_CATEGORIES.map((c) => c.key) as [string, ...string[]];
 
@@ -78,6 +79,15 @@ export function JobPoster({ isVerified, editJob, trigger, controlledOpen, onOpen
   const isEdit = !!editJob;
   const [selectedSkills, setSelectedSkills] = useState<string[]>(editJob?.skills ?? []);
   const [skillInput, setSkillInput] = useState("");
+  // v0.4.33 (Phase 3): Matching Engine v2 inputs. All optional.
+  const [qualification, setQualification] = useState<string>(editJob?.qualificationRequired ?? "");
+  const [requiredIeltsBand, setRequiredIeltsBand] = useState<number | null>(
+    editJob?.requiredIeltsBand !== undefined && editJob?.requiredIeltsBand !== null
+      ? Number(editJob.requiredIeltsBand) : null
+  );
+  const [languagesRequired, setLanguagesRequired] = useState<Record<string, string>>(
+    (editJob?.languagesRequired && typeof editJob.languagesRequired === "object") ? editJob.languagesRequired : {}
+  );
 
   const initialCountry = editJob?.country ?? "";
   const initialLocation = editJob?.location ?? "";
@@ -120,6 +130,11 @@ export function JobPoster({ isVerified, editJob, trigger, controlledOpen, onOpen
         ...data,
         requirements: toArray(data.requirements),
         skills: selectedSkills,
+        // v0.4.33 (Phase 3): Matching v2 fields. Empty → null so the engine
+        // applies the missing-criteria policy rather than scoring blanks.
+        qualificationRequired: qualification || null,
+        requiredIeltsBand: requiredIeltsBand,
+        languagesRequired: Object.keys(languagesRequired).length ? languagesRequired : null,
         isDraft,
       };
       // Empty date strings break Postgres — coerce to null
@@ -343,6 +358,17 @@ export function JobPoster({ isVerified, editJob, trigger, controlledOpen, onOpen
               </Field>
             </div>
           </Section>
+
+          {/* Hiring criteria — Phase 3 Matching v2 inputs */}
+          <HiringCriteriaSection
+            country={form.watch("country") || ""}
+            qualification={qualification}
+            setQualification={setQualification}
+            requiredIeltsBand={requiredIeltsBand}
+            setRequiredIeltsBand={setRequiredIeltsBand}
+            languagesRequired={languagesRequired}
+            setLanguagesRequired={setLanguagesRequired}
+          />
 
           {/* Description & skills */}
           <Section icon={FileText} color="text-purple-600 bg-purple-50" title="Description & skills" subtitle="Describe the role and what skills you need">

@@ -19,6 +19,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { AgencyApprovalList } from "@/components/admin/agency-approval-list";
 import { KYBReviewList } from "@/components/admin/KYBReviewList";
+import { MatchingEnginePanel } from "@/components/admin/MatchingEnginePanel";
 
 async function fetchJson(url: string) {
   const res = await fetch(url);
@@ -124,6 +125,7 @@ export default function AdminDashboard() {
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="agencies">Agencies</TabsTrigger>
           <TabsTrigger value="employers">Employers</TabsTrigger>
+          <TabsTrigger value="matching">Matching Engine</TabsTrigger>
           <TabsTrigger value="compliance">Compliance</TabsTrigger>
           <TabsTrigger value="welfare">Welfare SLA</TabsTrigger>
           <TabsTrigger value="reports">Reports</TabsTrigger>
@@ -333,6 +335,11 @@ export default function AdminDashboard() {
             secondaryLabel: "CIN",
             secondaryField: "cin",
           }} />
+        </TabsContent>
+
+        {/* ── Matching Engine Tab (v0.4.33 Phase 3, HPSEDC Item 2) ──── */}
+        <TabsContent value="matching">
+          <MatchingEnginePanel />
         </TabsContent>
 
         {/* ── Reports Tab ──────────────────────────────── */}

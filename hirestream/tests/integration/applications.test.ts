@@ -122,11 +122,16 @@ describe('GET /api/v1/applications/:id', () => {
 
     expect(res.status).toBe(200);
     expect(res.body.data.id).toBe(appId);
-    expect(res.body.data.matchScore).toBe(100);
+    // v0.4.33: engine v2 weights are skill=30, experience=20, country=15;
+    // candidate fully matches all three so each factor scores at max.
     expect(res.body.data.scoreBreakdown).toBeDefined();
-    expect(res.body.data.scoreBreakdown.skill.score).toBe(50);
-    expect(res.body.data.scoreBreakdown.experience.score).toBe(30);
-    expect(res.body.data.scoreBreakdown.country.score).toBe(20);
+    expect(res.body.data.scoreBreakdown.engineVersion).toBe('v2');
+    expect(res.body.data.scoreBreakdown.skill.score).toBe(30);
+    expect(res.body.data.scoreBreakdown.experience.score).toBe(20);
+    expect(res.body.data.scoreBreakdown.country.score).toBe(15);
+    // Other factors are neutral (full marks under default policy) — total
+    // is capped at 100 regardless.
+    expect(res.body.data.matchScore).toBe(100);
     expect(res.body.data.scoreBreakdown.total).toBe(100);
     expect(res.body.data.job).toHaveProperty('title');
     expect(res.body.data.candidate).toHaveProperty('fullName');

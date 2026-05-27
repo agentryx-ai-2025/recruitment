@@ -76,6 +76,14 @@ export const candidates = pgTable("candidates", {
   pbbyPolicyNumber: text("pbby_policy_number"),
   // PWS §2: agent outreach opt-in (default controlled by setting candidate.default_open_to_outreach)
   openToOutreach: boolean("open_to_outreach").notNull().default(true),
+  // v0.4.33 (Phase 3, HPSEDC Item 2): Matching Engine v2 candidate-side
+  // fields. All nullable so existing rows continue to score (missing-
+  // criteria policy applies — see server/services/matching.service.ts).
+  qualificationLevel: text("qualification_level"),        // school | diploma | bachelor | master | doctorate
+  preferredCategories: text("preferred_categories").array(),  // subset of job-category keys
+  preferredSalaryMin: integer("preferred_salary_min"),     // stored as annualised USD-equivalent integer
+  preferredSalaryMax: integer("preferred_salary_max"),
+  preferredSalaryCurrency: text("preferred_salary_currency"), // ISO 4217, e.g. USD / INR / AED
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -109,6 +117,15 @@ export const jobs = pgTable("jobs", {
   // jobs continue to render; Job Poster form will require it on new posts.
   // Seed vocabulary in server/services/job-categories.seed.ts.
   category: text("category"),
+  // v0.4.33 (Phase 3, HPSEDC Item 2): Matching Engine v2 job-side fields.
+  // All nullable — when missing, the engine treats the factor as neutral
+  // per the configurable Missing-Criteria policy. languagesRequired uses
+  // CEFR levels (A1-C2) for non-IELTS countries; requiredIeltsBand is a
+  // convenience field for IELTS countries (UK / AUS / NZ / CAN / IE) so
+  // the matching engine doesn't have to dig into the jsonb to score.
+  qualificationRequired: text("qualification_required"),    // school | diploma | bachelor | master | doctorate
+  languagesRequired: jsonb("languages_required"),           // { english: "B2", arabic: "A1" } or { english_ielts: 6.0 }
+  requiredIeltsBand: decimal("required_ielts_band"),
   salary: text("salary"),
   description: text("description"),
   requirements: text("requirements").array(),
@@ -345,6 +362,16 @@ export const candidateEducation = pgTable("candidate_education", {
   institution: text("institution").notNull(),
   year: integer("year"),
   percentage: decimal("percentage"),
+  // v0.4.33 (Phase 3, HPSEDC Item 5): structure the education record so
+  // the wizard can group entries into Schooling / Higher Education /
+  // Certifications & Courses. `type` is nullable for backward-compat with
+  // pre-v0.4.33 rows (treated as "university" in the UI as a sensible
+  // default). `board` is for 10th/12th and is distinct from `institution`
+  // (which captures the school name). `subject` is for the field of study
+  // on degrees (e.g. "Computer Science", "Mechanical Engineering").
+  type: text("type"),         // school | university | diploma | certification | course
+  board: text("board"),       // CBSE / ICSE / HPBSE / Cambridge / IB / etc.
+  subject: text("subject"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
