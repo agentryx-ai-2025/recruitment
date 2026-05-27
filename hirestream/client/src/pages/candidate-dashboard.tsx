@@ -2663,7 +2663,12 @@ const PIPELINE_STAGES = [
   { key: "reviewed",            label: "Under Review", intent: "status:reviewed",            ring: "ring-amber-500",   bg: "bg-amber-50",   text: "text-amber-700",   dot: "bg-amber-500" },
   { key: "shortlisted",         label: "Shortlisted",  intent: "status:shortlisted",         ring: "ring-purple-500",  bg: "bg-purple-50",  text: "text-purple-700",  dot: "bg-purple-500" },
   { key: "interview_scheduled", label: "Interview",    intent: "status:interview_scheduled", ring: "ring-cyan-500",    bg: "bg-cyan-50",    text: "text-cyan-700",    dot: "bg-cyan-500" },
-  { key: "selected",            label: "Offer",        intent: "offers",                     ring: "ring-emerald-500", bg: "bg-emerald-50", text: "text-emerald-700", dot: "bg-emerald-500" },
+  // v0.4.33.1: pipeline pill counts applications with status="selected" but
+  // previously routed via intent="offers" which only surfaces apps whose
+  // placement is already in "offered" state — so clicking "Offer 2" landed
+  // on an empty awaiting-action list. Switched to status:selected so the
+  // click lands on the exact rows the count is showing.
+  { key: "selected",            label: "Offer",        intent: "status:selected",            ring: "ring-emerald-500", bg: "bg-emerald-50", text: "text-emerald-700", dot: "bg-emerald-500" },
   { key: "placed",              label: "Accepted",     intent: "status:placed",              ring: "ring-green-600",   bg: "bg-green-50",   text: "text-green-700",   dot: "bg-green-600" },
 ] as const;
 
