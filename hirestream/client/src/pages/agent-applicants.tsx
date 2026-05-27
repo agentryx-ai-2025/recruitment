@@ -195,13 +195,13 @@ export default function AgentApplicantsPage() {
         <span className="text-slate-300">/</span>
         <Link href="/" className="text-slate-500 hover:text-blue-600">Dashboard</Link>
         <span className="text-slate-300">/</span>
-        <span className="text-slate-900 font-medium">All applicants</span>
+        <span className="text-slate-900 font-medium">Applications Pipeline</span>
       </div>
 
       <div className="bg-gradient-to-br from-blue-600 to-indigo-700 text-white rounded-2xl p-6 shadow-lg">
-        <h1 className="text-2xl font-bold flex items-center gap-2"><Users className="w-6 h-6" /> All applicants across your jobs</h1>
+        <h1 className="text-2xl font-bold flex items-center gap-2"><Users className="w-6 h-6" /> Applications Pipeline</h1>
         <p className="text-sm text-blue-100 mt-1">
-          {applicants.length} applicants across {jobCount} job{jobCount !== 1 ? "s" : ""}. Default view shows fresh submissions awaiting your triage.
+          {applicants.length} application{applicants.length !== 1 ? "s" : ""} across {jobCount} job{jobCount !== 1 ? "s" : ""}. Default view shows fresh submissions awaiting your triage.
         </p>
       </div>
 

@@ -134,7 +134,7 @@ export default function AgentDashboard() {
   const navItems = [
     { key: "overview", label: "Dashboard", icon: LayoutDashboard, count: null, href: null },
     { key: "jobs", label: "My Jobs", icon: Briefcase, count: allJobs.length, href: null },
-    { key: "applicants-all", label: "All Applicants", icon: ClipboardList, count: null, href: "/agent/applicants" },
+    { key: "applicants-all", label: "Applications Pipeline", icon: ClipboardList, count: null, href: "/agent/applicants" },
     { key: "requisitions", label: "Open Requisitions", icon: Handshake, count: null, href: null },
     { key: "candidates", label: "Candidates", icon: Users, count: candidateTotal, href: null },
     { key: "drives", label: "Drives", icon: Megaphone, count: drives.length, href: null },
@@ -236,7 +236,7 @@ export default function AgentDashboard() {
           <Link href="/agent/applicants"
             className="block mt-3 bg-gradient-to-br from-blue-600 to-indigo-700 text-white rounded-xl p-3 shadow-sm hover:shadow-md transition">
             <p className="text-[11px] font-bold uppercase tracking-wider opacity-80">One-pane view</p>
-            <p className="text-sm font-semibold mt-0.5">All applicants across your jobs →</p>
+            <p className="text-sm font-semibold mt-0.5">Applications Pipeline — across all jobs →</p>
             <p className="text-[11px] opacity-80 mt-0.5">Default filter: awaiting your triage</p>
           </Link>
         </aside>
