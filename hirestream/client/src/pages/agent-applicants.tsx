@@ -205,19 +205,22 @@ export default function AgentApplicantsPage() {
         </p>
       </div>
 
-      {/* Stage cards — single horizontal row with nowrap. On narrow viewports
-          the row scrolls horizontally rather than wrapping to a second line,
-          keeping the visual rhythm intact. All 8 cells (All + 7 stages) live
-          on one line on any screen ≥ 720px. */}
-      <div className="mt-6 flex gap-2 overflow-x-auto pb-1 -mx-1 px-1 snap-x">
+      {/* Stage filter pills.
+          v0.4.25: switched from a flex row with shrink-0 pills (which
+          clustered on the left and left the right gutter empty) to a
+          CSS grid: 3 columns on mobile, 9 on large screens (All + 8
+          stages). Pills now stretch equal-width across the full
+          container — the row visually fills end-to-end instead of
+          looking like 60% of a toolbar. */}
+      <div className="mt-6 grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-9 gap-2">
         <button onClick={() => setStatusFilterManual("all")}
-          className={`shrink-0 snap-start bg-slate-100 text-slate-700 rounded-lg px-3 py-2 text-left hover:ring-2 hover:ring-offset-1 hover:ring-slate-300 transition min-w-[92px] ${statusFilter === "all" ? "ring-2 ring-slate-900" : ""}`}>
+          className={`bg-slate-100 text-slate-700 rounded-lg px-3 py-2 text-left hover:ring-2 hover:ring-offset-1 hover:ring-slate-300 transition ${statusFilter === "all" ? "ring-2 ring-slate-900" : ""}`}>
           <div className="text-[11px] font-medium opacity-90">All</div>
           <div className="text-lg font-bold tabular-nums">{applicants.length}</div>
         </button>
         {PIPELINE.map((s) => (
           <button key={s.key} onClick={() => setStatusFilterManual(s.key === statusFilter ? "all" : s.key)}
-            className={`shrink-0 snap-start ${s.color} rounded-lg px-3 py-2 text-left hover:ring-2 hover:ring-offset-1 hover:ring-slate-300 transition min-w-[92px] ${statusFilter === s.key ? "ring-2 ring-slate-900" : ""}`}>
+            className={`${s.color} rounded-lg px-3 py-2 text-left hover:ring-2 hover:ring-offset-1 hover:ring-slate-300 transition ${statusFilter === s.key ? "ring-2 ring-slate-900" : ""}`}>
             <div className="text-[11px] font-medium opacity-90">{s.label}</div>
             <div className="text-lg font-bold tabular-nums">{counts[s.key] || 0}</div>
           </button>
