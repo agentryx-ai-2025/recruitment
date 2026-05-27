@@ -306,3 +306,115 @@ describe('PATCH /api/v1/drives/placements/:id/decline', () => {
     expect(res.body.data.declineReason).toBe('Personal reasons');
   });
 });
+
+// ── v0.4.17 IDOR guards ─────────────────────────────────────────────
+// Before v0.4.17 these four endpoints had `protect` only and would let
+// any authenticated user (including unrelated agents and candidates)
+// schedule/record interviews and create/read placements on jobs they
+// don't own. Each test below uses a SECOND agent (different user, no
+// ownership of the test job) and expects 403.
+describe('v0.4.17 IDOR guards on drive.routes', () => {
+  // Reusable: create a separate verified agent whose job we'll attack.
+  async function setupOtherAgent() {
+    const db = getDb();
+    const reg = await request(app).post('/api/v1/auth/register')
+      .send({ email: 'other-agent@test.com', password: 'Test@123', role: 'agent' });
+    const cookie = reg.headers['set-cookie'] as unknown as string[];
+    await request(app).post('/api/v1/agencies/register').set('Cookie', cookie)
+      .send({ agencyName: 'Other Agency', licenseNumber: 'LIC999', specializations: ['IT'] });
+    await db.update(recruitmentAgents).set({ verified: true })
+      .where(eq(recruitmentAgents.userId, reg.body.data.id));
+    return cookie;
+  }
+
+  // The "victim" job + application owned by agentCookie.
+  async function makeVictimApp() {
+    const drive = await createDrive(agentCookie);
+    await request(app).patch(`/api/v1/drives/${drive.body.data.id}/approve`).set('Cookie', adminCookie);
+    const job = await request(app).post('/api/v1/jobs').set('Cookie', agentCookie)
+      .send({ title: 'Dev', company: 'Corp', location: 'Dubai', country: 'UAE', skills: ['React'], experience: 2 });
+    const appRes = await request(app).post(`/api/v1/jobs/${job.body.data.id}/apply`).set('Cookie', candidateCookie);
+    return { driveId: drive.body.data.id, appId: appRes.body.data.id };
+  }
+
+  it('POST /:driveId/interviews — foreign agent gets 403', async () => {
+    const otherAgent = await setupOtherAgent();
+    const { driveId, appId } = await makeVictimApp();
+    const res = await request(app).post(`/api/v1/drives/${driveId}/interviews`)
+      .set('Cookie', otherAgent)
+      .send({ applicationId: appId, scheduledAt: '2026-05-01T14:00:00Z' });
+    expect(res.status).toBe(403);
+  });
+
+  it('POST /:driveId/interviews — candidate (non-agent) gets 403', async () => {
+    const { driveId, appId } = await makeVictimApp();
+    const res = await request(app).post(`/api/v1/drives/${driveId}/interviews`)
+      .set('Cookie', candidateCookie)
+      .send({ applicationId: appId, scheduledAt: '2026-05-01T14:00:00Z' });
+    expect(res.status).toBe(403);
+  });
+
+  it('PATCH /interviews/:id/result — foreign agent gets 403', async () => {
+    const otherAgent = await setupOtherAgent();
+    const { driveId, appId } = await makeVictimApp();
+    const iv = await request(app).post(`/api/v1/drives/${driveId}/interviews`)
+      .set('Cookie', agentCookie)
+      .send({ applicationId: appId, scheduledAt: '2026-05-01T14:00:00Z' });
+    const res = await request(app).patch(`/api/v1/drives/interviews/${iv.body.data.id}/result`)
+      .set('Cookie', otherAgent)
+      .send({ result: 'rejected' });
+    expect(res.status).toBe(403);
+  });
+
+  it('POST /placements — foreign agent gets 403', async () => {
+    const otherAgent = await setupOtherAgent();
+    const { driveId, appId } = await makeVictimApp();
+    // Walk app to selected first (owner does this)
+    const iv = await request(app).post(`/api/v1/drives/${driveId}/interviews`)
+      .set('Cookie', agentCookie)
+      .send({ applicationId: appId, scheduledAt: '2026-05-01T14:00:00Z' });
+    await request(app).patch(`/api/v1/drives/interviews/${iv.body.data.id}/result`)
+      .set('Cookie', agentCookie).send({ result: 'selected' });
+
+    const res = await request(app).post('/api/v1/drives/placements')
+      .set('Cookie', otherAgent)
+      .send({ applicationId: appId, country: 'UAE' });
+    expect(res.status).toBe(403);
+  });
+
+  it('GET /placements/:id — unrelated candidate gets 403', async () => {
+    const { driveId, appId } = await makeVictimApp();
+    const iv = await request(app).post(`/api/v1/drives/${driveId}/interviews`)
+      .set('Cookie', agentCookie)
+      .send({ applicationId: appId, scheduledAt: '2026-05-01T14:00:00Z' });
+    await request(app).patch(`/api/v1/drives/interviews/${iv.body.data.id}/result`)
+      .set('Cookie', agentCookie).send({ result: 'selected' });
+    const placement = await request(app).post('/api/v1/drives/placements')
+      .set('Cookie', agentCookie).send({ applicationId: appId, country: 'UAE' });
+
+    // Register a totally unrelated candidate and try to read the placement
+    const stranger = await request(app).post('/api/v1/auth/register')
+      .send({ email: 'stranger@test.com', password: 'Test@123', role: 'candidate' });
+    const strangerCookie = stranger.headers['set-cookie'] as unknown as string[];
+
+    const res = await request(app).get(`/api/v1/drives/placements/${placement.body.data.id}`)
+      .set('Cookie', strangerCookie);
+    expect(res.status).toBe(403);
+  });
+
+  it('GET /placements/:id — owning candidate gets 200', async () => {
+    const { driveId, appId } = await makeVictimApp();
+    const iv = await request(app).post(`/api/v1/drives/${driveId}/interviews`)
+      .set('Cookie', agentCookie)
+      .send({ applicationId: appId, scheduledAt: '2026-05-01T14:00:00Z' });
+    await request(app).patch(`/api/v1/drives/interviews/${iv.body.data.id}/result`)
+      .set('Cookie', agentCookie).send({ result: 'selected' });
+    const placement = await request(app).post('/api/v1/drives/placements')
+      .set('Cookie', agentCookie).send({ applicationId: appId, country: 'UAE' });
+
+    const res = await request(app).get(`/api/v1/drives/placements/${placement.body.data.id}`)
+      .set('Cookie', candidateCookie);
+    expect(res.status).toBe(200);
+    expect(res.body.data.country).toBe('UAE');
+  });
+});

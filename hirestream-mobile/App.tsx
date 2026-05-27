@@ -44,7 +44,7 @@ import ForceUpdateScreen from "./src/screens/ForceUpdateScreen";
 import OnboardingScreen from "./src/screens/OnboardingScreen";
 import NetworkBanner from "./src/components/NetworkBanner";
 import { colors } from "./src/theme";
-import { API_BASE_URL, STORAGE_KEYS } from "./src/config";
+import { API_BASE_URL, STORAGE_KEYS, APP_VERSION } from "./src/config";
 import { getItem, setItem } from "./src/storage";
 import { initSentry, captureException } from "./src/sentry";
 import { setupForegroundHandler } from "./src/push";
@@ -63,7 +63,10 @@ LogBox.ignoreLogs([
   "Sentry Logger",
 ]);
 
-const APP_VERSION = "1.0.0";
+// v0.4.17: APP_VERSION imported from ./src/config above. Previously a
+// hardcoded "1.0.0" shadowed the real version, so the force-update
+// check on line ~270 always compared against "1.0.0" instead of the
+// actual deployed version — force-update was silently broken.
 
 // ── Error Boundary ──────────────────────────────────────────────────
 class ErrorBoundary extends React.Component<

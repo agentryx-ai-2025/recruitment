@@ -4,7 +4,10 @@ import { z } from "zod";
 const envSchema = z.object({
   // ── Required ──────────────────────────────────────────────────────
   DATABASE_URL: z.string().url("A valid PostgreSQL URL is required in DATABASE_URL"),
-  SESSION_SECRET: z.string().min(10).default("super-secret-default-session-key"),
+  // v0.4.17: no default. A predictable shared session secret would let
+  // anyone forge sessions. The startup gate below additionally rejects
+  // weak / placeholder values even if NODE_ENV is dev or test.
+  SESSION_SECRET: z.string().min(32, "SESSION_SECRET must be at least 32 chars (production secret, no default)"),
   PORT: z.string().transform(Number).default("5000"),
   NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
 
@@ -49,8 +52,13 @@ const envSchema = z.object({
   JWT_SECRET: z.string().min(32).optional(),
   JWT_ACCESS_TTL_SEC: z.string().transform(Number).default("900"),      // 15 min
   JWT_REFRESH_TTL_SEC: z.string().transform(Number).default("2592000"), // 30 days
-  MOBILE_MIN_SUPPORTED_VERSION: z.string().default("1.0.0"),
-  MOBILE_LATEST_VERSION: z.string().default("1.0.0"),
+  // v0.4.17: defaults bumped to match the actual shipped mobile build.
+  // The previous "1.0.0" default made /api/v1/mobile/version always say
+  // 1.0.0 unless explicitly overridden in env — so the client's force-
+  // update check could never trigger. These should be set explicitly in
+  // production env, but the default at least matches reality now.
+  MOBILE_MIN_SUPPORTED_VERSION: z.string().default("0.4.10.0"),
+  MOBILE_LATEST_VERSION: z.string().default("0.4.17.0"),
 
   // ── Firebase Cloud Messaging (push notifications) ────────────────
   FCM_PROJECT_ID: z.string().optional(),

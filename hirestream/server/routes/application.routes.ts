@@ -242,7 +242,38 @@ router.patch("/bulk-status", protect, async (req, res, next) => {
       } catch (e: any) { logger.warn(`bulk placement auto-create failed: ${e?.message}`); }
     }
 
-    // Create notifications for each updated candidate
+    // v0.4.17: parity with the single-status path — fire the templated
+    // pipeline event through the engine so candidates/agents/employers
+    // all get the right role-specific wording. The legacy generic
+    // notify() below stays as a fall-back when the engine can't fire
+    // (unmapped status, missing template, autoNotify disabled).
+    const eventKey =
+      status === "reviewed"            ? "application.reviewed"
+    : status === "shortlisted"         ? "application.shortlisted"
+    : status === "interview_scheduled" ? "interview.scheduled"
+    : status === "selected"            ? "application.selected"
+    : status === "rejected"            ? "application.rejected"
+    : null;
+
+    const autoNotify: boolean = await getSetting("notifications.auto_on_status_change");
+    const firedSet = new Set<string>();
+    if (autoNotify && eventKey) {
+      try {
+        const { fireEvent, resolveParticipantsFromApplication } = await import("../services/event-notifications.service");
+        await Promise.all(updated.map(async (app: any) => {
+          try {
+            const ctx = await resolveParticipantsFromApplication(app.id);
+            ctx.actorUserId = userId;
+            ctx.actorRole = userRole;
+            await fireEvent(eventKey as any, ctx);
+            firedSet.add(app.id);
+          } catch (e: any) { logger.warn(`bulk fireEvent failed for ${app.id}: ${e?.message}`); }
+        }));
+      } catch (e: any) { logger.warn(`bulk fireEvent module load failed: ${e?.message}`); }
+    }
+
+    // Legacy fallback notification — only for rows the event engine
+    // didn't fire on (unmapped status, missing template, etc.).
     const statusLabels: Record<string, string> = {
       reviewed: "Your application has been reviewed",
       shortlisted: "You've been shortlisted",
@@ -252,6 +283,7 @@ router.patch("/bulk-status", protect, async (req, res, next) => {
     };
 
     for (const app of updated) {
+      if (firedSet.has(app.id)) continue;
       if (!app.candidateId || !app.jobId) continue;
 
       const candRows = await db.select().from(candidates).where(eq(candidates.id, app.candidateId)).limit(1);
@@ -268,7 +300,7 @@ router.patch("/bulk-status", protect, async (req, res, next) => {
       }
     }
 
-    logger.info(`Bulk status update: ${updated.length} applications → ${status}`);
+    logger.info(`Bulk status update: ${updated.length} applications → ${status} (${firedSet.size} via event engine, ${updated.length - firedSet.size} via fallback)`);
     res.json({ success: true, data: { updated: updated.length, status } });
   } catch (error) {
     next(error);

@@ -9,6 +9,49 @@ import { notify } from "../services/notification.service";
 
 const router = Router();
 
+// ── v0.4.17: Shared ownership check for application-scoped mutations ─
+// Returns null when the caller is authorised (admin/superadmin, or the
+// agent on the application's job, or the employer who owns the job
+// directly OR via parent requisition per FRS §2.2). Returns the role
+// the caller is acting as so handlers can branch on it; or an
+// error tuple {status, message} to send back.
+//
+// This is the same pattern application.routes.ts PATCH /:id/status
+// already uses; consolidated here because the audit found four
+// drive.routes endpoints missing the same guard (POST /:driveId/
+// interviews, PATCH /interviews/:id/result, POST /placements, GET
+// /placements/:id). DRY-ing the check makes future drive endpoints
+// safe-by-default — copy this helper into the new handler.
+async function assertCanActOnApplication(
+  db: any,
+  user: any,
+  applicationId: string,
+): Promise<{ ok: true; isAdmin: boolean; app: any; job: any } | { ok: false; status: number; message: string }> {
+  if (!user) return { ok: false, status: 401, message: "Authentication required" };
+  if (!["agent", "employer", "admin", "superadmin"].includes(user.role)) {
+    return { ok: false, status: 403, message: "Not authorized" };
+  }
+  const [app] = await db.select().from(applications).where(eq(applications.id, applicationId)).limit(1);
+  if (!app) return { ok: false, status: 404, message: "Application not found" };
+  const [job] = await db.select().from(jobs).where(eq(jobs.id, app.jobId!)).limit(1);
+  if (!job) return { ok: false, status: 404, message: "Job not found" };
+
+  const isAdmin = user.role === "admin" || user.role === "superadmin";
+  if (isAdmin) return { ok: true, isAdmin: true, app, job };
+
+  const ownsAsAgent = user.role === "agent" && job.agentId === user.id;
+  let ownsAsEmployer = user.role === "employer" && job.employerId === user.id;
+  if (!ownsAsEmployer && user.role === "employer" && job.parentRequisitionId) {
+    const [parent] = await db.select({ employerId: jobs.employerId }).from(jobs)
+      .where(eq(jobs.id, job.parentRequisitionId)).limit(1);
+    ownsAsEmployer = !!parent && parent.employerId === user.id;
+  }
+  if (!ownsAsAgent && !ownsAsEmployer) {
+    return { ok: false, status: 403, message: "You can only act on applications for jobs you own." };
+  }
+  return { ok: true, isAdmin: false, app, job };
+}
+
 // ── Create Drive (verified agent only) ──────────────────────────────
 router.post("/", protect, async (req, res, next) => {
   try {
@@ -362,10 +405,11 @@ router.post("/:driveId/interviews", protect, async (req, res, next) => {
       return res.status(400).json({ success: false, error: { code: 400, message: "applicationId and scheduledAt are required" } });
     }
 
-    // Verify the application exists
-    const appRows = await db.select().from(applications).where(eq(applications.id, applicationId)).limit(1);
-    if (!appRows.length) {
-      return res.status(404).json({ success: false, error: { code: 404, message: "Application not found" } });
+    // v0.4.17: IDOR guard — only the agent/employer who owns the
+    // application's job (or admin) can schedule an interview on it.
+    const guard = await assertCanActOnApplication(db, user, applicationId);
+    if (!guard.ok) {
+      return res.status(guard.status).json({ success: false, error: { code: guard.status, message: guard.message } });
     }
 
     const result = await db.insert(interviews).values({
@@ -381,20 +425,20 @@ router.post("/:driveId/interviews", protect, async (req, res, next) => {
     await db.update(applications).set({ status: "interview_scheduled" }).where(eq(applications.id, applicationId));
 
     // Notify candidate
-    const candRows = await db.select().from(candidates).where(eq(candidates.id, appRows[0].candidateId!)).limit(1);
-    const jobRows = await db.select().from(jobs).where(eq(jobs.id, appRows[0].jobId!)).limit(1);
+    const candRows = await db.select().from(candidates).where(eq(candidates.id, guard.app.candidateId!)).limit(1);
+    const jobTitle = guard.job.title;
 
-    if (candRows.length && candRows[0].userId && jobRows.length) {
+    if (candRows.length && candRows[0].userId) {
       notify({
         userId: candRows[0].userId,
         type: "application_update",
         title: "Interview Scheduled",
-        message: `Your interview for "${jobRows[0].title}" is scheduled for ${new Date(scheduledAt).toLocaleDateString('en-IN')} at ${location || 'TBD'}.`,
-        metadata: { interviewId: result[0].id, applicationId, jobId: appRows[0].jobId },
+        message: `Your interview for "${jobTitle}" is scheduled for ${new Date(scheduledAt).toLocaleDateString('en-IN')} at ${location || 'TBD'}.`,
+        metadata: { interviewId: result[0].id, applicationId, jobId: guard.app.jobId },
       }).catch(() => {});
     }
 
-    logger.info(`Interview scheduled: ${result[0].id} for application ${applicationId}`);
+    logger.info(`Interview scheduled: ${result[0].id} for application ${applicationId} by ${user.role} ${user.id}`);
     res.status(201).json({ success: true, data: result[0] });
   } catch (error) {
     next(error);
@@ -473,6 +517,7 @@ router.patch("/interviews/:id/result", protect, async (req, res, next) => {
     const db = storage.db;
     if (!db) return res.status(500).json({ success: false, error: { code: 500, message: "Database not available" } });
 
+    const user = req.user as any;
     const { result: interviewResult, notes } = req.body;
     // Accept null/undefined to clear the result back to pending
     const validResults = ["selected", "rejected", "hold", null];
@@ -482,6 +527,13 @@ router.patch("/interviews/:id/result", protect, async (req, res, next) => {
 
     const intRows = await db.select().from(interviews).where(eq(interviews.id, req.params.id)).limit(1);
     if (!intRows.length) return res.status(404).json({ success: false, error: { code: 404, message: "Interview not found" } });
+
+    // v0.4.17: IDOR guard — only the agent/employer who owns the
+    // interview's application's job (or admin) can record its result.
+    const guard = await assertCanActOnApplication(db, user, intRows[0].applicationId);
+    if (!guard.ok) {
+      return res.status(guard.status).json({ success: false, error: { code: guard.status, message: guard.message } });
+    }
 
     const normalised = interviewResult ?? null;
     const updated = await db.update(interviews)
@@ -537,17 +589,21 @@ router.post("/placements", protect, async (req, res, next) => {
     const db = storage.db;
     if (!db) return res.status(500).json({ success: false, error: { code: 500, message: "Database not available" } });
 
+    const user = req.user as any;
     const { applicationId, country, salary, startDate, appointmentLetterUrl } = req.body;
 
     if (!applicationId || !country) {
       return res.status(400).json({ success: false, error: { code: 400, message: "applicationId and country are required" } });
     }
 
-    // Verify application is selected
-    const appRows = await db.select().from(applications).where(eq(applications.id, applicationId)).limit(1);
-    if (!appRows.length) return res.status(404).json({ success: false, error: { code: 404, message: "Application not found" } });
+    // v0.4.17: IDOR guard — only the agent/employer who owns the
+    // application's job (or admin) can issue a placement offer.
+    const guard = await assertCanActOnApplication(db, user, applicationId);
+    if (!guard.ok) {
+      return res.status(guard.status).json({ success: false, error: { code: guard.status, message: guard.message } });
+    }
 
-    if (appRows[0].status !== "selected") {
+    if (guard.app.status !== "selected") {
       return res.status(400).json({ success: false, error: { code: 400, message: "Application must be in 'selected' status to create placement" } });
     }
 
@@ -560,21 +616,31 @@ router.post("/placements", protect, async (req, res, next) => {
       status: "offered",
     }).returning();
 
-    // Notify candidate
-    const candRows = await db.select().from(candidates).where(eq(candidates.id, appRows[0].candidateId!)).limit(1);
-    const jobRows = await db.select().from(jobs).where(eq(jobs.id, appRows[0].jobId!)).limit(1);
+    // PWS §8: audit placement lifecycle (v0.4.17 — was missing before)
+    try {
+      const { logTransition } = await import("../services/audit-transitions.service");
+      await logTransition({
+        actorUserId: user.id, actorRole: user.role,
+        entityType: "placement", entityId: result[0].id, action: "create",
+        toState: "offered",
+        ipAddress: req.ip,
+        extra: { applicationId, country, salary: salary || null },
+      });
+    } catch (e: any) { logger.warn(`audit on placement create failed: ${e?.message}`); }
 
-    if (candRows.length && candRows[0].userId && jobRows.length) {
+    // Notify candidate
+    const candRows = await db.select().from(candidates).where(eq(candidates.id, guard.app.candidateId!)).limit(1);
+    if (candRows.length && candRows[0].userId) {
       notify({
         userId: candRows[0].userId,
         type: "application_update",
         title: "Placement Offer Received!",
-        message: `You have received a placement offer for "${jobRows[0].title}" in ${country}. Please review and accept/decline.`,
+        message: `You have received a placement offer for "${guard.job.title}" in ${country}. Please review and accept/decline.`,
         metadata: { placementId: result[0].id, applicationId },
       }).catch(() => {});
     }
 
-    logger.info(`Placement created: ${result[0].id} for application ${applicationId}`);
+    logger.info(`Placement created: ${result[0].id} for application ${applicationId} by ${user.role} ${user.id}`);
     res.status(201).json({ success: true, data: result[0] });
   } catch (error) {
     next(error);
@@ -582,13 +648,52 @@ router.post("/placements", protect, async (req, res, next) => {
 });
 
 // ── Get Placement Detail ────────────────────────────────────────────
+// v0.4.17: ownership-gated. Before this fix anyone with a placement id
+// could read salary, country, and appointment-letter URL. Three valid
+// readers: the placed candidate, the job's owning agent/employer
+// (direct or via parent requisition), and admin/superadmin.
 router.get("/placements/:id", protect, async (req, res, next) => {
   try {
     const db = storage.db;
     if (!db) return res.status(500).json({ success: false, error: { code: 500, message: "Database not available" } });
 
+    const user = req.user as any;
+    if (!user) return res.status(401).json({ success: false, error: { code: 401, message: "Authentication required" } });
+
     const rows = await db.select().from(placements).where(eq(placements.id, req.params.id)).limit(1);
     if (!rows.length) return res.status(404).json({ success: false, error: { code: 404, message: "Placement not found" } });
+
+    const isAdmin = user.role === "admin" || user.role === "superadmin";
+    if (!isAdmin) {
+      // Resolve the application + job + candidate so we can compare ids.
+      const [row] = await db
+        .select({
+          appId: applications.id,
+          candUserId: candidates.userId,
+          agentId: jobs.agentId,
+          employerId: jobs.employerId,
+          parentRequisitionId: jobs.parentRequisitionId,
+        })
+        .from(applications)
+        .innerJoin(candidates, eq(applications.candidateId, candidates.id))
+        .innerJoin(jobs, eq(applications.jobId, jobs.id))
+        .where(eq(applications.id, rows[0].applicationId))
+        .limit(1);
+
+      const isCandidateOwner = !!row && row.candUserId === user.id;
+      const isAgentOwner = !!row && user.role === "agent" && row.agentId === user.id;
+      let isEmployerOwner = !!row && user.role === "employer" && row.employerId === user.id;
+      // Employer also owns derivative jobs via parent requisition (FRS §2.2)
+      if (!isEmployerOwner && row && user.role === "employer" && row.parentRequisitionId) {
+        const [parent] = await db.select({ employerId: jobs.employerId }).from(jobs)
+          .where(eq(jobs.id, row.parentRequisitionId)).limit(1);
+        isEmployerOwner = !!parent && parent.employerId === user.id;
+      }
+
+      if (!isCandidateOwner && !isAgentOwner && !isEmployerOwner) {
+        return res.status(403).json({ success: false, error: { code: 403, message: "Not authorized" } });
+      }
+    }
 
     res.json({ success: true, data: rows[0] });
   } catch (error) {
@@ -628,6 +733,18 @@ router.patch("/placements/:id/accept", protect, async (req, res, next) => {
 
     await db.update(applications).set({ status: "placed" as any }).where(eq(applications.id, rows[0].applicationId));
 
+    // v0.4.17: audit placement lifecycle (PWS §8)
+    try {
+      const { logTransition } = await import("../services/audit-transitions.service");
+      await logTransition({
+        actorUserId: user.id, actorRole: user.role,
+        entityType: "placement", entityId: req.params.id, action: "accept",
+        fromState: "offered", toState: "accepted",
+        ipAddress: req.ip,
+        extra: { applicationId: rows[0].applicationId },
+      });
+    } catch (e: any) { logger.warn(`audit on placement accept failed: ${e?.message}`); }
+
     res.json({ success: true, data: result[0] });
   } catch (error) {
     next(error);
@@ -664,6 +781,19 @@ router.patch("/placements/:id/decline", protect, async (req, res, next) => {
       .set({ status: "declined", candidateResponse: "declined", declineReason: reason || null })
       .where(eq(placements.id, req.params.id))
       .returning();
+
+    // v0.4.17: audit placement lifecycle (PWS §8)
+    try {
+      const { logTransition } = await import("../services/audit-transitions.service");
+      await logTransition({
+        actorUserId: user.id, actorRole: user.role,
+        entityType: "placement", entityId: req.params.id, action: "decline",
+        fromState: "offered", toState: "declined",
+        reason: reason || undefined,
+        ipAddress: req.ip,
+        extra: { applicationId: rows[0].applicationId },
+      });
+    } catch (e: any) { logger.warn(`audit on placement decline failed: ${e?.message}`); }
 
     res.json({ success: true, data: result[0] });
   } catch (error) {
