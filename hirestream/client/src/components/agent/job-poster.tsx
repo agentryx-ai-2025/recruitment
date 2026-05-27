@@ -17,16 +17,21 @@ import {
 } from "@/components/ui/select";
 import {
   Loader2, Plus, AlertCircle, Edit, Briefcase, MapPin, Globe, Building,
-  DollarSign, Clock, FileText, Sparkles, X,
+  DollarSign, Clock, FileText, Sparkles, X, Tag,
 } from "lucide-react";
-import { CITIES_BY_COUNTRY, FIELD_LIMITS } from "@/lib/reference-data";
+import { CITIES_BY_COUNTRY, FIELD_LIMITS, JOB_CATEGORIES } from "@/lib/reference-data";
 import { SalaryRangePicker, EXPERIENCE_OPTIONS } from "@/components/shared/salary-range-picker";
+
+const CATEGORY_KEYS = JOB_CATEGORIES.map((c) => c.key) as [string, ...string[]];
 
 const jobSchema = z.object({
   title: z.string().min(2, "Job title is required").max(FIELD_LIMITS.jobTitle, `Max ${FIELD_LIMITS.jobTitle} characters`),
   company: z.string().min(2, "Company name is required").max(FIELD_LIMITS.companyName, `Max ${FIELD_LIMITS.companyName} characters`),
   location: z.string().min(2, "Location is required").max(FIELD_LIMITS.city, `Max ${FIELD_LIMITS.city} characters`),
   country: z.string().min(2, "Country is required"),
+  // v0.4.31 (HPSEDC Item 8): category required so the matching engine, browse-filter,
+  // and HPSEDC reports can group jobs by role family.
+  category: z.enum(CATEGORY_KEYS, { errorMap: () => ({ message: "Pick a job category" }) }),
   salary: z.string().max(FIELD_LIMITS.salary, `Max ${FIELD_LIMITS.salary} characters`).optional(),
   description: z.string().min(10, "Description must be at least 10 characters").max(FIELD_LIMITS.longDescription, `Max ${FIELD_LIMITS.longDescription} characters`),
   experience: z.number().min(0).max(50),
@@ -90,6 +95,7 @@ export function JobPoster({ isVerified, editJob, trigger, controlledOpen, onOpen
       company: editJob?.company ?? "",
       location: editJob?.location ?? "",
       country: editJob?.country ?? "",
+      category: (editJob?.category as any) ?? undefined,
       salary: editJob?.salary ?? "",
       description: editJob?.description ?? "",
       experience: editJob?.experience ?? 0,
@@ -289,6 +295,22 @@ export function JobPoster({ isVerified, editJob, trigger, controlledOpen, onOpen
                     placeholder="Enter city name" />
                 </Field>
               )}
+              <Field label="Job category" required error={form.formState.errors.category?.message as any}
+                hint="Drives match-engine grouping and browse filters">
+                <Select value={form.watch("category") ?? ""} onValueChange={(v) => form.setValue("category", v as any, { shouldDirty: true, shouldValidate: true })}>
+                  <SelectTrigger className="h-10">
+                    <div className="flex items-center gap-2">
+                      <Tag className="w-4 h-4 text-slate-400" />
+                      <SelectValue placeholder="Select category" />
+                    </div>
+                  </SelectTrigger>
+                  <SelectContent className="max-h-72">
+                    {JOB_CATEGORIES.map((c) => (
+                      <SelectItem key={c.key} value={c.key}>{c.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
             </div>
           </Section>
 

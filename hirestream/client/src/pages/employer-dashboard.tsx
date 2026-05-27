@@ -17,8 +17,9 @@ import {
   Calendar, Loader2, Building, Eye, Edit, MapPin, FileText,
   ChevronRight, User, Star, AlertCircle, Bell, LayoutDashboard,
   Activity, ArrowRight, CheckCircle, TrendingUp, Globe, Download, Heart,
-  Copy, Trash2, PauseCircle, PlayCircle, ClipboardList, Route,
+  Copy, Trash2, PauseCircle, PlayCircle, ClipboardList, Route, Tag,
 } from "lucide-react";
+import { jobCategoryLabel } from "@/lib/reference-data";
 
 async function fetchJson(url: string) {
   const res = await fetch(url);
@@ -349,9 +350,14 @@ function CompactJobRow({ job }: { job: any }) {
       className="flex items-center justify-between p-3 rounded-lg border border-slate-100 hover:border-purple-300 hover:bg-purple-50/40 transition-colors group cursor-pointer">
       <div className="min-w-0 flex-1">
         <p className="text-sm font-semibold text-slate-900 truncate group-hover:text-blue-700">{job.title}</p>
-        <p className="text-xs text-slate-400 flex items-center gap-1">
+        <p className="text-xs text-slate-400 flex items-center gap-1 flex-wrap">
           <MapPin className="w-3 h-3" /> {job.location}, {job.country}
-          {job.salary && <span className="ml-1">· {job.salary}</span>}
+          {job.salary && <span>· {job.salary}</span>}
+          {job.category && (
+            <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold px-1.5 py-0 rounded bg-indigo-50 text-indigo-700 border border-indigo-100" title="Job category">
+              <Tag className="w-2.5 h-2.5" /> {jobCategoryLabel(job.category)}
+            </span>
+          )}
         </p>
       </div>
       <Badge className={`text-[11px] flex-shrink-0 ${job.status === "active" ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>{job.status}</Badge>
@@ -560,6 +566,11 @@ function JobCard({ job }: { job: any }) {
               <span className="flex items-center gap-0.5"><MapPin className="w-3.5 h-3.5" />{[job.location, job.country].filter(Boolean).join(", ") || <span className="italic">no location yet</span>}</span>
               {job.salary && <span>· {job.salary}</span>}
               {job.targetHires > 1 && <span>· {job.targetHires} hires</span>}
+              {job.category && (
+                <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold px-1.5 py-0 rounded bg-indigo-50 text-indigo-700 border border-indigo-100" title="Job category">
+                  <Tag className="w-2.5 h-2.5" /> {jobCategoryLabel(job.category)}
+                </span>
+              )}
             </div>
           </div>
           <Badge className={`text-[11px] flex-shrink-0 ${

@@ -41,15 +41,25 @@ export const candidates = pgTable("candidates", {
   // Photo URL (served from /uploads/photos/...) — candidates + agents both see
   // it; improves recognition in lists. Nullable; InitialsAvatar is the fallback.
   photoUrl: text("photo_url"),
-  // Postal address fields — captured separately from the free-text `location`
-  // (which holds city/state). Allows a candidate to record their full postal
-  // address (required for placement paperwork) and for the wizard to round-trip
-  // it. All nullable. Tester feedback: "Address info does not save" — root
-  // cause was the wizard had inputs but no corresponding columns.
+  // Family details (HPSEDC v0.4.31 — Item 4). All nullable; not required at
+  // registration but expected before placement paperwork is finalised.
+  fatherName: text("father_name"),
+  motherName: text("mother_name"),
+  // Current/postal address fields (the address the candidate lives at today).
+  // Captured separately from the free-text `location` (which holds city/state).
+  // All nullable.
   addressLine1: text("address_line_1"),
   addressLine2: text("address_line_2"),
   city: text("city"),
   pinCode: text("pin_code"),
+  // Permanent address — distinct from current address (v0.4.31, HPSEDC Item 4).
+  // Many overseas placement docs (PCC, visa, emigration) need the candidate's
+  // permanent home address even if they currently reside elsewhere for work or
+  // study. All nullable; wizard offers "same as current" checkbox.
+  permanentAddressLine1: text("permanent_address_line_1"),
+  permanentAddressLine2: text("permanent_address_line_2"),
+  permanentCity: text("permanent_city"),
+  permanentPinCode: text("permanent_pin_code"),
   // Regulatory compliance (Emigration Act, MEA) + overseas-placement essentials
   passportNumber: text("passport_number"),
   passportExpiry: date("passport_expiry"),
@@ -72,7 +82,13 @@ export const candidates = pgTable("candidates", {
 export const documents = pgTable("documents", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   candidateId: varchar("candidate_id").references(() => candidates.id),
-  type: text("type").notNull(), // 'cv', 'passport', 'certificate'
+  // v0.4.31 (HPSEDC Item 7): expanded from cv/passport/certificate to
+  // distinct slots per doc class so each gets its own ✓ indicator.
+  // Allowed values: cv | passport | identity_proof | educational_certificate
+  //                | experience_certificate | offer_letter | other
+  // Legacy "certificate" values stay valid (server doesn't reject reads);
+  // new uploads use the specific types.
+  type: text("type").notNull(),
   fileName: text("file_name").notNull(),
   fileUrl: text("file_url").notNull(),
   fileSize: integer("file_size"),
@@ -87,6 +103,12 @@ export const jobs = pgTable("jobs", {
   company: text("company").notNull(),
   location: text("location").notNull(),
   country: text("country").notNull(),
+  // v0.4.31 (HPSEDC Item 8): controlled-vocabulary role category drives
+  // overseas-placement essentials (ECR/non-ECR eligibility, PDO curriculum,
+  // PBBY premium tier) and Browse Jobs filtering. Nullable so existing
+  // jobs continue to render; Job Poster form will require it on new posts.
+  // Seed vocabulary in server/services/job-categories.seed.ts.
+  category: text("category"),
   salary: text("salary"),
   description: text("description"),
   requirements: text("requirements").array(),
@@ -438,6 +460,11 @@ export const insertJobSchema = createInsertSchema(jobs).omit({
   company: z.string().trim().min(2).max(150),
   location: z.string().trim().min(1).max(80),
   country: z.string().trim().min(2).max(60),
+  // v0.4.31 (HPSEDC Item 8): controlled-vocabulary category. Kept optional
+  // at the shared-schema layer so legacy seed data and existing tests still
+  // round-trip. Client-side forms (agent + employer) enforce it as required;
+  // the route handler runs normaliseCategory() when the field is present.
+  category: z.string().trim().min(1).max(60).optional().nullable(),
   salary: z.string().trim().max(120).optional().nullable(),
   description: z.string().trim().max(5000).optional().nullable(),
   employerNotes: z.string().trim().max(2000).optional().nullable(),
@@ -489,7 +516,9 @@ export const updateCandidateSchema = createInsertSchema(candidates).omit({
   id: true,
   userId: true,
   createdAt: true,
-  ecrStatus: true,
+  // v0.4.31: ecrStatus moved out of the omit list — the wizard's Identity
+  // & Travel section now captures it directly. pccStatus, medicalStatus,
+  // pdoCompleted, pbbyInsuranceStatus stay omitted as they're agent-managed.
   pccStatus: true,
   medicalStatus: true,
   pdoCompleted: true,

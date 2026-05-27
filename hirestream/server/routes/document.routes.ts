@@ -34,8 +34,20 @@ router.post("/", upload.single("file"), verifyUploadedFile, async (req, res, nex
       return res.status(404).json({ success: false, error: { code: 404, message: "Candidate profile not found. Complete your profile first." } });
     }
 
-    const docType = req.body.type || "cv"; // cv, passport, certificate
-    const validTypes = ["cv", "passport", "certificate", "other"];
+    const docType = req.body.type || "cv";
+    // v0.4.31 (HPSEDC Item 7): expanded vocabulary so each doc class has
+    // its own slot + ✓ indicator in the wizard. Legacy "certificate" still
+    // accepted for backward-compat with existing data.
+    const validTypes = [
+      "cv",
+      "passport",
+      "identity_proof",
+      "educational_certificate",
+      "experience_certificate",
+      "offer_letter",
+      "certificate", // legacy, kept for backward-compat
+      "other",
+    ];
     if (!validTypes.includes(docType)) {
       return res.status(400).json({ success: false, error: { code: 400, message: `Invalid document type. Must be one of: ${validTypes.join(", ")}` } });
     }

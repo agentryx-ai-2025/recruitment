@@ -70,7 +70,23 @@ router.post("/", protect, async (req, res, next) => {
         error: { code: 400, message: parsed.error.issues[0]?.message ?? "Invalid input", issues: parsed.error.issues },
       });
     }
-    const validatedData = parsed.data;
+    const validatedData = parsed.data as any;
+
+    // v0.4.31 (HPSEDC Item 8): canonicalise the category against the controlled
+    // vocabulary. Required for non-draft posts. We accept any seed key plus an
+    // admin-extended key from `job.categories.extra` so HPSEDC can broaden the
+    // list at runtime without a redeploy.
+    if (validatedData.category !== undefined && validatedData.category !== null && validatedData.category !== "") {
+      const { normaliseCategory } = await import("../services/job-categories.seed");
+      const canonical = normaliseCategory(String(validatedData.category));
+      if (!canonical) {
+        return res.status(400).json({
+          success: false,
+          error: { code: 400, message: "Invalid job category. Pick one from the dropdown." },
+        });
+      }
+      validatedData.category = canonical;
+    }
 
     // PWS §7 / Tier 3: cap drafts per user to prevent sprawl
     if (isDraft) {
@@ -142,7 +158,7 @@ router.get("/", async (req, res, next) => {
     if (!db) return res.status(500).json({ success: false, error: { code: 500, message: "Database not available" } });
 
     const {
-      q, country, location, sector, minSalary, maxSalary, minExp, maxExp,
+      q, country, location, sector, category, minSalary, maxSalary, minExp, maxExp,
       status, sort, order, page = "1", limit = "20",
       mine,  // when "true", restrict to jobs owned by authed agent/employer — unlocks drafts
     } = req.query;
@@ -219,6 +235,17 @@ router.get("/", async (req, res, next) => {
     // Sector filter (search in description)
     if (sector && typeof sector === "string") {
       conditions.push(ilike(jobs.description, `%${sector}%`));
+    }
+
+    // v0.4.31 (HPSEDC Item 8): category filter — accepts a single key
+    // or a comma-separated list (e.g. ?category=driver,electrician).
+    // Unknown keys are silently dropped so a stale UI doesn't 500.
+    if (category && typeof category === "string") {
+      const { JOB_CATEGORY_KEYS } = await import("../services/job-categories.seed");
+      const allowed = new Set(JOB_CATEGORY_KEYS);
+      const keys = category.split(",").map((k) => k.trim().toLowerCase()).filter((k) => allowed.has(k));
+      if (keys.length === 1) conditions.push(eq(jobs.category, keys[0]));
+      else if (keys.length > 1) conditions.push(inArray(jobs.category, keys));
     }
 
     // Experience range
@@ -354,7 +381,21 @@ router.put("/:id", protect, async (req, res, next) => {
     }
 
     const isDraft = req.body?.isDraft === true;
-    const { id: _, createdAt: __, agentId: ___, employerId: ____, isDraft: _____, ...updateData } = req.body;
+    const { id: _, createdAt: __, agentId: ___, employerId: ____, isDraft: _____, ...updateData } = req.body as any;
+
+    // v0.4.31 (HPSEDC Item 8): normalise category on update too. Defensive
+    // against clients sending a stale label or a free-typed value.
+    if (updateData.category !== undefined && updateData.category !== null && updateData.category !== "") {
+      const { normaliseCategory } = await import("../services/job-categories.seed");
+      const canonical = normaliseCategory(String(updateData.category));
+      if (!canonical) {
+        return res.status(400).json({
+          success: false,
+          error: { code: 400, message: "Invalid job category. Pick one from the dropdown." },
+        });
+      }
+      updateData.category = canonical;
+    }
 
     // If publishing a draft (was "draft" and isDraft is false), validate fully.
     const becomingActive = job.status === "draft" && !isDraft;

@@ -6,8 +6,9 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import {
   ArrowLeft, Briefcase, MapPin, DollarSign, Clock, Shield,
-  CheckCircle, Loader2, ArrowRight, Bookmark, BookmarkCheck, Share2,
+  CheckCircle, Loader2, ArrowRight, Bookmark, BookmarkCheck, Share2, Tag,
 } from "lucide-react";
+import { jobCategoryLabel } from "@/lib/reference-data";
 
 async function fetchJson(url: string) {
   const res = await fetch(url);
@@ -113,6 +114,9 @@ export default function JobDetailPage() {
             <p className="text-base text-slate-600 font-medium mt-1">{job.company}</p>
             <div className="flex flex-wrap items-center gap-4 text-sm text-slate-500 mt-3">
               <span className="flex items-center gap-1.5"><MapPin className="w-4 h-4 text-slate-400" />{job.location}, {job.country}</span>
+              {job.category && (
+                <span className="flex items-center gap-1.5"><Tag className="w-4 h-4 text-slate-400" />{jobCategoryLabel(job.category)}</span>
+              )}
               {job.salary && <span className="flex items-center gap-1.5"><DollarSign className="w-4 h-4 text-slate-400" />{job.salary}</span>}
               {job.experience > 0 && <span className="flex items-center gap-1.5"><Clock className="w-4 h-4 text-slate-400" />{job.experience}+ years</span>}
               <span className="flex items-center gap-1.5"><Shield className="w-4 h-4 text-emerald-500" /> Verified by HPSEDC</span>

@@ -393,32 +393,66 @@ function BasicInfoStep({ profile, onNext }: { profile: any; onNext: () => void }
   const [email, setEmail] = useState(profile.email || "");
   const [phone, setPhone] = useState(profile.phone || "");
   const [username, setUsername] = useState(profile.username || "");
+  // v0.4.31 (HPSEDC Item 4): family details
+  const [fatherName, setFatherName] = useState(profile.fatherName || "");
+  const [motherName, setMotherName] = useState(profile.motherName || "");
+  // Current/postal address
   const [addressLine1, setAddressLine1] = useState("");
   const [addressLine2, setAddressLine2] = useState("");
   const [city, setCity] = useState("");
   const [district, setDistrict] = useState("");
   const [state, setState] = useState("Himachal Pradesh");
   const [pinCode, setPinCode] = useState("");
+  // v0.4.31 (HPSEDC Item 4): permanent address — distinct from current
+  const [sameAsCurrent, setSameAsCurrent] = useState(false);
+  const [permAddressLine1, setPermAddressLine1] = useState("");
+  const [permAddressLine2, setPermAddressLine2] = useState("");
+  const [permCity, setPermCity] = useState("");
+  const [permPinCode, setPermPinCode] = useState("");
+  // v0.4.31 (HPSEDC Item 4 gap A): surface passport + IELTS at top level so
+  // HPSEDC testers (and real candidates) see them in the wizard instead of
+  // buried in the Compliance panel later.
+  const [passportNumber, setPassportNumber] = useState(profile.passportNumber || "");
+  const [passportExpiry, setPassportExpiry] = useState(profile.passportExpiry || "");
+  const [ecrStatus, setEcrStatus] = useState(profile.ecrStatus || "");
+  const [ieltsBand, setIeltsBand] = useState(profile.ieltsBand || "");
 
   useEffect(() => {
     if (profile.fullName) setFullName(profile.fullName);
     if (profile.email) setEmail(profile.email);
     if (profile.phone) setPhone(profile.phone);
     if (profile.username) setUsername(profile.username);
+    if (profile.fatherName) setFatherName(profile.fatherName);
+    if (profile.motherName) setMotherName(profile.motherName);
     if (profile.location) {
       const parts = profile.location.split(",").map((s: string) => s.trim());
       if (parts.length >= 2) { setDistrict(parts[0]); setState(parts[1]); }
       else if (parts.length === 1) { setDistrict(parts[0]); }
     }
-    // Rehydrate postal-address fields so editing an existing profile shows what
-    // was saved. Previously the wizard state was always blank on reload — users
-    // would re-type their address only to see it vanish on save (regression
-    // fixed together with the missing-column bug).
     if (profile.addressLine1) setAddressLine1(profile.addressLine1);
     if (profile.addressLine2) setAddressLine2(profile.addressLine2);
     if (profile.city) setCity(profile.city);
     if (profile.pinCode) setPinCode(profile.pinCode);
+    if (profile.permanentAddressLine1) setPermAddressLine1(profile.permanentAddressLine1);
+    if (profile.permanentAddressLine2) setPermAddressLine2(profile.permanentAddressLine2);
+    if (profile.permanentCity) setPermCity(profile.permanentCity);
+    if (profile.permanentPinCode) setPermPinCode(profile.permanentPinCode);
+    if (profile.passportNumber) setPassportNumber(profile.passportNumber);
+    if (profile.passportExpiry) setPassportExpiry(profile.passportExpiry);
+    if (profile.ecrStatus) setEcrStatus(profile.ecrStatus);
+    if (profile.ieltsBand != null) setIeltsBand(String(profile.ieltsBand));
   }, [profile]);
+
+  // When "same as current" is checked, mirror the current address into perm.
+  // Effect runs whenever the toggle flips on or the current address changes.
+  useEffect(() => {
+    if (sameAsCurrent) {
+      setPermAddressLine1(addressLine1);
+      setPermAddressLine2(addressLine2);
+      setPermCity(city);
+      setPermPinCode(pinCode);
+    }
+  }, [sameAsCurrent, addressLine1, addressLine2, city, pinCode]);
 
   const location = [district, state].filter(Boolean).join(", ");
 
@@ -428,10 +462,20 @@ function BasicInfoStep({ profile, onNext }: { profile: any; onNext: () => void }
         method: "PATCH", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           fullName, email, phone, location, username: username || undefined,
+          fatherName: fatherName || null,
+          motherName: motherName || null,
           addressLine1: addressLine1 || null,
           addressLine2: addressLine2 || null,
           city: city || null,
           pinCode: pinCode || null,
+          permanentAddressLine1: permAddressLine1 || null,
+          permanentAddressLine2: permAddressLine2 || null,
+          permanentCity: permCity || null,
+          permanentPinCode: permPinCode || null,
+          passportNumber: passportNumber || null,
+          passportExpiry: passportExpiry || null,
+          ecrStatus: ecrStatus || null,
+          ieltsBand: ieltsBand ? Number(ieltsBand) : null,
         }),
       });
       if (!res.ok) throw new Error("Failed to save");
@@ -484,10 +528,19 @@ function BasicInfoStep({ profile, onNext }: { profile: any; onNext: () => void }
               <p className="text-[11px] text-red-600 mt-1 pl-2">Phone must be digits only.</p>
             )}
           </FormField>
+          {/* v0.4.31 (HPSEDC Item 4): Father / Mother names */}
+          <FormField label="Father's Name" icon={User} hint="As on passport / official records">
+            <Input value={fatherName} onChange={e => setFatherName(e.target.value)} placeholder="Father's full name"
+              className="pl-11 h-12 rounded-xl border-blue-200/80 bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all" />
+          </FormField>
+          <FormField label="Mother's Name" icon={User} hint="As on passport / official records">
+            <Input value={motherName} onChange={e => setMotherName(e.target.value)} placeholder="Mother's full name"
+              className="pl-11 h-12 rounded-xl border-blue-200/80 bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all" />
+          </FormField>
         </div>
       </motion.div>
 
-      {/* Address Section */}
+      {/* Address Section (current/postal) */}
       <motion.div variants={fadeUp} className="bg-gradient-to-br from-emerald-50/80 to-teal-50/40 rounded-xl border border-emerald-100/60 p-5">
         <p className="text-xs font-bold text-emerald-600 uppercase tracking-wider mb-4 flex items-center gap-2">
           <MapPin className="w-4 h-4" /> Address
@@ -543,6 +596,82 @@ function BasicInfoStep({ profile, onNext }: { profile: any; onNext: () => void }
               </p>
             )}
           </div>
+        </div>
+      </motion.div>
+
+      {/* v0.4.31 (HPSEDC Item 4): Permanent Address — distinct from
+          current. Visa, PCC, and emigration paperwork need both. */}
+      <motion.div variants={fadeUp} className="bg-gradient-to-br from-amber-50/80 to-orange-50/40 rounded-xl border border-amber-100/60 p-5 mt-6">
+        <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+          <p className="text-xs font-bold text-amber-700 uppercase tracking-wider flex items-center gap-2">
+            <MapPin className="w-4 h-4" /> Permanent Address
+          </p>
+          <label className="text-xs text-amber-800 flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" checked={sameAsCurrent} onChange={(e) => setSameAsCurrent(e.target.checked)}
+              className="w-3.5 h-3.5 rounded border-amber-300" />
+            Same as current address
+          </label>
+        </div>
+        <div className={`space-y-4 ${sameAsCurrent ? "opacity-50 pointer-events-none" : ""}`}>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <FormField label="Address Line 1">
+              <Input value={permAddressLine1} onChange={e => setPermAddressLine1(e.target.value)} placeholder="House/Flat No., Street, Colony"
+                disabled={sameAsCurrent}
+                className="h-12 rounded-xl border-amber-200/80 bg-white focus:ring-2 focus:ring-amber-500/20 focus:border-amber-400 transition-all" />
+            </FormField>
+            <FormField label="Address Line 2">
+              <Input value={permAddressLine2} onChange={e => setPermAddressLine2(e.target.value)} placeholder="Landmark, Area (optional)"
+                disabled={sameAsCurrent}
+                className="h-12 rounded-xl border-amber-200/80 bg-white focus:ring-2 focus:ring-amber-500/20 focus:border-amber-400 transition-all" />
+            </FormField>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <FormField label="City / Town">
+              <Input value={permCity} onChange={e => setPermCity(e.target.value)} placeholder="e.g. Shimla"
+                disabled={sameAsCurrent}
+                className="h-12 rounded-xl border-amber-200/80 bg-white focus:ring-2 focus:ring-amber-500/20 focus:border-amber-400 transition-all" />
+            </FormField>
+            <FormField label="PIN Code">
+              <Input value={permPinCode} onChange={e => setPermPinCode(e.target.value)} placeholder="171001" maxLength={6}
+                disabled={sameAsCurrent}
+                className="h-12 rounded-xl border-amber-200/80 bg-white focus:ring-2 focus:ring-amber-500/20 focus:border-amber-400 transition-all" />
+            </FormField>
+          </div>
+        </div>
+      </motion.div>
+
+      {/* v0.4.31 (HPSEDC Item 4 gap A): Identity & Travel — surface
+          passport, ECR, IELTS at top level. Existed before but lived
+          in the Compliance panel that testers didn't reach. */}
+      <motion.div variants={fadeUp} className="bg-gradient-to-br from-indigo-50/80 to-violet-50/40 rounded-xl border border-indigo-100/60 p-5 mt-6">
+        <p className="text-xs font-bold text-indigo-700 uppercase tracking-wider mb-1 flex items-center gap-2">
+          <Shield className="w-4 h-4" /> Identity &amp; Travel
+        </p>
+        <p className="text-[11px] text-indigo-600 mb-4">Optional now, mandatory before any overseas placement. Filling these early speeds up offer-acceptance.</p>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          <FormField label="Passport Number" hint="Letters and digits, as printed on the data page">
+            <Input value={passportNumber} onChange={e => setPassportNumber(e.target.value.toUpperCase())} placeholder="e.g. M1234567" maxLength={20}
+              className="h-12 rounded-xl border-indigo-200/80 bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 transition-all" />
+          </FormField>
+          <FormField label="Passport Expiry">
+            <Input type="date" value={passportExpiry || ""} onChange={e => setPassportExpiry(e.target.value)}
+              className="h-12 rounded-xl border-indigo-200/80 bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 transition-all" />
+          </FormField>
+          <FormField label="ECR / Non-ECR" hint="Emigration Check Required status (visible in passport)">
+            <Select value={ecrStatus || "unset"} onValueChange={(v) => setEcrStatus(v === "unset" ? "" : v)}>
+              <SelectTrigger className="h-12 rounded-xl border-indigo-200/80 bg-white"><SelectValue placeholder="Select status" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="unset">Don't know / not specified</SelectItem>
+                <SelectItem value="ecr">ECR — Emigration Check Required</SelectItem>
+                <SelectItem value="ecnr">ECNR / Non-ECR</SelectItem>
+                <SelectItem value="unknown">Not on passport</SelectItem>
+              </SelectContent>
+            </Select>
+          </FormField>
+          <FormField label="IELTS Overall Band" hint="Required for UK / Australia / NZ / Canada / Ireland; leave empty if not taken">
+            <Input type="number" step="0.5" min="0" max="9" value={ieltsBand || ""} onChange={e => setIeltsBand(e.target.value)} placeholder="e.g. 6.5"
+              className="h-12 rounded-xl border-indigo-200/80 bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 transition-all" />
+          </FormField>
         </div>
       </motion.div>
 
@@ -734,7 +863,7 @@ function ExperienceStep({ onNext, onBack }: { onNext: () => void; onBack: () => 
   return (
     <motion.div variants={staggerContainer} initial="initial" animate="animate">
       <SectionHeader icon={Briefcase} color="from-emerald-500 to-emerald-600" title="Work Experience" subtitle="Add your work history — even internships and freelance count" />
-      <Hint text="Experience contributes 30% to your match score. Candidates with 3+ years get significantly better matches." />
+      <Hint text="Add every relevant work experience — internships, freelance and contract roles all count. More detail helps recruiters assess fit." />
 
       {isLoading ? <Loader2 className="w-6 h-6 animate-spin mx-auto my-8 text-emerald-500" /> : (
         <>
@@ -1067,21 +1196,24 @@ function SkillsStep({ profile, onNext, onBack }: { profile: any; onNext: () => v
 }
 
 // ── Step 5: Documents ────────────────────────────────────────────────
+// v0.4.31 (HPSEDC Item 7): Replaced the single drag-and-drop zone with 6
+// per-document-type slot cards. Each HPSEDC-mandated doc class now has its
+// own card, upload trigger, and persistent ✓ indicator so candidates (and
+// agents reviewing them) can see at a glance which docs are still missing.
+// "Other" remains as a catch-all for anything outside the mandated set.
 function DocumentsStep({ onBack, onFinish }: { onBack: () => void; onFinish: () => void }) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const [uploading, setUploading] = useState(false);
-  const [docType, setDocType] = useState("cv");
-  const [isDragging, setIsDragging] = useState(false);
+  const [uploadingSlot, setUploadingSlot] = useState<string | null>(null);
 
   const { data: docsRes, isLoading } = useQuery({
     queryKey: ["/api/v1/candidates/documents"], queryFn: () => fetchJson("/api/v1/candidates/documents"),
   });
 
-  const handleUpload = async (file: File) => {
+  const handleUpload = async (file: File, slotType: string) => {
     if (file.size > 5 * 1024 * 1024) { toast({ title: "File too large", description: "Max 5MB", variant: "destructive" }); return; }
-    setUploading(true);
-    const formData = new FormData(); formData.append("file", file); formData.append("type", docType);
+    setUploadingSlot(slotType);
+    const formData = new FormData(); formData.append("file", file); formData.append("type", slotType);
     try {
       const res = await fetch("/api/v1/candidates/documents", { method: "POST", body: formData });
       if (!res.ok) { const err = await res.json(); throw new Error(err.error?.message || "Upload failed"); }
@@ -1089,7 +1221,7 @@ function DocumentsStep({ onBack, onFinish }: { onBack: () => void; onFinish: () 
       queryClient.invalidateQueries({ queryKey: ["/api/v1/candidates/profile/completion"] });
       toast({ title: "Document uploaded" });
     } catch (err: any) { toast({ title: "Upload failed", description: err.message, variant: "destructive" }); }
-    finally { setUploading(false); }
+    finally { setUploadingSlot(null); }
   };
 
   const deleteMutation = useMutation({
@@ -1097,102 +1229,173 @@ function DocumentsStep({ onBack, onFinish }: { onBack: () => void; onFinish: () 
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/v1/candidates/documents"] });
       queryClient.invalidateQueries({ queryKey: ["/api/v1/candidates/profile/completion"] });
+      toast({ title: "Document removed" });
     },
   });
 
-  const docs = docsRes?.data || [];
-  const docCategories = [
-    { value: "cv", label: "CV / Resume", icon: FileText, color: "text-blue-600 bg-blue-100" },
-    { value: "passport", label: "Passport", icon: Shield, color: "text-emerald-600 bg-emerald-100" },
-    { value: "certificate", label: "Certificate", icon: Award, color: "text-violet-600 bg-violet-100" },
-    { value: "other", label: "Other", icon: FileText, color: "text-slate-600 bg-slate-100" },
+  const docs: any[] = docsRes?.data || [];
+
+  // 6 HPSEDC-mandated slots + "other" catch-all. Order matters — drives the
+  // visual sequence the candidate walks through. "cv" is marked required so
+  // the wizard surfaces it as the must-have for applying to any job.
+  // Legacy "certificate" uploads (from before v0.4.31) get bucketed into
+  // educational_certificate for display so they remain visible.
+  const slots: { value: string; label: string; description: string; icon: any; color: string; required?: boolean }[] = [
+    { value: "cv", label: "CV / Resume", description: "Required to apply for any job", icon: FileText, color: "text-blue-600 bg-blue-100", required: true },
+    { value: "passport", label: "Passport", description: "Bio-page scan (PDF or JPG)", icon: Shield, color: "text-emerald-600 bg-emerald-100" },
+    { value: "identity_proof", label: "Identity Proof", description: "Aadhaar / Voter ID / Driving Licence", icon: User, color: "text-cyan-600 bg-cyan-100" },
+    { value: "educational_certificate", label: "Educational Certificate", description: "Degree, diploma, or 10th/12th marksheet", icon: GraduationCap, color: "text-violet-600 bg-violet-100" },
+    { value: "experience_certificate", label: "Experience Certificate", description: "Past employer letter / payslips", icon: Briefcase, color: "text-amber-600 bg-amber-100" },
+    { value: "offer_letter", label: "Offer Letter", description: "Existing offer from overseas employer (optional)", icon: Mail, color: "text-indigo-600 bg-indigo-100" },
   ];
+
+  // Match docs to slots. Legacy "certificate" docs surface under the
+  // educational_certificate slot so we don't lose visibility of pre-v0.4.31
+  // uploads. A slot may have multiple docs (e.g. front + back of ID).
+  const docsBySlot: Record<string, any[]> = {};
+  const otherDocs: any[] = [];
+  for (const d of docs) {
+    let bucket = d.type;
+    if (bucket === "certificate") bucket = "educational_certificate"; // legacy
+    if (slots.some(s => s.value === bucket)) {
+      (docsBySlot[bucket] = docsBySlot[bucket] || []).push(d);
+    } else {
+      otherDocs.push(d);
+    }
+  }
 
   return (
     <motion.div variants={staggerContainer} initial="initial" animate="animate">
-      <SectionHeader icon={FileText} color="from-rose-500 to-rose-600" title="Documents" subtitle="Upload your CV, passport copy, and certificates for verification" />
-      <Hint text="Agencies need these to process your application. Upload at least your CV to be considered for positions. Accepted: PDF, JPG, PNG (max 5MB each)." />
+      <SectionHeader icon={FileText} color="from-rose-500 to-rose-600" title="Documents" subtitle="Upload each document into its own slot. Agencies see at a glance which ones are still missing." />
+      <Hint text="At minimum, upload your CV — without it you cannot apply to jobs. Other documents speed up verification once you're shortlisted. Accepted formats: PDF, JPG, PNG (max 5MB each)." />
 
-      {/* Upload Zone — premium glassmorphism style */}
-      <motion.div variants={fadeUp}>
-        <div
-          onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
-          onDragLeave={() => setIsDragging(false)}
-          onDrop={(e) => { e.preventDefault(); setIsDragging(false); const f = e.dataTransfer.files[0]; if (f) handleUpload(f); }}
-          className={`relative border-2 border-dashed rounded-2xl p-8 text-center transition-all duration-300 mb-6 ${
-            isDragging
-              ? "border-rose-500 bg-gradient-to-br from-rose-50 to-pink-50 scale-[1.01] shadow-lg shadow-rose-100/50"
-              : "border-slate-300/60 bg-gradient-to-br from-slate-50/80 to-white hover:border-rose-400 hover:bg-rose-50/30"
-          }`}
-        >
-          <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 transition-all ${
-            isDragging ? "bg-rose-100 scale-110" : "bg-slate-100"
-          }`}>
-            <Upload className={`w-7 h-7 transition-colors ${isDragging ? "text-rose-600" : "text-slate-400"}`} />
-          </div>
-          <p className="text-base text-slate-700 font-medium mb-1">
-            Drag and drop files here
-          </p>
-          <p className="text-sm text-slate-400 mb-5">or choose a file from your computer</p>
-
-          <div className="flex items-center justify-center gap-3 flex-wrap">
-            <select value={docType} onChange={e => setDocType(e.target.value)}
-              className="border border-slate-200 rounded-xl px-4 py-2.5 text-sm bg-white font-medium text-slate-700 focus:ring-2 focus:ring-rose-500/20 focus:border-rose-400 outline-none">
-              {docCategories.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
-            </select>
-            <label className={`cursor-pointer inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white transition-all ${
-              uploading
-                ? 'bg-slate-400'
-                : 'bg-gradient-to-r from-rose-600 to-rose-700 hover:from-rose-700 hover:to-rose-800 shadow-lg shadow-rose-500/25 hover:-translate-y-0.5'
-            }`}>
-              {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
-              {uploading ? "Uploading..." : "Choose File"}
-              <input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={e => { const f = e.target.files?.[0]; if (f) handleUpload(f); e.target.value = ""; }} className="hidden" disabled={uploading} />
-            </label>
-          </div>
-          <p className="text-xs text-slate-400 mt-4">PDF, JPG, PNG — max 5MB each</p>
-        </div>
-      </motion.div>
-
-      {/* Document List */}
-      {isLoading ? <Loader2 className="w-6 h-6 animate-spin mx-auto text-rose-500" /> : docs.length > 0 && (
-        <motion.div variants={fadeUp} className="space-y-2 mb-6">
-          {docs.map((doc: any, i: number) => {
-            const cat = docCategories.find(c => c.value === doc.type) || docCategories[3];
-            const CatIcon = cat.icon;
+      {isLoading ? (
+        <div className="py-12 flex justify-center"><Loader2 className="w-6 h-6 animate-spin text-rose-500" /></div>
+      ) : (
+        <motion.div variants={fadeUp} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {slots.map((slot) => {
+            const slotDocs = docsBySlot[slot.value] || [];
+            const hasDoc = slotDocs.length > 0;
+            const Icon = slot.icon;
+            const isUploading = uploadingSlot === slot.value;
             return (
-              <motion.div
-                key={doc.id}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.05 }}
-                className="group flex items-center justify-between p-4 bg-gradient-to-r from-rose-50/60 to-pink-50/30 rounded-xl border border-rose-100/60 hover:shadow-md transition-all"
+              <div
+                key={slot.value}
+                className={`relative rounded-2xl border p-4 transition-all ${
+                  hasDoc
+                    ? "border-emerald-200 bg-gradient-to-br from-emerald-50/70 to-white"
+                    : "border-slate-200 bg-gradient-to-br from-slate-50/60 to-white hover:border-rose-200"
+                }`}
               >
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className={`w-10 h-10 rounded-xl ${cat.color} flex items-center justify-center flex-shrink-0`}>
-                    <CatIcon className="w-5 h-5" />
+                <div className="flex items-start gap-3 mb-3">
+                  <div className={`w-10 h-10 rounded-xl ${slot.color} flex items-center justify-center flex-shrink-0`}>
+                    <Icon className="w-5 h-5" />
                   </div>
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold text-slate-700 truncate">{doc.fileName}</p>
-                    <div className="flex items-center gap-2 mt-0.5">
-                      <Badge variant="outline" className="text-[10px] capitalize rounded-md">{doc.type}</Badge>
-                      {doc.fileSize && <span className="text-[10px] text-slate-400">{(doc.fileSize / 1024).toFixed(0)} KB</span>}
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-semibold text-slate-800">{slot.label}</p>
+                      {slot.required && <Badge variant="outline" className="text-[9px] rounded-md border-rose-200 text-rose-600 bg-rose-50">Required</Badge>}
+                      {hasDoc && (
+                        <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-emerald-500 text-white flex-shrink-0" title="Uploaded">
+                          <Check className="w-3 h-3" strokeWidth={3} />
+                        </span>
+                      )}
                     </div>
+                    <p className="text-[11px] text-slate-500 mt-0.5">{slot.description}</p>
                   </div>
                 </div>
-                <div className="flex items-center gap-1.5">
-                  <Button variant="outline" size="sm" onClick={() => window.open(`/api/v1/candidates/documents/${doc.id}/download`, "_blank")}
-                    className="text-xs h-8 rounded-lg">
-                    Download
-                  </Button>
-                  <Button variant="ghost" size="sm" onClick={() => deleteMutation.mutate(doc.id)}
-                    className="opacity-0 group-hover:opacity-100 transition-opacity text-red-400 hover:text-red-600 hover:bg-red-50 h-8 rounded-lg">
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </Button>
-                </div>
-              </motion.div>
+
+                {hasDoc && (
+                  <div className="space-y-1.5 mb-3">
+                    {slotDocs.map((doc: any) => (
+                      <div key={doc.id} className="flex items-center justify-between gap-2 p-2 rounded-lg bg-white border border-emerald-100">
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs font-medium text-slate-700 truncate">{doc.fileName}</p>
+                          {doc.fileSize && <p className="text-[10px] text-slate-400">{(doc.fileSize / 1024).toFixed(0)} KB</p>}
+                        </div>
+                        <div className="flex items-center gap-1 flex-shrink-0">
+                          <Button variant="ghost" size="sm" onClick={() => window.open(`/api/v1/candidates/documents/${doc.id}/download`, "_blank")}
+                            className="h-7 px-2 text-[10px] rounded-md text-slate-600 hover:text-rose-600">
+                            View
+                          </Button>
+                          <Button variant="ghost" size="sm" onClick={() => deleteMutation.mutate(doc.id)}
+                            className="h-7 w-7 p-0 rounded-md text-red-400 hover:text-red-600 hover:bg-red-50">
+                            <Trash2 className="w-3 h-3" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <label className={`cursor-pointer w-full inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold transition-all ${
+                  isUploading
+                    ? "bg-slate-200 text-slate-500"
+                    : hasDoc
+                      ? "bg-white border border-slate-200 text-slate-600 hover:bg-slate-50"
+                      : "bg-gradient-to-r from-rose-600 to-rose-700 hover:from-rose-700 hover:to-rose-800 text-white shadow-sm"
+                }`}>
+                  {isUploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
+                  {isUploading ? "Uploading…" : hasDoc ? "Replace / Add another" : "Upload file"}
+                  <input type="file" accept=".pdf,.jpg,.jpeg,.png"
+                    onChange={e => { const f = e.target.files?.[0]; if (f) handleUpload(f, slot.value); e.target.value = ""; }}
+                    className="hidden" disabled={isUploading} />
+                </label>
+              </div>
             );
           })}
+
+          {/* "Other" catch-all — only renders if there are uploads not matching a known slot,
+              plus a permanent slot at the bottom for new misc uploads. */}
+          <div className="relative rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-50/60 to-white p-4 md:col-span-2">
+            <div className="flex items-start gap-3 mb-3">
+              <div className="w-10 h-10 rounded-xl text-slate-600 bg-slate-100 flex items-center justify-center flex-shrink-0">
+                <FileText className="w-5 h-5" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold text-slate-800">Other Documents</p>
+                <p className="text-[11px] text-slate-500 mt-0.5">Anything else an agent or employer might need (e.g. PCC, medical, reference letters).</p>
+              </div>
+            </div>
+
+            {otherDocs.length > 0 && (
+              <div className="space-y-1.5 mb-3">
+                {otherDocs.map((doc: any) => (
+                  <div key={doc.id} className="flex items-center justify-between gap-2 p-2 rounded-lg bg-white border border-slate-200">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-medium text-slate-700 truncate">{doc.fileName}</p>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <Badge variant="outline" className="text-[9px] capitalize rounded-md">{doc.type}</Badge>
+                        {doc.fileSize && <span className="text-[10px] text-slate-400">{(doc.fileSize / 1024).toFixed(0)} KB</span>}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1 flex-shrink-0">
+                      <Button variant="ghost" size="sm" onClick={() => window.open(`/api/v1/candidates/documents/${doc.id}/download`, "_blank")}
+                        className="h-7 px-2 text-[10px] rounded-md text-slate-600 hover:text-rose-600">
+                        View
+                      </Button>
+                      <Button variant="ghost" size="sm" onClick={() => deleteMutation.mutate(doc.id)}
+                        className="h-7 w-7 p-0 rounded-md text-red-400 hover:text-red-600 hover:bg-red-50">
+                        <Trash2 className="w-3 h-3" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <label className={`cursor-pointer w-full inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold transition-all ${
+              uploadingSlot === "other"
+                ? "bg-slate-200 text-slate-500"
+                : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-50"
+            }`}>
+              {uploadingSlot === "other" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
+              {uploadingSlot === "other" ? "Uploading…" : "Upload other document"}
+              <input type="file" accept=".pdf,.jpg,.jpeg,.png"
+                onChange={e => { const f = e.target.files?.[0]; if (f) handleUpload(f, "other"); e.target.value = ""; }}
+                className="hidden" disabled={uploadingSlot === "other"} />
+            </label>
+          </div>
         </motion.div>
       )}
 

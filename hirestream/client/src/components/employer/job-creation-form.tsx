@@ -13,9 +13,9 @@ import {
 } from "@/components/ui/select";
 import {
   Plus, Loader2, X, Briefcase, MapPin, Globe, DollarSign, Clock, Users,
-  Calendar, Zap, FileText, Sparkles, Building, AlertTriangle, Flame,
+  Calendar, Zap, FileText, Sparkles, Building, AlertTriangle, Flame, Tag,
 } from "lucide-react";
-import { CITIES_BY_COUNTRY, FIELD_LIMITS } from "@/lib/reference-data";
+import { CITIES_BY_COUNTRY, FIELD_LIMITS, JOB_CATEGORIES } from "@/lib/reference-data";
 import { SalaryRangePicker, EXPERIENCE_OPTIONS } from "@/components/shared/salary-range-picker";
 
 const COUNTRIES = [
@@ -38,6 +38,7 @@ const COMMON_SKILLS = [
 
 interface JobFormData {
   title: string; company: string; location: string; country: string;
+  category: string;
   salary: string; description: string; experience: number; skills: string[];
   targetHires: number; hiringDeadline: string;
   priority: "standard" | "urgent" | "critical";
@@ -73,6 +74,7 @@ export function JobCreationForm({ editJob, trigger, controlledOpen, onOpenChange
     company: editJob?.company ?? "",
     location: editJob?.location ?? "",
     country: editJob?.country ?? "",
+    category: editJob?.category ?? "",
     salary: editJob?.salary ?? "",
     description: editJob?.description ?? "",
     experience: editJob?.experience ?? 0,
@@ -125,7 +127,7 @@ export function JobCreationForm({ editJob, trigger, controlledOpen, onOpenChange
 
   const resetForm = () => {
     setForm({
-      title: "", company: "", location: "", country: "",
+      title: "", company: "", location: "", country: "", category: "",
       salary: "", description: "", experience: 0, skills: [],
       targetHires: 1, hiringDeadline: "", priority: "standard", employerNotes: "",
     });
@@ -153,6 +155,10 @@ export function JobCreationForm({ editJob, trigger, controlledOpen, onOpenChange
     e.preventDefault();
     if (!form.title || !form.company || !form.location || !form.country) {
       toast({ title: "Missing fields", description: "Title, company, location, and country are required.", variant: "destructive" });
+      return;
+    }
+    if (!form.category) {
+      toast({ title: "Pick a category", description: "Choose the closest job category — used for matching and HPSEDC reporting.", variant: "destructive" });
       return;
     }
     mutation.mutate({ data: form, isDraft: false });
@@ -287,6 +293,21 @@ export function JobCreationForm({ editJob, trigger, controlledOpen, onOpenChange
                     placeholder="Enter city name" />
                 </Field>
               )}
+              <Field label="Job category" required hint="Drives match-engine grouping and browse filters">
+                <Select value={form.category} onValueChange={(v) => setForm({ ...form, category: v })}>
+                  <SelectTrigger className="h-10">
+                    <div className="flex items-center gap-2">
+                      <Tag className="w-4 h-4 text-slate-400" />
+                      <SelectValue placeholder="Select category" />
+                    </div>
+                  </SelectTrigger>
+                  <SelectContent className="max-h-72">
+                    {JOB_CATEGORIES.map((c) => (
+                      <SelectItem key={c.key} value={c.key}>{c.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
             </div>
           </Section>
 

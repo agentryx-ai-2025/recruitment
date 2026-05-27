@@ -366,7 +366,7 @@ function ExperienceTab({ onNext }: { onNext: () => void }) {
 
   return (
     <div className="space-y-4 pt-4">
-      <Hint text="Add work experience — even internships count! Candidates with 3+ years get 40% more match scores." />
+      <Hint text="Add every relevant work experience — internships, freelance and contract roles all count." />
 
       {isLoading ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : (
         <>

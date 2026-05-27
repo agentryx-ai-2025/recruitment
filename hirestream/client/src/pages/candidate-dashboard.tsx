@@ -13,10 +13,11 @@ import {
   MapPin, Mail, User, GraduationCap, Building, Search, DollarSign,
   Clock, Shield, ChevronDown, ChevronUp, ArrowUpDown, Sparkles,
   LayoutDashboard, ClipboardList, XCircle, Calendar, ArrowRight,
-  Bookmark, BookmarkCheck, Heart, TrendingUp, Globe, Award, Eye, Route, Trash2, Flag, Zap, Upload
+  Bookmark, BookmarkCheck, Heart, TrendingUp, Globe, Award, Eye, Route, Trash2, Flag, Zap, Upload, Tag
 } from "lucide-react";
 import { ReportJobDialog } from "@/components/shared/report-job-dialog";
 import { PhotoAvatar } from "@/components/shared/PhotoAvatar";
+import { JOB_CATEGORIES, jobCategoryLabel } from "@/lib/reference-data";
 
 async function fetchJson(url: string) {
   const res = await fetch(url);
@@ -588,6 +589,7 @@ function JobsView({ allJobs, appliedJobIds, savedJobIds, recommendations, comple
   const [selectedJob, setSelectedJob] = useState<any>(null);
   const [salaryTier, setSalaryTier] = useState("all");
   const [experienceTier, setExperienceTier] = useState("all");
+  const [categoryFilter, setCategoryFilter] = useState("all");
   const [reportOpen, setReportOpen] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -599,6 +601,7 @@ function JobsView({ allJobs, appliedJobIds, savedJobIds, recommendations, comple
     const s = search.toLowerCase();
     const matchSearch = !s || j.title.toLowerCase().includes(s) || j.company.toLowerCase().includes(s) || j.skills?.some((sk: string) => sk.toLowerCase().includes(s));
     const matchCountry = country === "all" || j.country?.toLowerCase() === country.toLowerCase();
+    const matchCategory = categoryFilter === "all" || j.category === categoryFilter;
     const annual = estimatedAnnualUsd(j.salary || "");
     const matchSalary = salaryTier === "all"
       || (salaryTier === "entry"  && annual > 0  && annual < 40_000)
@@ -612,7 +615,7 @@ function JobsView({ allJobs, appliedJobIds, savedJobIds, recommendations, comple
       || (experienceTier === "mid"     && exp >= 4 && exp <= 6)
       || (experienceTier === "senior"  && exp >= 7 && exp <= 10)
       || (experienceTier === "lead"    && exp > 10);
-    return matchSearch && matchCountry && matchSalary && matchExperience;
+    return matchSearch && matchCountry && matchCategory && matchSalary && matchExperience;
   });
 
   filtered = [...filtered].sort((a: any, b: any) => {
@@ -666,6 +669,15 @@ function JobsView({ allJobs, appliedJobIds, savedJobIds, recommendations, comple
               <SelectContent>
                 <SelectItem value="all">All Countries</SelectItem>
                 {countries.map(c => <SelectItem key={c} value={c!}>{c}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+              <SelectTrigger className="h-9 text-xs rounded-xl border-slate-200"><Tag className="w-3.5 h-3.5 mr-1.5 text-slate-400" /><SelectValue placeholder="Category" /></SelectTrigger>
+              <SelectContent className="max-h-72">
+                <SelectItem value="all">All Categories</SelectItem>
+                {JOB_CATEGORIES.map((c) => (
+                  <SelectItem key={c.key} value={c.key}>{c.label}</SelectItem>
+                ))}
               </SelectContent>
             </Select>
             <Select value={experienceTier} onValueChange={setExperienceTier}>
@@ -753,6 +765,11 @@ function JobsView({ allJobs, appliedJobIds, savedJobIds, recommendations, comple
                             <Briefcase className="w-2.5 h-2.5" /> {job.experience}+ yrs
                           </span>
                         )}
+                        {job.category && (
+                          <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold px-1.5 py-0 rounded bg-indigo-50 text-indigo-700 border border-indigo-100 ml-1" title="Job category">
+                            <Tag className="w-2.5 h-2.5" /> {jobCategoryLabel(job.category)}
+                          </span>
+                        )}
                       </p>
                     </div>
                     {match && (
@@ -824,8 +841,11 @@ function JobsView({ allJobs, appliedJobIds, savedJobIds, recommendations, comple
                 <div>
                   <h2 className="text-xl font-bold text-slate-900">{selectedJob.title}</h2>
                   <p className="text-sm text-slate-600 mt-0.5 font-medium">{selectedJob.company}</p>
-                  <div className="flex items-center gap-4 text-xs text-slate-500 mt-2.5">
+                  <div className="flex items-center gap-4 text-xs text-slate-500 mt-2.5 flex-wrap">
                     <span className="flex items-center gap-1.5"><MapPin className="w-3.5 h-3.5 text-slate-400" />{selectedJob.location}, {selectedJob.country}</span>
+                    {selectedJob.category && (
+                      <span className="flex items-center gap-1.5"><Tag className="w-3.5 h-3.5 text-slate-400" />{jobCategoryLabel(selectedJob.category)}</span>
+                    )}
                     {selectedJob.salary && <span className="flex items-center gap-1.5"><DollarSign className="w-3.5 h-3.5 text-slate-400" />{selectedJob.salary}</span>}
                     <span className="flex items-center gap-1.5"><Clock className="w-3.5 h-3.5 text-slate-400" />{selectedJob.createdAt ? new Date(selectedJob.createdAt).toLocaleDateString("en-IN") : "Recent"}</span>
                   </div>

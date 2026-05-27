@@ -168,6 +168,44 @@ export const CITIES_BY_COUNTRY: Record<string, string[]> = {
 
 export const MAX_CUSTOM_CITY_LEN = 80;
 
+// ── Job categories ──────────────────────────────────────────────────
+// v0.4.31 (HPSEDC Item 8): client-side mirror of server's job-categories.seed.ts.
+// Keep these two lists in sync — the server is authoritative; this list only
+// drives the dropdown and filter UI. Server validates on submit.
+export interface JobCategoryOption {
+  key: string;
+  label: string;
+  tier: "blue_collar" | "skilled_trade" | "service" | "professional";
+}
+
+export const JOB_CATEGORIES: JobCategoryOption[] = [
+  // HPSEDC-mandated (Item 8)
+  { key: "factory_worker",      label: "Factory Worker",      tier: "blue_collar" },
+  { key: "construction_worker", label: "Construction Worker", tier: "blue_collar" },
+  { key: "driver",              label: "Driver",              tier: "skilled_trade" },
+  { key: "electrician",         label: "Electrician",         tier: "skilled_trade" },
+  { key: "plumber",             label: "Plumber",             tier: "skilled_trade" },
+  { key: "helper",              label: "Helper",              tier: "blue_collar" },
+  { key: "technician",          label: "Technician",          tier: "skilled_trade" },
+  { key: "hospitality_staff",   label: "Hospitality Staff",   tier: "service" },
+  { key: "caregiver",           label: "Caregiver",           tier: "service" },
+  { key: "warehouse_worker",    label: "Warehouse Worker",    tier: "blue_collar" },
+  // Additional
+  { key: "healthcare",  label: "Healthcare",  tier: "professional" },
+  { key: "it",          label: "IT",          tier: "professional" },
+  { key: "engineering", label: "Engineering", tier: "professional" },
+  { key: "sales",       label: "Sales",       tier: "professional" },
+  { key: "education",   label: "Education",   tier: "professional" },
+  { key: "other",       label: "Other",       tier: "professional" },
+];
+
+export function jobCategoryLabel(key: string | null | undefined): string {
+  if (!key) return "—";
+  const found = JOB_CATEGORIES.find((c) => c.key === key);
+  if (found) return found.label;
+  return String(key).split("_").map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+}
+
 // ── Field length limits (reused across forms) ───────────────────────
 export const FIELD_LIMITS = {
   jobTitle: 120,

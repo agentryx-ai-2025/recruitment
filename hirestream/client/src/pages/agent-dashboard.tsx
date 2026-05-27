@@ -19,9 +19,10 @@ import { JobPoster } from "@/components/agent/job-poster";
 import { ApplicantManager } from "@/components/agent/applicant-manager";
 import { DriveCreationForm } from "@/components/agent/drive-form";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { Mail, Phone, GraduationCap, Award, AlertTriangle, Heart, Shield, MessageSquare, FolderLock, Fingerprint } from "lucide-react";
+import { Mail, Phone, GraduationCap, Award, AlertTriangle, Heart, Shield, MessageSquare, FolderLock, Fingerprint, Tag } from "lucide-react";
 import { PhotoAvatar } from "@/components/shared/PhotoAvatar";
 import { ReportsBI } from "@/components/shared/ReportsBI";
+import { jobCategoryLabel } from "@/lib/reference-data";
 
 async function fetchJson(url: string) {
   const res = await fetch(url);
@@ -1072,9 +1073,14 @@ function AgentJobCard({ job }: { job: any }) {
         <div className="flex justify-between items-start gap-3">
           <div className="min-w-0 flex-1">
             <h4 className="font-semibold text-slate-900 text-sm group-hover:text-blue-700 transition-colors">{job.title}</h4>
-            <div className="flex items-center gap-2 text-xs text-slate-500 mt-1">
+            <div className="flex items-center gap-2 text-xs text-slate-500 mt-1 flex-wrap">
               <MapPin className="w-3.5 h-3.5" />{job.location}, {job.country}
               {job.salary && <span>· {job.salary}</span>}
+              {job.category && (
+                <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold px-1.5 py-0 rounded bg-indigo-50 text-indigo-700 border border-indigo-100" title="Job category">
+                  <Tag className="w-2.5 h-2.5" /> {jobCategoryLabel(job.category)}
+                </span>
+              )}
             </div>
           </div>
           <div className="flex items-center gap-2 shrink-0">

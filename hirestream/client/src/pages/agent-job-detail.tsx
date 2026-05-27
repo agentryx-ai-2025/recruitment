@@ -14,11 +14,12 @@ import {
   Clock, Filter, Users, TrendingUp, Star, Eye, Calendar, Download,
   MessageSquare, Send, Trash2, Edit, PauseCircle, PlayCircle,
   AlertTriangle, Flame, Zap, DollarSign, ChevronDown, ChevronUp, Share2,
-  GitCompareArrows,
+  GitCompareArrows, Tag,
 } from "lucide-react";
 import { JobPoster } from "@/components/agent/job-poster";
 import { RecordOutcomeModal } from "@/components/shared/RecordOutcomeModal";
 import { ScheduleInterviewModal } from "@/components/shared/ScheduleInterviewModal";
+import { jobCategoryLabel } from "@/lib/reference-data";
 
 async function fetchJson(url: string) {
   const res = await fetch(url);
@@ -223,6 +224,9 @@ export default function AgentJobDetailPage() {
             <p className="text-sm text-slate-600 font-medium mt-1">{job.company}</p>
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-slate-500 mt-2">
               <span className="flex items-center gap-1.5"><MapPin className="w-4 h-4 text-slate-400" />{[job.location, job.country].filter(Boolean).join(", ")}</span>
+              {job.category && (
+                <span className="flex items-center gap-1.5"><Tag className="w-4 h-4 text-slate-400" />{jobCategoryLabel(job.category)}</span>
+              )}
               {job.salary && <span className="flex items-center gap-1.5 font-medium text-slate-700"><DollarSign className="w-4 h-4 text-slate-400" />{job.salary}</span>}
               {job.experience !== undefined && job.experience !== null && (
                 <span className="flex items-center gap-1.5"><Clock className="w-4 h-4 text-slate-400" />Min {job.experience} yr{job.experience === 1 ? "" : "s"}</span>
