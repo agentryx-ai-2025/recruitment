@@ -302,29 +302,16 @@ export default function AdminDashboard() {
         </TabsContent>
 
         {/* ── Reports Tab ──────────────────────────────── */}
+        {/* v0.4.18: full rendering. Cards expand inline to show charts/
+            tables rather than toast-only placeholders. */}
         <TabsContent value="reports">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {[
-              { title: "By District", desc: "Candidates & placements by location", endpoint: "by-district" },
-              { title: "By Agency", desc: "Agency performance & placement rates", endpoint: "by-agency" },
-              { title: "By Skill", desc: "Skill demand vs supply analysis", endpoint: "by-skill" },
-              { title: "By Placement Status", desc: "Application funnel metrics", endpoint: "by-placement-status" },
-              { title: "By Country", desc: "Jobs & placements by destination", endpoint: "by-country" },
-              { title: "By Sector", desc: "Jobs grouped by company/sector", endpoint: "by-sector" },
-            ].map((report) => (
-              <div key={report.endpoint} className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 hover:shadow-md transition-shadow">
-                <h4 className="font-semibold text-gray-900 mb-1">{report.title}</h4>
-                <p className="text-sm text-gray-500 mb-4">{report.desc}</p>
-                <Button size="sm" variant="outline"
-                  onClick={async () => {
-                    const res = await fetch(`/api/v1/admin/reports/${report.endpoint}`);
-                    const data = await res.json();
-                    toast({ title: `${report.title} Report`, description: `${JSON.stringify(data.data).length > 100 ? 'Data loaded — ' + (Array.isArray(data.data) ? data.data.length : Object.keys(data.data).length) + ' entries' : 'No data yet'}` });
-                  }}>
-                  <BarChart3 className="w-4 h-4 mr-1" /> View Report
-                </Button>
-              </div>
-            ))}
+          <div className="space-y-4">
+            <AdminReport title="By District" desc="Candidates by home district (top 10)" endpoint="by-district" kind="district" />
+            <AdminReport title="By Country" desc="Jobs & placements by destination" endpoint="by-country" kind="country" />
+            <AdminReport title="By Placement Status" desc="Application funnel — pipeline distribution" endpoint="by-placement-status" kind="funnel" />
+            <AdminReport title="By Agency" desc="Per-agency throughput: applications, selections, placements" endpoint="by-agency" kind="agency" />
+            <AdminReport title="By Skill" desc="Demand (jobs) vs supply (candidates)" endpoint="by-skill" kind="skill" />
+            <AdminReport title="By Sector / Company" desc="Top companies by job count" endpoint="by-sector" kind="sector" />
           </div>
         </TabsContent>
 
@@ -2107,4 +2094,246 @@ function NotificationTemplatesPanel() {
       )}
     </div>
   );
+}
+
+// ── Admin Reports renderer (v0.4.18) ─────────────────────────────────
+// One component per Reports-tab card. Click "View Report" → fetches the
+// /api/v1/admin/reports/<endpoint> JSON and renders an appropriate
+// visualisation inline (recharts for charts, a plain table for tabular
+// data). Before v0.4.18 the Reports tab just toasted "N entries" and
+// never showed the data.
+type AdminReportKind = "district" | "country" | "funnel" | "agency" | "skill" | "sector";
+function AdminReport({ title, desc, endpoint, kind }: { title: string; desc: string; endpoint: string; kind: AdminReportKind }) {
+  const { toast } = useToast();
+  const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [data, setData] = useState<any>(null);
+
+  const fetchReport = async () => {
+    setLoading(true);
+    try {
+      const r = await fetch(`/api/v1/admin/reports/${endpoint}`);
+      const j = await r.json();
+      if (!j.success) throw new Error(j.message || "Failed");
+      setData(j.data);
+      setOpen(true);
+    } catch (e: any) {
+      toast({ title: "Couldn't load report", description: e?.message ?? "Server error", variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+      <div className="p-5 flex items-start justify-between flex-wrap gap-3">
+        <div className="min-w-0">
+          <h4 className="font-semibold text-gray-900">{title}</h4>
+          <p className="text-sm text-gray-500 mt-0.5">{desc}</p>
+        </div>
+        <div className="flex items-center gap-2">
+          {open && data && (
+            <Button size="sm" variant="ghost" onClick={() => setOpen(false)}>Hide</Button>
+          )}
+          <Button size="sm" variant="outline" onClick={fetchReport} disabled={loading}>
+            {loading
+              ? <span className="inline-block animate-pulse">Loading…</span>
+              : <><BarChart3 className="w-4 h-4 mr-1" /> {open && data ? "Refresh" : "View Report"}</>}
+          </Button>
+        </div>
+      </div>
+      {open && data && (
+        <div className="px-5 pb-5 border-t border-slate-100 pt-4">
+          <AdminReportBody kind={kind} data={data} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function AdminReportBody({ kind, data }: { kind: AdminReportKind; data: any }) {
+  // Helper for the chart palette
+  const palette = ["#3b82f6", "#10b981", "#f59e0b", "#8b5cf6", "#ef4444", "#06b6d4", "#ec4899", "#84cc16"];
+
+  if (kind === "district") {
+    const rows: any[] = Array.isArray(data) ? data : [];
+    if (rows.length === 0) return <p className="text-sm text-gray-500">No district data yet.</p>;
+    const top = rows.slice(0, 10);
+    return (
+      <div>
+        <ResponsiveContainer width="100%" height={260}>
+          <BarChart data={top}>
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis dataKey="district" tick={{ fontSize: 11 }} interval={0} angle={-15} textAnchor="end" height={50} />
+            <YAxis allowDecimals={false} />
+            <Tooltip />
+            <Bar dataKey="candidates" fill="#3b82f6" name="Candidates" radius={[4, 4, 0, 0]} />
+            <Bar dataKey="applications" fill="#10b981" name="Applications" radius={[4, 4, 0, 0]} />
+            <Bar dataKey="placements" fill="#f59e0b" name="Placements" radius={[4, 4, 0, 0]} />
+          </BarChart>
+        </ResponsiveContainer>
+        <p className="text-[11px] text-gray-400 mt-2">{rows.length} district{rows.length === 1 ? "" : "s"} total · showing top 10</p>
+      </div>
+    );
+  }
+
+  if (kind === "country") {
+    const rows: any[] = Array.isArray(data) ? data : [];
+    if (rows.length === 0) return <p className="text-sm text-gray-500">No country data yet.</p>;
+    return (
+      <div className="grid md:grid-cols-2 gap-6 items-center">
+        <ResponsiveContainer width="100%" height={260}>
+          <PieChart>
+            <Pie data={rows.map((c: any) => ({ name: c.country, value: c.total_jobs }))}
+              dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={90} label={(e: any) => e.name}>
+              {rows.map((_: any, i: number) => <Cell key={i} fill={palette[i % palette.length]} />)}
+            </Pie>
+            <Tooltip />
+          </PieChart>
+        </ResponsiveContainer>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="text-xs text-gray-500 uppercase">
+              <tr><th className="text-left py-1.5">Country</th><th className="text-right">Jobs</th><th className="text-right">Apps</th><th className="text-right">Placed</th></tr>
+            </thead>
+            <tbody>
+              {rows.map((r: any, i: number) => (
+                <tr key={i} className="border-t border-slate-100">
+                  <td className="py-1.5 font-medium text-gray-800">{r.country}</td>
+                  <td className="py-1.5 text-right tabular-nums">{r.total_jobs}</td>
+                  <td className="py-1.5 text-right tabular-nums">{r.total_applications}</td>
+                  <td className="py-1.5 text-right tabular-nums text-emerald-700 font-semibold">{r.placements}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    );
+  }
+
+  if (kind === "funnel") {
+    const funnel: any[] = data?.funnel ?? [];
+    const summary = data?.summary ?? {};
+    if (funnel.length === 0) return <p className="text-sm text-gray-500">No applications yet.</p>;
+    const max = Math.max(...funnel.map((f: any) => f.count || 0), 1);
+    return (
+      <div>
+        <div className="grid grid-cols-3 gap-3 mb-4">
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+            <p className="text-[10px] uppercase font-bold text-blue-700">Registered</p>
+            <p className="text-2xl font-bold text-blue-900 mt-1 tabular-nums">{summary.registered ?? 0}</p>
+          </div>
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+            <p className="text-[10px] uppercase font-bold text-amber-700">Applied</p>
+            <p className="text-2xl font-bold text-amber-900 mt-1 tabular-nums">{summary.applied ?? 0}</p>
+          </div>
+          <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3">
+            <p className="text-[10px] uppercase font-bold text-emerald-700">Placed</p>
+            <p className="text-2xl font-bold text-emerald-900 mt-1 tabular-nums">{summary.placed ?? 0}</p>
+          </div>
+        </div>
+        <div className="space-y-2">
+          {funnel.map((f: any, i: number) => (
+            <div key={i} className="flex items-center gap-3">
+              <span className="text-xs text-gray-700 w-40 capitalize">{String(f.status).replace(/_/g, " ")}</span>
+              <div className="flex-1 bg-gray-100 rounded-full h-3 relative">
+                <div className="h-3 rounded-full" style={{ width: `${(f.count / max) * 100}%`, backgroundColor: palette[i % palette.length] }} />
+              </div>
+              <span className="text-sm font-semibold text-gray-900 w-12 text-right tabular-nums">{f.count}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (kind === "agency") {
+    const rows: any[] = Array.isArray(data) ? data : [];
+    if (rows.length === 0) return <p className="text-sm text-gray-500">No agency data yet.</p>;
+    return (
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead className="text-xs text-gray-500 uppercase">
+            <tr>
+              <th className="text-left py-1.5">Agency</th>
+              <th className="text-center">Verified</th>
+              <th className="text-right">Jobs</th>
+              <th className="text-right">Apps</th>
+              <th className="text-right">Selected</th>
+              <th className="text-right">Placed</th>
+              <th className="text-right">Avg match</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r: any, i: number) => (
+              <tr key={i} className="border-t border-slate-100">
+                <td className="py-1.5 font-medium text-gray-800">{r.agency_name}</td>
+                <td className="py-1.5 text-center">{r.verified ? <span className="text-emerald-600">✓</span> : <span className="text-slate-400">—</span>}</td>
+                <td className="py-1.5 text-right tabular-nums">{r.total_jobs}</td>
+                <td className="py-1.5 text-right tabular-nums">{r.total_applications}</td>
+                <td className="py-1.5 text-right tabular-nums">{r.selections}</td>
+                <td className="py-1.5 text-right tabular-nums font-semibold text-emerald-700">{r.placements}</td>
+                <td className="py-1.5 text-right tabular-nums text-gray-500">{r.avg_match_score ?? "—"}%</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    );
+  }
+
+  if (kind === "skill") {
+    const demand: any[] = data?.demand ?? [];
+    const supply: any[] = data?.supply ?? [];
+    if (demand.length === 0 && supply.length === 0) return <p className="text-sm text-gray-500">No skill data yet.</p>;
+    return (
+      <div className="grid md:grid-cols-2 gap-6">
+        <div>
+          <p className="text-xs font-semibold text-gray-600 mb-2 uppercase">Demand (jobs)</p>
+          {demand.length === 0 ? <p className="text-sm text-gray-400">—</p> : (
+            <ResponsiveContainer width="100%" height={240}>
+              <BarChart data={demand.slice(0, 10)} layout="vertical">
+                <XAxis type="number" allowDecimals={false} />
+                <YAxis type="category" dataKey="skill" width={110} tick={{ fontSize: 11 }} />
+                <Tooltip />
+                <Bar dataKey="job_count" fill="#3b82f6" radius={[0, 4, 4, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          )}
+        </div>
+        <div>
+          <p className="text-xs font-semibold text-gray-600 mb-2 uppercase">Supply (candidates)</p>
+          {supply.length === 0 ? <p className="text-sm text-gray-400">—</p> : (
+            <ResponsiveContainer width="100%" height={240}>
+              <BarChart data={supply.slice(0, 10)} layout="vertical">
+                <XAxis type="number" allowDecimals={false} />
+                <YAxis type="category" dataKey="skill" width={110} tick={{ fontSize: 11 }} />
+                <Tooltip />
+                <Bar dataKey="candidate_count" fill="#10b981" radius={[0, 4, 4, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  if (kind === "sector") {
+    const rows: any[] = Array.isArray(data) ? data : [];
+    if (rows.length === 0) return <p className="text-sm text-gray-500">No sector data yet.</p>;
+    return (
+      <ResponsiveContainer width="100%" height={Math.max(200, rows.slice(0, 15).length * 26)}>
+        <BarChart data={rows.slice(0, 15)} layout="vertical">
+          <XAxis type="number" allowDecimals={false} />
+          <YAxis type="category" dataKey="sector" width={150} tick={{ fontSize: 11 }} />
+          <Tooltip />
+          <Bar dataKey="total_jobs" fill="#8b5cf6" name="Jobs" radius={[0, 4, 4, 0]} />
+          <Bar dataKey="placements" fill="#10b981" name="Placements" radius={[0, 4, 4, 0]} />
+        </BarChart>
+      </ResponsiveContainer>
+    );
+  }
+
+  return <pre className="text-xs text-gray-500 overflow-x-auto">{JSON.stringify(data, null, 2)}</pre>;
 }
