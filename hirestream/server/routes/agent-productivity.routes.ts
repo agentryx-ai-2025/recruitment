@@ -17,6 +17,7 @@ import { storage } from "../storage";
 import {
   applicationNotes, applications, interviews, jobs, candidates,
   savedSegments, placements, users, recruitmentAgents, auditLog,
+  grievances, employers,
 } from "@shared/schema";
 import { eq, and, desc, isNull, or, sql, inArray } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
@@ -614,6 +615,13 @@ router.patch("/candidates/:id/compliance", async (req, res, next) => {
 });
 
 // ── Agent-scoped reports / BI ────────────────────────────────────────
+// v0.4.26: comprehensive rewrite. Adds drop-off rates, stale counts,
+// welfare SLA tracking, compliance alerts, open grievances, period
+// comparison (this month vs last), top employers, skill demand/supply,
+// time-in-stage histogram, and HPSEDC-specific PBBY/PDO/ECR widgets.
+// Conversion-rate calculation fixed: now uses ACCEPTED placements as
+// the success criterion, not application.status="placed" (which only
+// fires very late and missed all 7 of demo_agent's real placements).
 router.get("/reports", async (req, res, next) => {
   try {
     if (!storage.db) return res.status(500).json({ success: false });
@@ -622,23 +630,30 @@ router.get("/reports", async (req, res, next) => {
       return res.status(403).json({ success: false, message: "Forbidden" });
     }
     const db = storage.db;
+    const now = Date.now();
+    const DAY_MS = 86400_000;
 
-    // All jobs owned by this user (agent or employer)
-    const myJobs = user.role === "agent"
-      ? await db.select().from(jobs).where(eq(jobs.agentId, user.id))
-      : user.role === "employer"
-      ? await db.select().from(jobs).where(eq(jobs.employerId, user.id))
-      : await db.select().from(jobs);
+    // ── Jobs owned by this user ──────────────────────────────────────
+    const ownershipFilter = user.role === "agent" ? eq(jobs.agentId, user.id)
+      : user.role === "employer" ? eq(jobs.employerId, user.id)
+      : undefined as any;
+
+    const myJobs = user.role === "admin" || user.role === "superadmin"
+      ? await db.select().from(jobs)
+      : await db.select().from(jobs).where(ownershipFilter);
 
     const jobIds = myJobs.map((j: any) => j.id);
-    const allApps = jobIds.length === 0 ? [] : await db.select({
-      application: applications, job: jobs,
+
+    // ── Applications on my jobs (with stageEnteredAt for time-in-stage) ─
+    const allApps: any[] = jobIds.length === 0 ? [] : await db.select({
+      application: applications, job: jobs, candidate: candidates,
     }).from(applications)
       .innerJoin(jobs, eq(applications.jobId, jobs.id))
-      .where(user.role === "agent" ? eq(jobs.agentId, user.id) : user.role === "employer" ? eq(jobs.employerId, user.id) : undefined as any);
+      .innerJoin(candidates, eq(applications.candidateId, candidates.id))
+      .where(ownershipFilter || undefined as any);
 
-    // Funnel counts
-    const funnelKeys = ["submitted", "reviewed", "shortlisted", "interview_scheduled", "selected", "placed", "rejected"];
+    // ── Funnel counts (current snapshot) ──────────────────────────────
+    const funnelKeys = ["submitted", "reviewed", "shortlisted", "interview_scheduled", "selected", "placed", "rejected", "withdrawn"];
     const funnel: Record<string, number> = {};
     for (const k of funnelKeys) funnel[k] = 0;
     for (const r of allApps) {
@@ -646,37 +661,74 @@ router.get("/reports", async (req, res, next) => {
       funnel[s] = (funnel[s] || 0) + 1;
     }
 
-    // Placements + average time-to-placement
-    const myPlacements = jobIds.length === 0 ? [] : await db
-      .select({ p: placements, a: applications })
+    // ── Stage drop-off rates (active stages only) ─────────────────────
+    // Conversion from one stage to the next, measured as the cumulative
+    // "reached" count divided by the previous stage's "reached" count.
+    // "Reached" = currently in that stage OR any later stage (= got past).
+    const stageOrder = ["submitted", "reviewed", "shortlisted", "interview_scheduled", "selected", "placed"];
+    const reached: Record<string, number> = {};
+    for (let i = 0; i < stageOrder.length; i++) {
+      reached[stageOrder[i]] = stageOrder.slice(i).reduce((sum, k) => sum + (funnel[k] || 0), 0);
+    }
+    const dropoff = stageOrder.slice(1).map((stage, i) => {
+      const prev = stageOrder[i];
+      const prevCount = reached[prev] || 0;
+      const thisCount = reached[stage] || 0;
+      const pct = prevCount === 0 ? 0 : Math.round((thisCount / prevCount) * 100);
+      return { from: prev, to: stage, fromCount: prevCount, toCount: thisCount, conversionPct: pct };
+    });
+
+    // ── Stale applicant counts (≥7 days in non-terminal stage) ────────
+    const terminalStatuses = new Set(["rejected", "withdrawn", "placed"]);
+    const stale = { warning: 0, critical: 0 };  // 7-13d = warning, ≥14d = critical
+    for (const r of allApps) {
+      if (terminalStatuses.has(r.application.status)) continue;
+      const entered = r.application.stageEnteredAt ? new Date(r.application.stageEnteredAt).getTime()
+                    : r.application.appliedAt ? new Date(r.application.appliedAt).getTime()
+                    : null;
+      if (!entered) continue;
+      const days = Math.floor((now - entered) / DAY_MS);
+      if (days >= 14) stale.critical++;
+      else if (days >= 7) stale.warning++;
+    }
+
+    // ── Placements ────────────────────────────────────────────────────
+    const myPlacements: any[] = jobIds.length === 0 ? [] : await db
+      .select({ p: placements, a: applications, c: candidates, j: jobs })
       .from(placements)
       .innerJoin(applications, eq(placements.applicationId, applications.id))
+      .innerJoin(candidates, eq(applications.candidateId, candidates.id))
       .innerJoin(jobs, eq(applications.jobId, jobs.id))
-      .where(user.role === "agent" ? eq(jobs.agentId, user.id) : user.role === "employer" ? eq(jobs.employerId, user.id) : undefined as any);
+      .where(ownershipFilter || undefined as any);
 
-    const timesToPlaceMs: number[] = myPlacements
-      .filter((r: any) => r.p.status === "accepted" || r.p.status === "active" || r.p.status === "completed")
+    const acceptedPlacements = myPlacements.filter((r: any) =>
+      ["accepted", "active", "completed"].includes(r.p.status)
+    );
+
+    const timesToPlaceMs: number[] = acceptedPlacements
       .map((r: any) => {
         const applied = r.a.appliedAt ? new Date(r.a.appliedAt).getTime() : 0;
-        const placed = r.p.startDate ? new Date(r.p.startDate).getTime() : Date.now();
+        const placed = r.p.startDate ? new Date(r.p.startDate).getTime() : now;
         return placed - applied;
       })
       .filter((n: number) => n > 0);
     const avgTimeToPlaceDays = timesToPlaceMs.length
-      ? Math.round((timesToPlaceMs.reduce((s: number, n: number) => s + n, 0) / timesToPlaceMs.length) / 86400_000)
+      ? Math.round((timesToPlaceMs.reduce((s: number, n: number) => s + n, 0) / timesToPlaceMs.length) / DAY_MS)
       : 0;
 
-    // Conversion: submitted → placed
-    const conversionPct = funnel.submitted + funnel.reviewed + funnel.shortlisted + funnel.interview_scheduled + funnel.selected + funnel.placed > 0
-      ? Math.round((funnel.placed / (funnel.submitted + funnel.reviewed + funnel.shortlisted + funnel.interview_scheduled + funnel.selected + funnel.placed + funnel.rejected)) * 100)
-      : 0;
+    // v0.4.26: Conversion rate = accepted placements / total applicants
+    // (was application.status="placed" / total which was wrong — that
+    // status only fires very late and missed all real placements).
+    const conversionPct = allApps.length === 0
+      ? 0
+      : Math.round((acceptedPlacements.length / allApps.length) * 100);
 
-    // Top countries by placement
+    // ── Top destination countries ─────────────────────────────────────
     const countryMap: Record<string, number> = {};
     for (const r of myPlacements) countryMap[r.p.country] = (countryMap[r.p.country] || 0) + 1;
     const topCountries = Object.entries(countryMap).map(([country, count]) => ({ country, count })).sort((a, b) => b.count - a.count).slice(0, 5);
 
-    // Monthly applications for trend
+    // ── Monthly applications trend (last 6 months) ────────────────────
     const byMonth: Record<string, number> = {};
     for (const r of allApps) {
       const d = r.application.appliedAt ? new Date(r.application.appliedAt) : null;
@@ -686,12 +738,172 @@ router.get("/reports", async (req, res, next) => {
     }
     const trend = Object.entries(byMonth).sort(([a], [b]) => a.localeCompare(b)).slice(-6).map(([month, count]) => ({ month, count }));
 
+    // ── Period comparison: this month vs last month ──────────────────
+    const today = new Date();
+    const ymKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    const thisMonthKey = ymKey(today);
+    const lastMonthKey = ymKey(new Date(today.getFullYear(), today.getMonth() - 1, 1));
+    const periodCompare = {
+      thisMonth: byMonth[thisMonthKey] || 0,
+      lastMonth: byMonth[lastMonthKey] || 0,
+    };
+
+    // ── Welfare SLA (overdue check-ins on accepted placements) ────────
+    const welfareSla = { due30: 0, due60: 0, due90: 0, overdue: 0 };
+    for (const r of acceptedPlacements) {
+      const start = r.p.startDate ? new Date(r.p.startDate).getTime() : null;
+      if (!start) continue;
+      const days = Math.floor((now - start) / DAY_MS);
+      // Check-in is "due" when the milestone has elapsed but no record exists
+      if (days >= 30 && !r.p.welfare30Day) { welfareSla.due30++; if (days >= 35) welfareSla.overdue++; }
+      if (days >= 60 && !r.p.welfare60Day) { welfareSla.due60++; if (days >= 65) welfareSla.overdue++; }
+      if (days >= 90 && !r.p.welfare90Day) { welfareSla.due90++; if (days >= 95) welfareSla.overdue++; }
+    }
+
+    // ── Compliance alerts (passport / PCC / medical expiring) ─────────
+    // Looks at candidates on my placed/selected pipeline only — those
+    // who actually need clearance soon.
+    const placedCandidateIds = new Set(acceptedPlacements.map((r: any) => r.c?.id).filter(Boolean));
+    const compliance = {
+      passportExpiringSoon: 0,  // ≤60 days
+      passportExpired: 0,
+      pccPending: 0,
+      medicalPending: 0,
+      ecrPending: 0,            // ecr_status null or "unknown"
+    };
+    for (const r of myPlacements) {
+      const c = r.c;
+      if (!c || !placedCandidateIds.has(c.id)) continue;
+      if (c.passportExpiry) {
+        const exp = new Date(c.passportExpiry).getTime();
+        const days = Math.floor((exp - now) / DAY_MS);
+        if (days < 0) compliance.passportExpired++;
+        else if (days <= 60) compliance.passportExpiringSoon++;
+      }
+      if (c.pccStatus === "pending" || !c.pccStatus) compliance.pccPending++;
+      if (c.medicalStatus === "pending" || !c.medicalStatus) compliance.medicalPending++;
+      if (!c.ecrStatus || c.ecrStatus === "unknown") compliance.ecrPending++;
+    }
+
+    // ── HPSEDC-specific: PBBY insurance, PDO, ECR ─────────────────────
+    const hpsedc = { pbbyEnrolled: 0, pbbyPending: 0, pdoCompleted: 0, pdoPending: 0, ecr: 0, ecnr: 0 };
+    for (const r of myPlacements) {
+      const c = r.c;
+      if (!c || !placedCandidateIds.has(c.id)) continue;
+      if (c.pbbyInsuranceStatus === "enrolled") hpsedc.pbbyEnrolled++;
+      else hpsedc.pbbyPending++;
+      if (c.pdoCompleted) hpsedc.pdoCompleted++;
+      else hpsedc.pdoPending++;
+      if (c.ecrStatus === "ecr") hpsedc.ecr++;
+      else if (c.ecrStatus === "ecnr") hpsedc.ecnr++;
+    }
+
+    // ── Open grievances on this agency's candidates ───────────────────
+    // Grievances are filed by candidates via their userId, so we
+    // translate candidateIds → userIds first then scope the query.
+    let openGrievances = 0;
+    let avgResolutionDays = 0;
+    if (allApps.length > 0) {
+      const candidateUserIds = Array.from(new Set(
+        allApps.map((r: any) => r.candidate?.userId).filter(Boolean)
+      ));
+      if (candidateUserIds.length > 0) {
+        const myGrievances: any[] = await db
+          .select().from(grievances)
+          .where(inArray(grievances.userId, candidateUserIds));
+        openGrievances = myGrievances.filter((g: any) => !["resolved", "closed"].includes(g.status)).length;
+        const resolved = myGrievances.filter((g: any) => g.status === "resolved" && g.resolvedAt && g.createdAt);
+        if (resolved.length > 0) {
+          const totalMs = resolved.reduce((s: number, g: any) =>
+            s + (new Date(g.resolvedAt).getTime() - new Date(g.createdAt).getTime()), 0);
+          avgResolutionDays = Math.round(totalMs / resolved.length / DAY_MS);
+        }
+      }
+    }
+
+    // ── Top employers (by placements + count of jobs) ─────────────────
+    const employerStats: Record<string, { company: string; jobs: number; applications: number; placements: number }> = {};
+    for (const r of allApps) {
+      const co = r.job.company || "—";
+      if (!employerStats[co]) employerStats[co] = { company: co, jobs: 0, applications: 0, placements: 0 };
+      employerStats[co].applications++;
+    }
+    for (const j of myJobs) {
+      const co = j.company || "—";
+      if (!employerStats[co]) employerStats[co] = { company: co, jobs: 0, applications: 0, placements: 0 };
+      employerStats[co].jobs++;
+    }
+    for (const r of acceptedPlacements) {
+      const co = r.j?.company || "—";
+      if (employerStats[co]) employerStats[co].placements++;
+    }
+    const topEmployers = Object.values(employerStats)
+      .sort((a, b) => b.placements - a.placements || b.applications - a.applications)
+      .slice(0, 6);
+
+    // ── Skill demand (jobs) vs supply (candidates who applied) ────────
+    const demandSkills: Record<string, number> = {};
+    const supplySkills: Record<string, number> = {};
+    for (const j of myJobs) {
+      for (const s of (j.skills || [])) {
+        const k = String(s).toLowerCase();
+        demandSkills[k] = (demandSkills[k] || 0) + 1;
+      }
+    }
+    for (const r of allApps) {
+      for (const s of (r.candidate?.skills || [])) {
+        const k = String(s).toLowerCase();
+        supplySkills[k] = (supplySkills[k] || 0) + 1;
+      }
+    }
+    const skillGap = Object.keys(demandSkills)
+      .map(skill => ({
+        skill,
+        demand: demandSkills[skill],
+        supply: supplySkills[skill] || 0,
+        gap: demandSkills[skill] - (supplySkills[skill] || 0),
+      }))
+      .sort((a, b) => b.demand - a.demand)
+      .slice(0, 8);
+
+    // ── Time-in-stage histogram (active applicants only) ──────────────
+    const timeInStage: Record<string, { sum: number; n: number }> = {};
+    for (const k of stageOrder) timeInStage[k] = { sum: 0, n: 0 };
+    for (const r of allApps) {
+      if (terminalStatuses.has(r.application.status)) continue;
+      if (!stageOrder.includes(r.application.status)) continue;
+      const entered = r.application.stageEnteredAt ? new Date(r.application.stageEnteredAt).getTime()
+                    : r.application.appliedAt ? new Date(r.application.appliedAt).getTime()
+                    : null;
+      if (!entered) continue;
+      const days = Math.floor((now - entered) / DAY_MS);
+      const bucket = timeInStage[r.application.status];
+      bucket.sum += days;
+      bucket.n++;
+    }
+    const avgTimeInStage = Object.entries(timeInStage).map(([stage, { sum, n }]) => ({
+      stage, avgDays: n === 0 ? 0 : Math.round(sum / n), count: n,
+    }));
+
     res.json({
       success: true,
       data: {
         jobs: { total: myJobs.length, active: myJobs.filter((j: any) => j.status === "active").length },
-        applicants: { total: allApps.length, funnel, conversionPct },
-        placements: { total: myPlacements.length, avgTimeToPlaceDays, topCountries },
+        applicants: { total: allApps.length, funnel, conversionPct, dropoff, stale },
+        placements: {
+          total: myPlacements.length,
+          accepted: acceptedPlacements.length,
+          avgTimeToPlaceDays,
+          topCountries,
+        },
+        welfareSla,
+        compliance,
+        hpsedc,
+        grievances: { open: openGrievances, avgResolutionDays },
+        topEmployers,
+        skillGap,
+        avgTimeInStage,
+        periodCompare,
         trend,
       },
     });
