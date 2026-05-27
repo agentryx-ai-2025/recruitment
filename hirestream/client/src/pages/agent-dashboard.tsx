@@ -997,8 +997,13 @@ function RecentJobRow({ job }: { job: any }) {
     <>
       <div className="min-w-0 flex-1">
         <p className="text-sm font-semibold text-slate-900 truncate group-hover:text-blue-700">{job.title}</p>
-        <p className="text-xs text-slate-400">
-          {[job.location, job.country].filter(Boolean).join(", ") || <span className="italic">No location yet</span>}
+        <p className="text-xs text-slate-400 flex items-center gap-1.5 flex-wrap">
+          <span>{[job.location, job.country].filter(Boolean).join(", ") || <span className="italic">No location yet</span>}</span>
+          {job.category && (
+            <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold px-1.5 py-0 rounded bg-indigo-50 text-indigo-700 border border-indigo-100" title="Job category">
+              <Tag className="w-2.5 h-2.5" /> {jobCategoryLabel(job.category)}
+            </span>
+          )}
         </p>
       </div>
       <Badge className={`text-[11px] ${
