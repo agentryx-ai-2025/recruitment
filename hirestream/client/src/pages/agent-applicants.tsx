@@ -59,7 +59,13 @@ export default function AgentApplicantsPage() {
   const initialStatus = useMemo(() => {
     const p = new URLSearchParams(queryString);
     const s = p.get("status");
-    return s && VALID_STATUSES.includes(s) ? s : "all";
+    if (s && VALID_STATUSES.includes(s)) return s;
+    // v0.4.22: default eagerly to "submitted" (new triage queue) so the
+    // page lands on the action-needed list even before applicants load.
+    // The data-load effect downgrades to "all" only if zero submitted
+    // apps come back. Previously the effect raced against any early
+    // user click and could leave the user on "all" by accident.
+    return "submitted";
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const [statusFilter, setStatusFilter] = useState<string>(initialStatus);
@@ -71,10 +77,11 @@ export default function AgentApplicantsPage() {
   const [priorityFilter, setPriorityFilter] = useState<string>("all");
   const [jobFilter, setJobFilter] = useState<string>("all");
 
-  // When the query explicitly specifies a status, treat that as the user's
-  // intent — don't let the "auto-default to submitted" effect override it.
-  const userTouchedFilter = useRef(initialStatus !== "all");
-  const autoFilterApplied = useRef(initialStatus !== "all");
+  // v0.4.22: the initial default is now "submitted" (eager). The effect
+  // below only flips to "all" if data comes back with zero submitted
+  // apps. URL ?status=... still wins. Manual clicks pin user choice.
+  const userTouchedFilter = useRef(false);
+  const autoFilterApplied = useRef(false);
   const setStatusFilterManual = (v: string) => { userTouchedFilter.current = true; setStatusFilter(v); };
 
   const { data, isLoading } = useQuery({
@@ -115,11 +122,17 @@ export default function AgentApplicantsPage() {
   for (const s of PIPELINE) counts[s.key] = 0;
   for (const a of applicants) counts[a.status] = (counts[a.status] || 0) + 1;
 
-  // Awaiting-me default — "submitted" when any exist. Only runs once per load.
+  // v0.4.22: initial state is already "submitted". This effect only
+  // downgrades to "all" when the data arrives and there are zero
+  // submitted applicants — so the page never shows an empty list by
+  // default. Once the user manually changes the filter, this stops.
   useEffect(() => {
     if (autoFilterApplied.current || userTouchedFilter.current) return;
     if (applicants.length > 0) {
-      if ((counts.submitted ?? 0) > 0) setStatusFilter("submitted");
+      if ((counts.submitted ?? 0) === 0) {
+        // No new submissions — fall back to the broadest non-terminal view.
+        setStatusFilter("all");
+      }
       autoFilterApplied.current = true;
     }
   }, [applicants.length, counts.submitted]);
@@ -290,15 +303,34 @@ export default function AgentApplicantsPage() {
               const stale = !terminal && days != null && days >= 7;
               const stageColor = PIPELINE.find(p => p.key === a.status)?.color ?? "bg-slate-50";
               return (
-                <div key={a.applicationId} className="p-4 md:p-5 hover:bg-slate-50/60 transition">
-                  <div className="flex items-start gap-4 flex-wrap">
+                <div key={a.applicationId} className="px-4 md:px-5 py-3 hover:bg-slate-50/60 transition">
+                  {/* v0.4.22: single-row dense layout. Avatar+identity
+                      stretches to fill, badges + action buttons share
+                      the right edge. No more wasted vertical space or
+                      empty right gutter. */}
+                  <div className="flex items-center gap-3 flex-wrap md:flex-nowrap">
                     <Link href={`/agent/candidates/${a.candidate.id}`}
                       className="flex items-center gap-3 min-w-0 flex-1 group cursor-pointer">
                       <PhotoAvatar photoUrl={a.candidate.photoUrl} name={a.candidate.fullName || "?"}
                         size="w-10 h-10" rounded="rounded-xl" textSize="text-xs" />
-                      <div className="min-w-0">
-                        <p className="text-sm font-bold text-slate-900 group-hover:text-blue-700 truncate">{a.candidate.fullName}</p>
-                        <p className="text-xs text-slate-500 truncate flex items-center gap-1">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="text-sm font-bold text-slate-900 group-hover:text-blue-700 truncate">{a.candidate.fullName}</p>
+                          <Badge variant="outline" className={`text-[10px] font-bold ${a.matchScore >= 80 ? "bg-emerald-50 text-emerald-700 border-emerald-200" : a.matchScore >= 60 ? "bg-amber-50 text-amber-700 border-amber-200" : "bg-slate-50"}`}>
+                            {a.matchScore}% match
+                          </Badge>
+                          <Badge variant="outline" className={`text-[10px] capitalize ${stageColor}`}>
+                            {a.status?.replace(/_/g, " ")}
+                          </Badge>
+                          {stale && (
+                            <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${
+                              critical ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-800"
+                            }`} title={`Entered ${a.status.replace(/_/g, " ")} ${days} day${days === 1 ? "" : "s"} ago`}>
+                              {critical ? "🔥 " : "⏳ "}{days}d
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-slate-500 truncate flex items-center gap-1 mt-0.5">
                           <Briefcase className="w-3 h-3" />
                           <Link href={`/agent/jobs/${a.jobId}`} onClick={(e) => e.stopPropagation()}
                             className="hover:text-blue-700 hover:underline truncate">
@@ -308,77 +340,60 @@ export default function AgentApplicantsPage() {
                         </p>
                         {a.candidate.skills?.length > 0 && (
                           <div className="flex flex-wrap gap-1 mt-1">
-                            {a.candidate.skills.slice(0, 4).map((s) => (
+                            {a.candidate.skills.slice(0, 5).map((s) => (
                               <Badge key={s} variant="secondary" className="text-[10px] rounded px-1.5 py-0">{s}</Badge>
                             ))}
-                            {a.candidate.skills.length > 4 && <span className="text-[10px] text-slate-400">+{a.candidate.skills.length - 4}</span>}
+                            {a.candidate.skills.length > 5 && <span className="text-[10px] text-slate-400">+{a.candidate.skills.length - 5}</span>}
                           </div>
                         )}
                       </div>
                     </Link>
-                    <div className="flex flex-col items-end gap-1 shrink-0">
-                      <Badge variant="outline" className={`text-[11px] font-bold ${a.matchScore >= 80 ? "bg-emerald-50 text-emerald-700 border-emerald-200" : a.matchScore >= 60 ? "bg-amber-50 text-amber-700 border-amber-200" : "bg-slate-50"}`}>
-                        {a.matchScore}% match
-                      </Badge>
-                      <Badge variant="outline" className={`text-[10px] capitalize ${stageColor}`}>
-                        {a.status?.replace(/_/g, " ")}
-                      </Badge>
-                      {stale && (
-                        <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${
-                          critical ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-800"
-                        }`} title={`Entered ${a.status.replace(/_/g, " ")} ${days} day${days === 1 ? "" : "s"} ago`}>
-                          {critical ? "🔥 " : "⏳ "}{days}d in stage
-                        </span>
+                    {/* Right-side action buttons — fill the right gutter */}
+                    <div className="flex flex-wrap gap-1.5 justify-end shrink-0 ml-auto">
+                      <Link href={`/agent/candidates/${a.candidate.id}`}>
+                        <Button size="sm" variant="outline" className="gap-1 h-8">
+                          <Eye className="w-3.5 h-3.5" /> View
+                        </Button>
+                      </Link>
+                      {a.status === "submitted" && (
+                        <Button size="sm" variant="outline" disabled={updateStatus.isPending}
+                          onClick={() => updateStatus.mutate({ applicationId: a.applicationId, status: "reviewed" })}
+                          className="gap-1 h-8 border-amber-200 text-amber-700 hover:bg-amber-50">
+                          Reviewed
+                        </Button>
+                      )}
+                      {["submitted", "reviewed"].includes(a.status) && (
+                        <Button size="sm" disabled={updateStatus.isPending}
+                          onClick={() => updateStatus.mutate({ applicationId: a.applicationId, status: "shortlisted" })}
+                          className="gap-1 h-8 bg-purple-600 hover:bg-purple-700 text-white">
+                          <Star className="w-3.5 h-3.5" /> Shortlist
+                        </Button>
+                      )}
+                      {a.status === "shortlisted" && (
+                        <Button size="sm"
+                          onClick={() => setInterviewFor({ applicationId: a.applicationId, candidateName: a.candidate.fullName })}
+                          className="gap-1 h-8 bg-cyan-600 hover:bg-cyan-700 text-white">
+                          <Clock className="w-3.5 h-3.5" /> Schedule
+                        </Button>
+                      )}
+                      {a.status === "interview_scheduled" && (
+                        <Button size="sm" disabled={updateStatus.isPending}
+                          onClick={() => setOutcomeFor({ applicationId: a.applicationId, candidateName: a.candidate.fullName })}
+                          className="gap-1 h-8 bg-emerald-600 hover:bg-emerald-700 text-white">
+                          <CheckCircle className="w-3.5 h-3.5" /> Outcome
+                        </Button>
+                      )}
+                      {!["rejected", "selected", "placed", "interview_scheduled"].includes(a.status) && (
+                        <Button size="sm" variant="outline" disabled={updateStatus.isPending}
+                          onClick={() => {
+                            const feedback = window.prompt("Feedback for candidate (optional):") || "";
+                            updateStatus.mutate({ applicationId: a.applicationId, status: "rejected", feedback });
+                          }}
+                          className="gap-1 h-8 border-red-200 text-red-700 hover:bg-red-50">
+                          <XCircle className="w-3.5 h-3.5" /> Reject
+                        </Button>
                       )}
                     </div>
-                  </div>
-
-                  {/* v0.4.21: inline action buttons. Same shape as the
-                      per-job page so agents only learn one UI. */}
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    <Link href={`/agent/candidates/${a.candidate.id}`}>
-                      <Button size="sm" variant="outline" className="gap-1">
-                        <Eye className="w-3.5 h-3.5" /> View Profile
-                      </Button>
-                    </Link>
-                    {a.status === "submitted" && (
-                      <Button size="sm" variant="outline" disabled={updateStatus.isPending}
-                        onClick={() => updateStatus.mutate({ applicationId: a.applicationId, status: "reviewed" })}
-                        className="gap-1 border-amber-200 text-amber-700 hover:bg-amber-50">
-                        Mark Reviewed
-                      </Button>
-                    )}
-                    {["submitted", "reviewed"].includes(a.status) && (
-                      <Button size="sm" disabled={updateStatus.isPending}
-                        onClick={() => updateStatus.mutate({ applicationId: a.applicationId, status: "shortlisted" })}
-                        className="gap-1 bg-purple-600 hover:bg-purple-700 text-white">
-                        <Star className="w-3.5 h-3.5" /> Shortlist
-                      </Button>
-                    )}
-                    {a.status === "shortlisted" && (
-                      <Button size="sm"
-                        onClick={() => setInterviewFor({ applicationId: a.applicationId, candidateName: a.candidate.fullName })}
-                        className="gap-1 bg-cyan-600 hover:bg-cyan-700 text-white">
-                        <Clock className="w-3.5 h-3.5" /> Schedule Interview
-                      </Button>
-                    )}
-                    {a.status === "interview_scheduled" && (
-                      <Button size="sm" disabled={updateStatus.isPending}
-                        onClick={() => setOutcomeFor({ applicationId: a.applicationId, candidateName: a.candidate.fullName })}
-                        className="gap-1 bg-emerald-600 hover:bg-emerald-700 text-white">
-                        <CheckCircle className="w-3.5 h-3.5" /> Record Outcome
-                      </Button>
-                    )}
-                    {!["rejected", "selected", "placed", "interview_scheduled"].includes(a.status) && (
-                      <Button size="sm" variant="outline" disabled={updateStatus.isPending}
-                        onClick={() => {
-                          const feedback = window.prompt("Feedback for candidate (optional):") || "";
-                          updateStatus.mutate({ applicationId: a.applicationId, status: "rejected", feedback });
-                        }}
-                        className="gap-1 border-red-200 text-red-700 hover:bg-red-50">
-                        <XCircle className="w-3.5 h-3.5" /> Reject
-                      </Button>
-                    )}
                   </div>
                 </div>
               );
