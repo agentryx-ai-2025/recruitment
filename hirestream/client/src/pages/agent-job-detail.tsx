@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { JobPoster } from "@/components/agent/job-poster";
 import { RecordOutcomeModal } from "@/components/shared/RecordOutcomeModal";
+import { ScheduleInterviewModal } from "@/components/shared/ScheduleInterviewModal";
 
 async function fetchJson(url: string) {
   const res = await fetch(url);
@@ -657,100 +658,6 @@ export default function AgentJobDetailPage() {
         }}
       />
     </div>
-  );
-}
-
-function ScheduleInterviewModal({ open, onClose, applicationId, candidateName, onScheduled }: {
-  open: boolean; onClose: () => void; applicationId: string; candidateName: string; onScheduled: () => void;
-}) {
-  const { toast } = useToast();
-  const [driveId, setDriveId] = useState("none");
-  const [date, setDate] = useState("");
-  const [time, setTime] = useState("10:00");
-  const [location, setLocation] = useState("");
-  const [mode, setMode] = useState("in_person");
-
-  const { data: drivesRes } = useQuery({
-    queryKey: ["/api/v1/drives/my"],
-    queryFn: () => fetchJson("/api/v1/drives/my"),
-    enabled: open,
-  });
-  const drives: any[] = (drivesRes?.data ?? []).filter((d: any) => d.status === "approved");
-
-  const schedule = useMutation({
-    mutationFn: async () => {
-      const scheduledAt = new Date(`${date}T${time}`).toISOString();
-      const res = await fetch(`/api/v1/drives/${driveId || "none"}/interviews`, {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ applicationId, scheduledAt, location, mode }),
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({} as any));
-        throw new Error(err?.error?.message || "Failed to schedule");
-      }
-      return res.json();
-    },
-    onSuccess: () => {
-      toast({ title: "Interview scheduled", description: `${candidateName} has been notified.` });
-      onScheduled();
-      setDate(""); setLocation(""); setDriveId("none");
-    },
-    onError: (e: any) => toast({ title: "Failed", description: e.message, variant: "destructive" }),
-  });
-
-  return (
-    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2"><Calendar className="w-5 h-5 text-cyan-600" /> Schedule Interview</DialogTitle>
-          <DialogDescription>with <span className="font-semibold text-slate-900">{candidateName}</span></DialogDescription>
-        </DialogHeader>
-        <div className="space-y-3 py-2">
-          <div>
-            <label className="text-xs font-semibold text-slate-600">Date</label>
-            <Input type="date" value={date} onChange={(e) => setDate(e.target.value)}
-              min={new Date().toISOString().split("T")[0]} className="mt-1 h-10 text-sm" />
-          </div>
-          <div>
-            <label className="text-xs font-semibold text-slate-600">Time</label>
-            <Input type="time" value={time} onChange={(e) => setTime(e.target.value)} className="mt-1 h-10 text-sm" />
-          </div>
-          <div>
-            <label className="text-xs font-semibold text-slate-600">Mode</label>
-            <Select value={mode} onValueChange={setMode}>
-              <SelectTrigger className="mt-1 h-10 text-sm"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="in_person">In-person</SelectItem>
-                <SelectItem value="virtual">Virtual</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <label className="text-xs font-semibold text-slate-600">Location / Link</label>
-            <Input value={location} onChange={(e) => setLocation(e.target.value)}
-              placeholder={mode === "virtual" ? "https://meet.google.com/..." : "Hotel Clarkes, Shimla"}
-              className="mt-1 h-10 text-sm" />
-          </div>
-          <div>
-            <label className="text-xs font-semibold text-slate-600">Drive (optional)</label>
-            <Select value={driveId} onValueChange={setDriveId}>
-              <SelectTrigger className="mt-1 h-10 text-sm"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">Standalone (no drive)</SelectItem>
-                {drives.map((d) => <SelectItem key={d.id} value={d.id}>{d.title}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-        <DialogFooter>
-          <Button variant="ghost" onClick={onClose}>Cancel</Button>
-          <Button disabled={!date || !time || schedule.isPending} onClick={() => schedule.mutate()}
-            className="bg-cyan-600 hover:bg-cyan-700 text-white">
-            {schedule.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "Schedule & Notify Candidate"}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
   );
 }
 

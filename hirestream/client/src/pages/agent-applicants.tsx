@@ -8,11 +8,15 @@
 
 import { useState, useEffect, useMemo, useRef } from "react";
 import { Link, useLocation, useSearch } from "wouter";
-import { useQuery } from "@tanstack/react-query";
-import { Loader2, Filter, Users, ArrowLeft, Briefcase, MapPin } from "lucide-react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Loader2, Filter, Users, ArrowLeft, Briefcase, MapPin, Eye, Star, Clock, CheckCircle, XCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PhotoAvatar } from "@/components/shared/PhotoAvatar";
+import { ScheduleInterviewModal } from "@/components/shared/ScheduleInterviewModal";
+import { RecordOutcomeModal } from "@/components/shared/RecordOutcomeModal";
+import { useToast } from "@/hooks/use-toast";
 
 type Applicant = {
   applicationId: string;
@@ -79,6 +83,33 @@ export default function AgentApplicantsPage() {
   });
   const applicants: Applicant[] = data?.data ?? [];
   const jobCount: number = data?.jobCount ?? 0;
+
+  // v0.4.21: inline action buttons on each card. Agents shouldn't have
+  // to drill into a specific job just to schedule an interview or move
+  // a candidate forward in the pipeline.
+  const { toast } = useToast();
+  const qc = useQueryClient();
+  const [interviewFor, setInterviewFor] = useState<{ applicationId: string; candidateName: string } | null>(null);
+  const [outcomeFor, setOutcomeFor] = useState<{ applicationId: string; candidateName: string } | null>(null);
+
+  const updateStatus = useMutation({
+    mutationFn: async ({ applicationId, status, feedback }: { applicationId: string; status: string; feedback?: string }) => {
+      const res = await fetch(`/api/v1/applications/${applicationId}/status`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status, rejectionFeedback: feedback }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({} as any));
+        throw new Error(err?.error?.message || "Failed");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/v1/agent/applicants"] });
+      toast({ title: "Status updated" });
+    },
+    onError: (e: any) => toast({ title: "Couldn't update", description: e.message, variant: "destructive" }),
+  });
 
   const counts: Record<string, number> = {};
   for (const s of PIPELINE) counts[s.key] = 0;
@@ -301,12 +332,85 @@ export default function AgentApplicantsPage() {
                       )}
                     </div>
                   </div>
+
+                  {/* v0.4.21: inline action buttons. Same shape as the
+                      per-job page so agents only learn one UI. */}
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <Link href={`/agent/candidates/${a.candidate.id}`}>
+                      <Button size="sm" variant="outline" className="gap-1">
+                        <Eye className="w-3.5 h-3.5" /> View Profile
+                      </Button>
+                    </Link>
+                    {a.status === "submitted" && (
+                      <Button size="sm" variant="outline" disabled={updateStatus.isPending}
+                        onClick={() => updateStatus.mutate({ applicationId: a.applicationId, status: "reviewed" })}
+                        className="gap-1 border-amber-200 text-amber-700 hover:bg-amber-50">
+                        Mark Reviewed
+                      </Button>
+                    )}
+                    {["submitted", "reviewed"].includes(a.status) && (
+                      <Button size="sm" disabled={updateStatus.isPending}
+                        onClick={() => updateStatus.mutate({ applicationId: a.applicationId, status: "shortlisted" })}
+                        className="gap-1 bg-purple-600 hover:bg-purple-700 text-white">
+                        <Star className="w-3.5 h-3.5" /> Shortlist
+                      </Button>
+                    )}
+                    {a.status === "shortlisted" && (
+                      <Button size="sm"
+                        onClick={() => setInterviewFor({ applicationId: a.applicationId, candidateName: a.candidate.fullName })}
+                        className="gap-1 bg-cyan-600 hover:bg-cyan-700 text-white">
+                        <Clock className="w-3.5 h-3.5" /> Schedule Interview
+                      </Button>
+                    )}
+                    {a.status === "interview_scheduled" && (
+                      <Button size="sm" disabled={updateStatus.isPending}
+                        onClick={() => setOutcomeFor({ applicationId: a.applicationId, candidateName: a.candidate.fullName })}
+                        className="gap-1 bg-emerald-600 hover:bg-emerald-700 text-white">
+                        <CheckCircle className="w-3.5 h-3.5" /> Record Outcome
+                      </Button>
+                    )}
+                    {!["rejected", "selected", "placed", "interview_scheduled"].includes(a.status) && (
+                      <Button size="sm" variant="outline" disabled={updateStatus.isPending}
+                        onClick={() => {
+                          const feedback = window.prompt("Feedback for candidate (optional):") || "";
+                          updateStatus.mutate({ applicationId: a.applicationId, status: "rejected", feedback });
+                        }}
+                        className="gap-1 border-red-200 text-red-700 hover:bg-red-50">
+                        <XCircle className="w-3.5 h-3.5" /> Reject
+                      </Button>
+                    )}
+                  </div>
                 </div>
               );
             })}
           </div>
         )}
       </div>
+
+      {/* v0.4.21: shared modals — Schedule Interview (for shortlisted)
+          and Record Outcome (for interview_scheduled). Same components
+          used on agent-job-detail.tsx so behaviour stays consistent
+          across the two agent surfaces. */}
+      <ScheduleInterviewModal
+        open={!!interviewFor}
+        onClose={() => setInterviewFor(null)}
+        applicationId={interviewFor?.applicationId ?? ""}
+        candidateName={interviewFor?.candidateName ?? ""}
+        onScheduled={() => {
+          qc.invalidateQueries({ queryKey: ["/api/v1/agent/applicants"] });
+          setInterviewFor(null);
+        }}
+      />
+      <RecordOutcomeModal
+        open={!!outcomeFor}
+        onClose={() => setOutcomeFor(null)}
+        applicationId={outcomeFor?.applicationId ?? ""}
+        candidateName={outcomeFor?.candidateName ?? ""}
+        onRecorded={() => {
+          qc.invalidateQueries({ queryKey: ["/api/v1/agent/applicants"] });
+          setOutcomeFor(null);
+        }}
+      />
     </div>
   );
 }
