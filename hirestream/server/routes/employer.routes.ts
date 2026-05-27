@@ -87,9 +87,11 @@ router.get("/requisitions", async (req, res, next) => {
       ? await db.select().from(jobs).where(eq(jobs.employerId, user.id))
       : await db.select().from(jobs);
 
-    // For each requisition, also sum applicants from every agent-derivative.
+    // v0.4.35 (Phase 4): requisition-centric stats — adds agentsPickedUp,
+    // daysSincePosted, daysToFirstPlacement so the rewritten employer
+    // dashboard can render the scorecard on each requisition card.
     const enriched = await Promise.all(myJobs.map(async (j: any) => {
-      const derivatives = await db.select({ id: jobs.id }).from(jobs)
+      const derivatives = await db.select({ id: jobs.id, agentId: jobs.agentId }).from(jobs)
         .where(eq(jobs.parentRequisitionId, j.id));
       const jobIds = [j.id, ...derivatives.map((d: any) => d.id)];
       const apps = await db.select().from(applications).where(inArray(applications.jobId, jobIds));
@@ -99,6 +101,26 @@ router.get("/requisitions", async (req, res, next) => {
       const approvedForInterview = apps.filter((a: any) => a.employerDecision === "approved_for_interview").length;
       const placed = apps.filter((a: any) => a.status === "placed").length;
       const selected = apps.filter((a: any) => a.status === "selected").length;
+
+      // v0.4.35: time-to-fill metrics
+      const postedAt = j.createdAt ? new Date(j.createdAt) : null;
+      const daysSincePosted = postedAt
+        ? Math.max(0, Math.floor((Date.now() - postedAt.getTime()) / 86_400_000))
+        : null;
+      // First placement date (placements join via applicationId)
+      let daysToFirstPlacement: number | null = null;
+      if (placed > 0 && postedAt) {
+        const placedRows = await db.select({ appliedAt: applications.appliedAt }).from(applications)
+          .where(and(inArray(applications.jobId, jobIds), eq(applications.status, "placed")))
+          .orderBy(applications.appliedAt).limit(1);
+        if (placedRows.length && placedRows[0].appliedAt) {
+          daysToFirstPlacement = Math.max(0, Math.floor(
+            (new Date(placedRows[0].appliedAt).getTime() - postedAt.getTime()) / 86_400_000));
+        }
+      }
+      // Unique agents who've picked up (each derivative typically has one agentId)
+      const uniqueAgentIds = new Set(derivatives.map((d: any) => d.agentId).filter(Boolean));
+
       return {
         ...j,
         stats: {
@@ -108,6 +130,10 @@ router.get("/requisitions", async (req, res, next) => {
           selected,
           placed,
           progressPct: j.targetHires > 0 ? Math.min(100, Math.round(((placed + selected) / j.targetHires) * 100)) : 0,
+          // Phase 4 additions
+          agentsPickedUp: uniqueAgentIds.size,
+          daysSincePosted,
+          daysToFirstPlacement,
         },
       };
     }));
@@ -326,6 +352,89 @@ router.post("/requisitions/:jobId/request-more", async (req, res, next) => {
 });
 
 // ── Employer: update requisition fields (target hires, deadline, priority) ──
+// v0.4.35 (Phase 4): Agency scorecard — per-agency conversion stats
+// across THIS employer's requisitions. Helps the employer decide which
+// agencies to prioritise for future picks. Optional ?requisitionId=
+// scopes to a single requisition; without it, aggregates across all.
+router.get("/agency-scorecard", async (req, res, next) => {
+  try {
+    const db = storage.db;
+    if (!db) return res.status(500).json({ success: false });
+    const user = (req as any).user;
+    if (user.role !== "employer" && user.role !== "admin" && user.role !== "superadmin") {
+      return res.status(403).json({ success: false });
+    }
+
+    const requisitionId = typeof req.query.requisitionId === "string" ? req.query.requisitionId : null;
+
+    // Resolve owned requisitions + derivatives
+    const myReqs = user.role === "employer"
+      ? await db.select({ id: jobs.id }).from(jobs).where(eq(jobs.employerId, user.id))
+      : await db.select({ id: jobs.id }).from(jobs);
+    let reqIds = myReqs.map((r: any) => r.id);
+    if (requisitionId) {
+      reqIds = reqIds.filter((id: string) => id === requisitionId);
+      if (reqIds.length === 0) return res.status(404).json({ success: false, message: "Requisition not found" });
+    }
+    if (reqIds.length === 0) return res.json({ success: true, data: [] });
+
+    // Derivatives (agent-picked) sit on these requisitions
+    const derivatives = await db.select().from(jobs).where(inArray(jobs.parentRequisitionId, reqIds));
+    // Direct postings (employer-posted) also valid — include them under
+    // the original employer "self" entry so the scorecard is complete.
+    const allJobIds = [...reqIds, ...derivatives.map((d: any) => d.id)];
+    const apps = await db.select().from(applications).where(inArray(applications.jobId, allJobIds));
+
+    // Map jobId → agentId (null for employer-direct postings)
+    const jobToAgent: Record<string, string | null> = {};
+    for (const d of derivatives as any[]) jobToAgent[d.id] = d.agentId ?? null;
+    for (const id of reqIds) jobToAgent[id] = null; // direct postings, no picker
+
+    // Group by agentId
+    const agentIds = Array.from(new Set(Object.values(jobToAgent).filter(Boolean))) as string[];
+    const agentRows = agentIds.length === 0 ? [] : await db.select().from(recruitmentAgents)
+      .where(inArray(recruitmentAgents.userId, agentIds));
+    const agentMeta: Record<string, { name: string; verified: boolean | null }> = {};
+    for (const a of agentRows as any[]) {
+      agentMeta[a.userId!] = { name: a.agencyName, verified: a.verified };
+    }
+
+    type Bucket = {
+      agencyKey: string; agencyName: string; verified: boolean | null;
+      submitted: number; shortlisted: number; interview: number; selected: number; placed: number; rejected: number;
+    };
+    const buckets: Record<string, Bucket> = {};
+    for (const a of apps as any[]) {
+      const agentId = jobToAgent[a.jobId] ?? "_employer_direct";
+      const key = agentId || "_employer_direct";
+      if (!buckets[key]) {
+        buckets[key] = {
+          agencyKey: key,
+          agencyName: key === "_employer_direct" ? "Direct (no agency)" : agentMeta[key]?.name ?? "Unknown agency",
+          verified: key === "_employer_direct" ? null : agentMeta[key]?.verified ?? null,
+          submitted: 0, shortlisted: 0, interview: 0, selected: 0, placed: 0, rejected: 0,
+        };
+      }
+      buckets[key].submitted++;
+      if (a.status === "shortlisted") buckets[key].shortlisted++;
+      else if (a.status === "interview_scheduled") buckets[key].interview++;
+      else if (a.status === "selected") buckets[key].selected++;
+      else if (a.status === "placed") buckets[key].placed++;
+      else if (a.status === "rejected") buckets[key].rejected++;
+    }
+    const data = Object.values(buckets).map((b) => ({
+      ...b,
+      // Conversion: shortlisted-or-better / submitted. Easy to grok metric.
+      conversionPct: b.submitted === 0 ? 0
+        : Math.round(((b.shortlisted + b.interview + b.selected + b.placed) / b.submitted) * 100),
+      placementRatePct: b.submitted === 0 ? 0
+        : Math.round((b.placed / b.submitted) * 100),
+    })).sort((x, y) => y.submitted - x.submitted);
+
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
 router.patch("/requisitions/:id", async (req, res, next) => {
   try {
     const db = storage.db;

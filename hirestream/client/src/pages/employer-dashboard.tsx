@@ -21,6 +21,8 @@ import {
 } from "lucide-react";
 import { jobCategoryLabel } from "@/lib/reference-data";
 import { EmployerVerificationForm } from "@/components/employer/EmployerVerificationForm";
+import { RequisitionsView } from "@/components/employer/RequisitionsView";
+import { AgencyScorecardPanel } from "@/components/employer/AgencyScorecardPanel";
 
 async function fetchJson(url: string) {
   const res = await fetch(url);
@@ -101,13 +103,18 @@ export default function EmployerDashboard() {
   // Applicants" / "Applications Pipeline" added so the employer has a
   // cross-requisition candidate view (same component as agent's
   // /agent/applicants, endpoint now scopes by role).
+  // v0.4.35 (Phase 4): nav rewritten requisition-first. "Requisitions"
+  // replaces "My Jobs" as primary surface. "Agencies" new tab surfaces
+  // the per-agency scorecard. "My Jobs" stays available for legacy
+  // workflows but moved down in priority.
   const navItems: { key: string; label: string; icon: any; count: number | null; href?: string | null }[] = [
-    { key: "overview",     label: "Dashboard",            icon: LayoutDashboard, count: null,                 href: null },
-    { key: "jobs",         label: "My Jobs",              icon: Briefcase,       count: myJobs.length,        href: null },
-    { key: "applicants",   label: "Applications Pipeline", icon: ClipboardList,  count: null,                 href: "/employer/applicants" },
-    { key: "placements",   label: "Offers & Placements",  icon: Handshake,       count: null,                 href: null },
-    { key: "reports",      label: "Reports",              icon: TrendingUp,      count: null,                 href: null },
-    { key: "activity",     label: "Activity",             icon: Activity,        count: notifications.length, href: null },
+    { key: "overview",     label: "Dashboard",             icon: LayoutDashboard, count: null,                 href: null },
+    { key: "requisitions", label: "Requisitions",          icon: Briefcase,       count: myJobs.length,        href: null },
+    { key: "applicants",   label: "Applications Pipeline", icon: ClipboardList,   count: null,                 href: "/employer/applicants" },
+    { key: "agencies",     label: "Agencies",              icon: Building,        count: null,                 href: null },
+    { key: "placements",   label: "Offers & Placements",   icon: Handshake,       count: null,                 href: null },
+    { key: "reports",      label: "Reports",               icon: TrendingUp,      count: null,                 href: null },
+    { key: "activity",     label: "Activity",              icon: Activity,        count: notifications.length, href: null },
   ];
 
   // v0.4.32 (HPSEDC Item 1): verification status banner. Three states:
@@ -268,7 +275,18 @@ export default function EmployerDashboard() {
                   notifications={notifications} setActiveView={setActiveView}
                 />
               )}
+              {/* v0.4.35 (Phase 4): "requisitions" is the new primary
+                  surface — renders RequisitionsView with per-req scorecard
+                  + roll-up KPIs. "jobs" remains addressable but the nav
+                  now points there only via deep-links / legacy URLs. */}
+              {activeView === "requisitions" && <RequisitionsView />}
               {activeView === "jobs" && <JobsContent jobs={myJobs} title="All Job Postings" statusFilter={jobStatusFilter} setStatusFilter={setJobStatusFilter} />}
+              {activeView === "agencies" && (
+                <AgencyScorecardPanel
+                  title="Agency Scorecard"
+                  subtitle="Conversion rates per agency across all your requisitions. Use this to prioritise high-performing agencies for new picks."
+                />
+              )}
               {activeView === "placements" && <EmployerPlacements />}
               {activeView === "reports" && <ReportsBI />}
               {activeView === "activity" && <ActivityContent notifications={notifications} />}

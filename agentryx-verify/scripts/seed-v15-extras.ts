@@ -1015,6 +1015,43 @@ const rows: Row[] = [
       "9. Download the .ics from any state — file opens cleanly in calendar app.",
     ].join("\n"),
     expectedResult: "All 9 steps succeed. Notifications fire on every candidate-side action. Badges + reasons surface bidirectionally. Agent has full visibility into who's coming + who's not without phone-tagging." },
+
+  // ── v0.4.35 (Phase 4 — Employer dashboard rework) ────────────────────
+  { itemRef: "A3.39", section: 3, sectionTitle: SECTIONS[3],
+    description: "Employer nav restructured — \"Requisitions\" is primary surface (was \"My Jobs\"), new \"Agencies\" tab",
+    testSteps: "Log in as demo_employer. Look at sidebar nav order.",
+    expectedResult: "Order: Dashboard · Requisitions · Applications Pipeline · Agencies · Offers & Placements · Reports · Activity. \"My Jobs\" only addressable as a legacy URL; not in primary nav." },
+  { itemRef: "A3.40", section: 3, sectionTitle: SECTIONS[3],
+    description: "Requisition card shows agency engagement count + days open + time-to-first-placement",
+    testSteps: "Open Requisitions tab. Inspect any requisition that has been picked up by at least one agent.",
+    expectedResult: "Each card displays: agents engaged count, days since posted, first-placement-day (if any placement exists). 5 MiniStats row: Total / Agencies / Awaiting you / Approved / Placed. Progress bar shows % of target hires reached." },
+  { itemRef: "A3.41", section: 3, sectionTitle: SECTIONS[3],
+    description: "Roll-up KPI strip aggregates \"Awaiting your review\" across all requisitions",
+    testSteps: "Requisitions tab → look at the 4 KPI tiles at top.",
+    expectedResult: "Amber 'Awaiting your review' tile sums shortlisted-without-decision rows across all open requisitions. Click 'Review N' on any individual card to jump to that requisition's review queue. Tile turns 'All caught up' when zero." },
+  { itemRef: "A3.42", section: 3, sectionTitle: SECTIONS[3],
+    description: "Sort + filter: Most awaiting review (default) / Newest / Oldest / Most progress",
+    testSteps: "Requisitions tab → change Sort dropdown. Try status + priority filters.",
+    expectedResult: "Sort moves requisitions with most awaiting-review to the top by default (the answer to 'what should I look at right now'). Status + priority + free-text search all compose. Default-sort matters because employers don't have time to scan all reqs." },
+  { itemRef: "A4.47", section: 4, sectionTitle: SECTIONS[4],
+    description: "Agency scorecard (new) — per-agency conversion stats across employer requisitions",
+    testSteps: "Login as demo_employer. Sidebar → Agencies. Inspect each agency row.",
+    expectedResult: "One row per agency that has submitted candidates. Shows: submitted count, stage-breakdown bar (Placed / Selected / Interview / Shortlisted / Rejected / In-flight), conversion %, placement rate %, verified/unverified badge. Sorted by submitted-count desc so highest-volume agencies surface first." },
+  { itemRef: "P6.11", section: 6, sectionTitle: SECTIONS[6],
+    description: "GET /api/v1/employer/agency-scorecard returns per-agency aggregation",
+    testSteps: "curl -b 'connect.sid=…' https://hirestream-stg.agentryx.dev/api/v1/employer/agency-scorecard",
+    expectedResult: "Array of { agencyKey, agencyName, verified, submitted, shortlisted, interview, selected, placed, rejected, conversionPct, placementRatePct }. ?requisitionId= filter scopes to one requisition. Non-employer/admin → 403." },
+  { itemRef: "E9.16", section: 9, sectionTitle: SECTIONS[9],
+    description: "Flow H — Employer review-driven workflow end-to-end",
+    testSteps: [
+      "1. Login as demo_employer. Post a new requisition with targetHires=2.",
+      "2. Login as 2 different agents (demo_agent + europe_careers). Both pick up the same requisition. Each agent submits 2 candidates → 4 total candidates across 2 derivative jobs.",
+      "3. Each agent shortlists their candidates.",
+      "4. Login as employer. Requisitions tab: card should show agentsPickedUp=2, totalApplicants=4, awaitingDecision=4.",
+      "5. Click 'Review 4'. Approve 2 candidates for interview, reject 2.",
+      "6. Login as Agencies tab. See both agencies in the scorecard with conversionPct reflecting the decisions.",
+    ].join("\n"),
+    expectedResult: "Each step succeeds. Requisition card stats update live as agents shortlist + employer decides. Agency scorecard shows the conversion rate split per agency so employer can decide who to prioritize for next req." },
 ];
 
 async function main() {
@@ -1024,7 +1061,7 @@ async function main() {
     [project] = await db.insert(projects).values({
       slug,
       name: "HireStream — Beyond-FRS Enhancements (v1.5)",
-      buildRef: "v2.1.0",
+      buildRef: "v2.2.0",
       contractor: "HTIS",
       client: "HPSEDC",
       description:
@@ -1035,7 +1072,7 @@ async function main() {
     // Update name/description in case reviewers see the old one
     await db.update(projects).set({
       name: "HireStream — Beyond-FRS Enhancements (v1.5)",
-      buildRef: "v2.1.0",
+      buildRef: "v2.2.0",
       description:
         "Value-add features delivered above the contracted FRS scope. Organised by stakeholder role so each reviewer can sign off the sections relevant to their domain.",
     }).where(eq(projects.id, project.id));
