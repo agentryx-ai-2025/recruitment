@@ -125,14 +125,21 @@ export default function AgentDashboard() {
     );
   }
 
+  // v0.4.27: added "All Applicants" entry pointing to /agent/applicants.
+  // Previously the only path to this page was the "One-pane view" CTA
+  // card below the nav (or via the Applicant Pipeline pills on the
+  // Dashboard) — too easy to miss from other views like Reports. The
+  // `href` field marks an item as an external route (Link) rather than
+  // an in-page setActiveView switch.
   const navItems = [
-    { key: "overview", label: "Dashboard", icon: LayoutDashboard, count: null },
-    { key: "jobs", label: "My Jobs", icon: Briefcase, count: allJobs.length },
-    { key: "requisitions", label: "Open Requisitions", icon: Handshake, count: null },
-    { key: "candidates", label: "Candidates", icon: Users, count: candidateTotal },
-    { key: "drives", label: "Drives", icon: Megaphone, count: drives.length },
-    { key: "reports", label: "Reports", icon: TrendingUp, count: null },
-    { key: "activity", label: "Activity", icon: Activity, count: notifications.length },
+    { key: "overview", label: "Dashboard", icon: LayoutDashboard, count: null, href: null },
+    { key: "jobs", label: "My Jobs", icon: Briefcase, count: allJobs.length, href: null },
+    { key: "applicants-all", label: "All Applicants", icon: ClipboardList, count: null, href: "/agent/applicants" },
+    { key: "requisitions", label: "Open Requisitions", icon: Handshake, count: null, href: null },
+    { key: "candidates", label: "Candidates", icon: Users, count: candidateTotal, href: null },
+    { key: "drives", label: "Drives", icon: Megaphone, count: drives.length, href: null },
+    { key: "reports", label: "Reports", icon: TrendingUp, count: null, href: null },
+    { key: "activity", label: "Activity", icon: Activity, count: notifications.length, href: null },
   ];
 
   return (
@@ -180,25 +187,37 @@ export default function AgentDashboard() {
 
           {/* Navigation */}
           <nav className="bg-white rounded-xl border border-slate-200 p-1.5 shadow-sm">
-            {navItems.map(item => (
-              <button
-                key={item.key}
-                onClick={() => setActiveView(item.key)}
-                className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-all ${
-                  activeView === item.key
-                    ? "bg-blue-50 text-blue-700 font-semibold"
-                    : "text-slate-600 hover:bg-slate-50"
-                }`}
-              >
-                <item.icon className="w-4 h-4 flex-shrink-0" />
-                <span className="flex-1 text-left truncate">{item.label}</span>
-                {item.count !== null && item.count > 0 && (
-                  <span className={`text-[11px] font-semibold tabular-nums ${
-                    activeView === item.key ? "text-blue-600" : "text-slate-400"
-                  }`}>{item.count}</span>
-                )}
-              </button>
-            ))}
+            {navItems.map(item => {
+              const baseClass = `w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-all ${
+                activeView === item.key
+                  ? "bg-blue-50 text-blue-700 font-semibold"
+                  : "text-slate-600 hover:bg-slate-50"
+              }`;
+              const inner = (
+                <>
+                  <item.icon className="w-4 h-4 flex-shrink-0" />
+                  <span className="flex-1 text-left truncate">{item.label}</span>
+                  {item.count !== null && item.count > 0 && (
+                    <span className={`text-[11px] font-semibold tabular-nums ${
+                      activeView === item.key ? "text-blue-600" : "text-slate-400"
+                    }`}>{item.count}</span>
+                  )}
+                </>
+              );
+              // v0.4.27: items with href are external routes (e.g. All
+              // Applicants → /agent/applicants). Use a Link so the
+              // browser navigates rather than switching the in-page view.
+              if (item.href) {
+                return <Link key={item.key} href={item.href} className={baseClass}>{inner}</Link>;
+              }
+              return (
+                <button
+                  key={item.key}
+                  onClick={() => setActiveView(item.key)}
+                  className={baseClass}
+                >{inner}</button>
+              );
+            })}
           </nav>
 
           {/* Quick Stats */}
