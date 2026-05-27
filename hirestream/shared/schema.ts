@@ -152,6 +152,22 @@ export const recruitmentAgents = pgTable("recruitment_agents", {
   verified: boolean("verified").default(false),
   rating: integer("rating").default(0),
   placements: integer("placements").default(0),
+  // v0.4.32 (HPSEDC Item 3): doc-review workflow metadata. Same shape as
+  // employers so the admin UI can share components.
+  contactEmail: text("contact_email"),
+  contactPhone: text("contact_phone"),
+  registeredAddressLine1: text("registered_address_line_1"),
+  registeredAddressLine2: text("registered_address_line_2"),
+  registeredCity: text("registered_city"),
+  registeredState: text("registered_state"),
+  registeredPinCode: text("registered_pin_code"),
+  authorisedSignatoryName: text("authorised_signatory_name"),
+  authorisedSignatoryDesignation: text("authorised_signatory_designation"),
+  meaLicenseExpiry: date("mea_license_expiry"),
+  verifiedAt: timestamp("verified_at"),
+  verifiedBy: varchar("verified_by").references(() => users.id),
+  rejectionReason: text("rejection_reason"),
+  submittedForReviewAt: timestamp("submitted_for_review_at"),
 });
 
 export const systemSettings = pgTable("system_settings", {
@@ -212,6 +228,69 @@ export const employers = pgTable("employers", {
   location: text("location"),
   verified: boolean("verified").default(false),
   activeJobs: integer("active_jobs").default(0),
+  // v0.4.32 (HPSEDC Item 1): full company verification surface so admin
+  // can run KYB on a foreign-employer or domestic-principal before they
+  // can publish a requisition. All nullable so existing seeded rows survive.
+  cin: text("cin"),                                // Corporate Identification Number
+  gst: text("gst"),                                // GSTIN
+  pan: text("pan"),                                // PAN
+  registeredAddressLine1: text("registered_address_line_1"),
+  registeredAddressLine2: text("registered_address_line_2"),
+  registeredCity: text("registered_city"),
+  registeredState: text("registered_state"),
+  registeredPinCode: text("registered_pin_code"),
+  registeredCountry: text("registered_country").default("India"),
+  contactEmail: text("contact_email"),
+  contactPhone: text("contact_phone"),
+  authorisedSignatoryName: text("authorised_signatory_name"),
+  authorisedSignatoryDesignation: text("authorised_signatory_designation"),
+  authorisedSignatoryIdType: text("authorised_signatory_id_type"),    // aadhaar | pan | passport | driving_licence
+  authorisedSignatoryIdNumber: text("authorised_signatory_id_number"),
+  // Verification metadata
+  verifiedAt: timestamp("verified_at"),
+  verifiedBy: varchar("verified_by").references(() => users.id),
+  rejectionReason: text("rejection_reason"),
+  submittedForReviewAt: timestamp("submitted_for_review_at"),
+});
+
+// v0.4.32 (HPSEDC Item 1): employer verification documents. Mirrors the
+// candidate `documents` table but scopes by employerId so admin doc-review
+// queue can render them per-applicant.
+export const employerDocuments = pgTable("employer_documents", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  employerId: varchar("employer_id").references(() => employers.id).notNull(),
+  // Allowed values:
+  //   cin_certificate | gst_certificate | pan_card | address_proof |
+  //   signatory_id | labour_permission | agreement | other
+  type: text("type").notNull(),
+  fileName: text("file_name").notNull(),
+  fileUrl: text("file_url").notNull(),
+  fileSize: integer("file_size"),
+  uploadedAt: timestamp("uploaded_at").defaultNow(),
+  status: text("status").notNull().default("pending"), // pending | approved | rejected
+  reviewedAt: timestamp("reviewed_at"),
+  reviewedBy: varchar("reviewed_by").references(() => users.id),
+  reviewNotes: text("review_notes"),
+});
+
+// v0.4.32 (HPSEDC Item 3): agency verification documents — the 9 doc
+// classes HPSEDC listed for an MEA RA-licensed agency.
+export const agencyDocuments = pgTable("agency_documents", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  agencyId: varchar("agency_id").references(() => recruitmentAgents.id).notNull(),
+  // Allowed values:
+  //   mea_ra_license | incorporation_certificate | pan_card | gst_certificate |
+  //   address_proof | signatory_id | labour_permission | experience_proof |
+  //   agreement | other
+  type: text("type").notNull(),
+  fileName: text("file_name").notNull(),
+  fileUrl: text("file_url").notNull(),
+  fileSize: integer("file_size"),
+  uploadedAt: timestamp("uploaded_at").defaultNow(),
+  status: text("status").notNull().default("pending"),
+  reviewedAt: timestamp("reviewed_at"),
+  reviewedBy: varchar("reviewed_by").references(() => users.id),
+  reviewNotes: text("review_notes"),
 });
 
 export const notifications = pgTable("notifications", {
@@ -497,6 +576,11 @@ export const insertRecruitmentAgentSchema = createInsertSchema(recruitmentAgents
   verified: true,
   rating: true,
   placements: true,
+  // v0.4.32: admin-controlled verification metadata is never client-supplied.
+  verifiedAt: true,
+  verifiedBy: true,
+  rejectionReason: true,
+  submittedForReviewAt: true,
 }).extend({
   agencyName: z.string().trim().min(2).max(150),
   licenseNumber: z.string().trim().min(3).max(50),

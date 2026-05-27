@@ -92,6 +92,8 @@ describe('Phase 3 — fireEvent direct', () => {
     const employerUserId = eReg.body.data.id;
     // Clear welcome/auto notifications created during registration so tests measure only fireEvent output
     const db = getDb();
+    // v0.4.32: pre-verify the employer so the new publish gate doesn't block this test
+    await db.execute(sql`UPDATE employers SET verified = true WHERE user_id = ${employerUserId}`);
     await db.execute(sql`DELETE FROM notifications`);
     return { candidateUserId, agentUserId, employerUserId };
   }

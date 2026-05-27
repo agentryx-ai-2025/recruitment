@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { AgencyRegisterForm } from "@/components/agent/agency-register-form";
+import { AgencyVerificationForm } from "@/components/agent/AgencyVerificationForm";
 import { JobPoster } from "@/components/agent/job-poster";
 import { ApplicantManager } from "@/components/agent/applicant-manager";
 import { DriveCreationForm } from "@/components/agent/drive-form";
@@ -62,6 +63,7 @@ export default function AgentDashboard() {
   const [activeView, setActiveView] = useState("overview");
   const [jobStatusFilter, setJobStatusFilter] = useState<"all" | "active" | "closed" | "draft">("all");
   const [searchSkill, setSearchSkill] = useState("");
+  const [verifyOpen, setVerifyOpen] = useState(false);
 
   const { data: agencyRes, isLoading } = useQuery({
     queryKey: ["/api/v1/agencies/me"],
@@ -245,15 +247,58 @@ export default function AgentDashboard() {
 
         {/* ── MAIN CONTENT ── */}
         <main className="min-w-0">
-          {!isVerified && (
-            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-5 flex items-start gap-3">
-              <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
-              <div>
-                <p className="font-semibold text-amber-800 text-sm">Agency verification pending</p>
-                <p className="text-xs text-amber-600 mt-0.5">HPSEDC will review your agency details. Once verified, you can post jobs and manage drives.</p>
+          {!isVerified && isRegistered && (() => {
+            // v0.4.32 (HPSEDC Item 3): three banner states — same logic as
+            // the employer banner.
+            const submittedAt = (agency as any)?.submittedForReviewAt;
+            const rejectionReason = (agency as any)?.rejectionReason;
+            const isSubmitted = !!submittedAt;
+            const wasRejected = !isSubmitted && !!rejectionReason;
+            return (
+              <div className={`rounded-xl border p-4 mb-5 flex items-start gap-3 ${
+                isSubmitted ? "border-blue-200 bg-blue-50"
+                : wasRejected ? "border-red-200 bg-red-50"
+                : "border-amber-200 bg-amber-50"
+              }`}>
+                <AlertCircle className={`w-5 h-5 flex-shrink-0 mt-0.5 ${
+                  isSubmitted ? "text-blue-600" : wasRejected ? "text-red-600" : "text-amber-600"
+                }`} />
+                <div className="flex-1 min-w-0">
+                  <p className={`font-semibold text-sm ${
+                    isSubmitted ? "text-blue-900" : wasRejected ? "text-red-900" : "text-amber-900"
+                  }`}>
+                    {isSubmitted ? "Verification under review"
+                      : wasRejected ? "Verification was not approved"
+                      : "Complete agency verification"}
+                  </p>
+                  <p className={`text-xs mt-0.5 ${
+                    isSubmitted ? "text-blue-700" : wasRejected ? "text-red-700" : "text-amber-700"
+                  }`}>
+                    {isSubmitted
+                      ? `Submitted ${new Date(submittedAt).toLocaleDateString("en-IN")}. HPSEDC usually decides within 48 hours.`
+                      : wasRejected
+                        ? `Reason: ${rejectionReason}. Update your submission and re-submit.`
+                        : "Upload your MEA RA Licence + supporting documents and submit for HPSEDC review — required before you can post jobs."}
+                  </p>
+                </div>
+                <Button size="sm" onClick={() => setVerifyOpen(true)} className="flex-shrink-0">
+                  {isSubmitted ? "View details" : "Complete verification"}
+                </Button>
               </div>
-            </div>
-          )}
+            );
+          })()}
+
+          <Dialog open={verifyOpen} onOpenChange={setVerifyOpen}>
+            <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>Agency Verification</DialogTitle>
+                <DialogDescription>
+                  Provide your agency KYB details + upload supporting documents. HPSEDC reviews submissions within 48 hours.
+                </DialogDescription>
+              </DialogHeader>
+              <AgencyVerificationForm onDone={() => setVerifyOpen(false)} />
+            </DialogContent>
+          </Dialog>
 
           <AnimatePresence mode="wait">
             <motion.div key={activeView} variants={scaleIn} initial="initial" animate="animate" exit="exit">

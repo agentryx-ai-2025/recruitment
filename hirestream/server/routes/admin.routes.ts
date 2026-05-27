@@ -5,8 +5,11 @@ import bcrypt from "bcrypt";
 import { format } from "date-fns";
 import { getAllSettings, updateSetting } from "../services/settings.service";
 import { storage } from "../storage";
-import { users, auditLog, notificationTemplates } from "@shared/schema";
-import { eq, and } from "drizzle-orm";
+import {
+  users, auditLog, notificationTemplates,
+  employers, employerDocuments, recruitmentAgents, agencyDocuments, notifications,
+} from "@shared/schema";
+import { eq, and, desc } from "drizzle-orm";
 import { sensitiveLimiter } from "../middleware/rateLimit.middleware";
 import { logger } from "../config/logger.config";
 
@@ -95,23 +98,35 @@ router.get("/agencies", async (req, res) => {
   }
 });
 
-// PATCH /api/v1/admin/agencies/:id/verify - Approve or reject an agency
+// PATCH /api/v1/admin/agencies/:id/verify - Approve or reject an agency.
+// v0.4.32: now accepts an optional `rejectionReason` so the agent sees
+// WHY their submission was rejected. Stored on the agency row + echoed
+// in the notification body.
 router.patch("/agencies/:id/verify", async (req, res) => {
   try {
-    const { storage } = await import("../storage");
-    const { recruitmentAgents, notifications } = await import("@shared/schema");
-    const { eq } = await import("drizzle-orm");
-
     if (!storage.db) return res.status(500).json({ success: false, message: "No db available" });
 
-    const { verified } = req.body;
+    const { verified, rejectionReason } = req.body;
     if (typeof verified !== "boolean") {
       return res.status(400).json({ success: false, message: "verified must be a boolean" });
+    }
+    if (!verified && typeof rejectionReason === "string" && rejectionReason.length > 1000) {
+      return res.status(400).json({ success: false, message: "rejectionReason max 1000 chars" });
+    }
+
+    const setFields: any = { verified };
+    if (verified) {
+      setFields.verifiedAt = new Date();
+      setFields.verifiedBy = (req.user as any)?.id;
+      setFields.rejectionReason = null;
+    } else {
+      setFields.rejectionReason = typeof rejectionReason === "string" && rejectionReason.trim() ? rejectionReason.trim() : null;
+      setFields.verifiedAt = null;
     }
 
     const updated = await storage.db
       .update(recruitmentAgents)
-      .set({ verified })
+      .set(setFields)
       .where(eq(recruitmentAgents.id, req.params.id))
       .returning();
 
@@ -121,19 +136,142 @@ router.patch("/agencies/:id/verify", async (req, res) => {
 
     // M5: Notify the agent about the status change
     await storage.db.insert(notifications).values({
-      userId: updated[0].userId, // Requires recruitmentAgents to have userId
+      userId: updated[0].userId,
       type: "agency_verified",
-      title: verified ? "Agency Verified" : "Agency Verification Revoked",
-      message: verified 
+      title: verified ? "Agency Verified" : "Agency Verification Update",
+      message: verified
         ? "Congratulations! Your agency has been verified by HPSEDC. You can now post jobs."
-        : "Your agency verification has been revoked by HPSEDC. Please contact support.",
-      metadata: { agencyId: updated[0].id }
+        : `Your agency verification was not approved.${setFields.rejectionReason ? ` Reason: ${setFields.rejectionReason}` : ""} Please contact support or re-submit with corrections.`,
+      metadata: { agencyId: updated[0].id, rejectionReason: setFields.rejectionReason },
     });
 
     res.json({ success: true, data: updated[0] });
   } catch (err) {
+    logger.error(`agencies/:id/verify failed: ${err}`);
     res.status(500).json({ success: false, message: "Failed to update agency" });
   }
+});
+
+// GET /api/v1/admin/agencies/:id/documents — agency's submitted KYB docs
+router.get("/agencies/:id/documents", async (req, res, next) => {
+  try {
+    if (!storage.db) return res.status(500).json({ success: false });
+    const docs = await storage.db.select().from(agencyDocuments)
+      .where(eq(agencyDocuments.agencyId, req.params.id))
+      .orderBy(agencyDocuments.uploadedAt);
+    res.json({ success: true, data: docs });
+  } catch (err) { next(err); }
+});
+
+// PATCH /api/v1/admin/agencies/:id/documents/:docId — approve/reject a single doc
+router.patch("/agencies/:id/documents/:docId", async (req, res, next) => {
+  try {
+    if (!storage.db) return res.status(500).json({ success: false });
+    const { status, reviewNotes } = req.body;
+    if (!["pending", "approved", "rejected"].includes(status)) {
+      return res.status(400).json({ success: false, message: "status must be pending/approved/rejected" });
+    }
+    const setFields: any = { status, reviewedAt: new Date(), reviewedBy: (req.user as any)?.id };
+    if (typeof reviewNotes === "string") setFields.reviewNotes = reviewNotes.slice(0, 1000);
+    const updated = await storage.db.update(agencyDocuments).set(setFields)
+      .where(and(eq(agencyDocuments.id, req.params.docId), eq(agencyDocuments.agencyId, req.params.id)))
+      .returning();
+    if (!updated.length) return res.status(404).json({ success: false });
+    res.json({ success: true, data: updated[0] });
+  } catch (err) { next(err); }
+});
+
+// ─────────────────────────────────────────────────────────────────────
+// v0.4.32 (HPSEDC Item 1): Employer admin queue
+// ─────────────────────────────────────────────────────────────────────
+
+// GET /api/v1/admin/employers — list with verification status. Defaults
+// to surfacing submitted-but-unverified first so reviewers see work-to-do.
+router.get("/employers", async (req, res, next) => {
+  try {
+    if (!storage.db) return res.status(500).json({ success: false });
+    const rows = await storage.db.select().from(employers).orderBy(desc(employers.submittedForReviewAt));
+    res.json({ success: true, data: rows });
+  } catch (err) { next(err); }
+});
+
+// GET /api/v1/admin/employers/:id — single employer + its docs in one shot
+router.get("/employers/:id", async (req, res, next) => {
+  try {
+    if (!storage.db) return res.status(500).json({ success: false });
+    const empRows = await storage.db.select().from(employers).where(eq(employers.id, req.params.id)).limit(1);
+    if (!empRows.length) return res.status(404).json({ success: false });
+    const docs = await storage.db.select().from(employerDocuments)
+      .where(eq(employerDocuments.employerId, req.params.id))
+      .orderBy(employerDocuments.uploadedAt);
+    res.json({ success: true, data: { ...empRows[0], documents: docs } });
+  } catch (err) { next(err); }
+});
+
+// PATCH /api/v1/admin/employers/:id/verify — approve/reject employer KYB
+router.patch("/employers/:id/verify", async (req, res, next) => {
+  try {
+    if (!storage.db) return res.status(500).json({ success: false });
+    const { verified, rejectionReason } = req.body;
+    if (typeof verified !== "boolean") {
+      return res.status(400).json({ success: false, message: "verified must be a boolean" });
+    }
+    const setFields: any = { verified };
+    if (verified) {
+      setFields.verifiedAt = new Date();
+      setFields.verifiedBy = (req.user as any)?.id;
+      setFields.rejectionReason = null;
+    } else {
+      setFields.rejectionReason = typeof rejectionReason === "string" && rejectionReason.trim() ? rejectionReason.trim() : null;
+      setFields.verifiedAt = null;
+    }
+    const updated = await storage.db.update(employers).set(setFields)
+      .where(eq(employers.id, req.params.id)).returning();
+    if (!updated.length) return res.status(404).json({ success: false });
+
+    // Notify the employer's owning user
+    if (updated[0].userId) {
+      await storage.db.insert(notifications).values({
+        userId: updated[0].userId,
+        type: "employer_verified",
+        title: verified ? "Company Verified" : "Company Verification Update",
+        message: verified
+          ? "Your company has been verified by HPSEDC. You can now publish requisitions."
+          : `Your company verification was not approved.${setFields.rejectionReason ? ` Reason: ${setFields.rejectionReason}` : ""} Please update the requested information and re-submit.`,
+        metadata: { employerId: updated[0].id, rejectionReason: setFields.rejectionReason },
+      });
+    }
+    res.json({ success: true, data: updated[0] });
+  } catch (err) { next(err); }
+});
+
+// GET /api/v1/admin/employers/:id/documents — admin view of an employer's docs
+router.get("/employers/:id/documents", async (req, res, next) => {
+  try {
+    if (!storage.db) return res.status(500).json({ success: false });
+    const docs = await storage.db.select().from(employerDocuments)
+      .where(eq(employerDocuments.employerId, req.params.id))
+      .orderBy(employerDocuments.uploadedAt);
+    res.json({ success: true, data: docs });
+  } catch (err) { next(err); }
+});
+
+// PATCH /api/v1/admin/employers/:id/documents/:docId — per-doc approve/reject
+router.patch("/employers/:id/documents/:docId", async (req, res, next) => {
+  try {
+    if (!storage.db) return res.status(500).json({ success: false });
+    const { status, reviewNotes } = req.body;
+    if (!["pending", "approved", "rejected"].includes(status)) {
+      return res.status(400).json({ success: false, message: "status must be pending/approved/rejected" });
+    }
+    const setFields: any = { status, reviewedAt: new Date(), reviewedBy: (req.user as any)?.id };
+    if (typeof reviewNotes === "string") setFields.reviewNotes = reviewNotes.slice(0, 1000);
+    const updated = await storage.db.update(employerDocuments).set(setFields)
+      .where(and(eq(employerDocuments.id, req.params.docId), eq(employerDocuments.employerId, req.params.id)))
+      .returning();
+    if (!updated.length) return res.status(404).json({ success: false });
+    res.json({ success: true, data: updated[0] });
+  } catch (err) { next(err); }
 });
 
 // ── System Settings (runtime configuration) ──────────────────────────

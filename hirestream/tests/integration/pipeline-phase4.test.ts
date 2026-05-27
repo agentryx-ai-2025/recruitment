@@ -52,7 +52,12 @@ async function makeAgent(email: string, licenseNumber: string): Promise<{ cookie
 
 async function makeEmployer(email: string): Promise<{ cookie: string[]; userId: string }> {
   const reg = await request(app).post('/api/v1/auth/register').send({ email, password: 'Test@123', role: 'employer' });
-  return { cookie: reg.headers['set-cookie'] as unknown as string[], userId: reg.body.data.id };
+  const cookie = reg.headers['set-cookie'] as unknown as string[];
+  const userId = reg.body.data.id;
+  // v0.4.32: pre-verify so the publish gate doesn't block phase-4 flow tests
+  const db = getDb();
+  await db.execute(sql`UPDATE employers SET verified = true WHERE user_id = ${userId}`);
+  return { cookie, userId };
 }
 
 async function makeCandidate(email: string): Promise<{ cookie: string[]; userId: string }> {

@@ -15,7 +15,12 @@ const UPLOAD_DIR = path.resolve(process.cwd(), "uploads");
 // asset classes are disjoint on disk (docs auth-protected, photos public).
 export const HS_DOCS_DIR = path.join(UPLOAD_DIR, "hs", "candidates", "docs");
 export const HS_PHOTOS_DIR = path.join(UPLOAD_DIR, "hs", "candidates", "photos");
-for (const d of [UPLOAD_DIR, HS_DOCS_DIR, HS_PHOTOS_DIR]) {
+// v0.4.32 (HPSEDC Items 1 & 3): KYB document leaves. Each role gets its own
+// directory so the admin queue can never accidentally cross-render docs from
+// the wrong owner type. All three leaves are auth-gated download-only.
+export const HS_EMPLOYER_DOCS_DIR = path.join(UPLOAD_DIR, "hs", "employers", "docs");
+export const HS_AGENCY_DOCS_DIR = path.join(UPLOAD_DIR, "hs", "agencies", "docs");
+for (const d of [UPLOAD_DIR, HS_DOCS_DIR, HS_PHOTOS_DIR, HS_EMPLOYER_DOCS_DIR, HS_AGENCY_DOCS_DIR]) {
   if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true });
 }
 
@@ -142,3 +147,31 @@ export function verifyUploadedFile(req: Request, res: Response, next: NextFuncti
 }
 
 export { UPLOAD_DIR };
+
+// v0.4.32: factory for role-scoped uploaders. Returns a multer instance bound
+// to the specified leaf dir so a route can NEVER accidentally write to the
+// wrong owner type's directory — the destination is captured at multer
+// construction time, not derived per-request. Magic-byte check + filter stay
+// identical to the candidate-docs path.
+function makeRoleStorage(leafDir: string) {
+  return multer.diskStorage({
+    destination: (_req, _file, cb) => { cb(null, leafDir); },
+    filename: (_req, file, cb) => {
+      const ext = ALLOWED_MIMES[file.mimetype] || path.extname(file.originalname);
+      const uniqueName = `${Date.now()}-${crypto.randomBytes(8).toString("hex")}${ext}`;
+      cb(null, uniqueName);
+    },
+  });
+}
+
+export const employerDocUpload = multer({
+  storage: makeRoleStorage(HS_EMPLOYER_DOCS_DIR),
+  fileFilter,
+  limits: { fileSize: MAX_SIZE },
+});
+
+export const agencyDocUpload = multer({
+  storage: makeRoleStorage(HS_AGENCY_DOCS_DIR),
+  fileFilter,
+  limits: { fileSize: MAX_SIZE },
+});

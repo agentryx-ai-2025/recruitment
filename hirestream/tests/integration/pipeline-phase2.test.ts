@@ -52,7 +52,14 @@ async function makeAgent(email: string, password: string, licenseNumber: string)
 
 async function makeEmployer(email: string, password: string): Promise<{ cookie: string[]; userId: string }> {
   const reg = await request(app).post('/api/v1/auth/register').send({ email, password, role: 'employer' });
-  return { cookie: reg.headers['set-cookie'] as unknown as string[], userId: reg.body.data.id };
+  const cookie = reg.headers['set-cookie'] as unknown as string[];
+  const userId = reg.body.data.id;
+  // v0.4.32: employer must be verified to publish requisitions. The
+  // employers row is auto-created at registration with verified=false;
+  // flip it here so the visibility-flow tests can post without the gate.
+  const db = getDb();
+  await db.execute(sql`UPDATE employers SET verified = true WHERE user_id = ${userId}`);
+  return { cookie, userId };
 }
 
 async function makeCandidate(email: string, password: string): Promise<string[]> {

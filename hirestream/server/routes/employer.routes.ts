@@ -5,14 +5,21 @@
  */
 
 import { Router } from "express";
+import path from "path";
+import fs from "fs/promises";
 import { protect } from "../middleware/auth.middleware";
 import { storage } from "../storage";
 import {
   jobs, applications, candidates, placements, recruitmentAgents, notifications, auditLog,
+  employers, employerDocuments,
 } from "@shared/schema";
 import { eq, and, inArray, desc, or, isNotNull } from "drizzle-orm";
 import { notify } from "../services/notification.service";
 import { logger } from "../config/logger.config";
+import {
+  employerDocUpload, verifyUploadedFile, handleUploadErrors,
+  HS_EMPLOYER_DOCS_DIR, UPLOAD_DIR,
+} from "../middleware/upload.middleware";
 
 const router = Router();
 router.use(protect);
@@ -23,6 +30,26 @@ router.use((req, res, next) => {
   }
   next();
 });
+
+// v0.4.32 (HPSEDC Item 1): allowed employer doc types — kept inline so the
+// route file is self-contained. Pair with the schema comment in shared/schema.
+const EMPLOYER_DOC_TYPES = [
+  "cin_certificate", "gst_certificate", "pan_card", "address_proof",
+  "signatory_id", "labour_permission", "agreement", "other",
+];
+
+// Helper: load the caller's employer row, or null. Auto-creates a stub row
+// for a logged-in employer who hasn't submitted KYB yet — without this, the
+// first PATCH /profile call would 404 because the row doesn't exist yet.
+async function getOrCreateEmployerRow(db: any, userId: string) {
+  const rows = await db.select().from(employers).where(eq(employers.userId, userId)).limit(1);
+  if (rows.length) return rows[0];
+  const created = await db.insert(employers).values({
+    userId,
+    companyName: "(pending)", // placeholder; will be filled by PATCH /profile
+  }).returning();
+  return created[0];
+}
 
 // Return the set of job IDs the employer "owns": their direct jobs + every
 // derivative (agent-picked-up) job whose parent requisition they posted.
@@ -345,5 +372,211 @@ router.patch("/placements/:id/welfare-note", async (req, res, next) => {
     res.json({ success: true });
   } catch (err) { next(err); }
 });
+
+// ─────────────────────────────────────────────────────────────────────
+// v0.4.32 (HPSEDC Item 1): Employer KYB profile + documents
+// ─────────────────────────────────────────────────────────────────────
+
+// GET own profile (auto-stubs the row on first read so the client always
+// has something to bind to).
+router.get("/profile", async (req, res, next) => {
+  try {
+    const db = storage.db;
+    if (!db) return res.status(500).json({ success: false });
+    const user = (req as any).user;
+    if (user.role !== "employer") return res.status(403).json({ success: false, message: "Employer-only" });
+    const row = await getOrCreateEmployerRow(db, user.id);
+    res.json({ success: true, data: row });
+  } catch (err) { next(err); }
+});
+
+// PATCH own profile — accept all KYB fields. Admin can also patch on
+// behalf of an employer using the same endpoint via :id (admin route below).
+router.patch("/profile", async (req, res, next) => {
+  try {
+    const db = storage.db;
+    if (!db) return res.status(500).json({ success: false });
+    const user = (req as any).user;
+    if (user.role !== "employer") return res.status(403).json({ success: false, message: "Employer-only" });
+
+    const row = await getOrCreateEmployerRow(db, user.id);
+    const allowed: any = {};
+    const fields = [
+      "companyName", "industry", "location",
+      "cin", "gst", "pan",
+      "registeredAddressLine1", "registeredAddressLine2", "registeredCity",
+      "registeredState", "registeredPinCode", "registeredCountry",
+      "contactEmail", "contactPhone",
+      "authorisedSignatoryName", "authorisedSignatoryDesignation",
+      "authorisedSignatoryIdType", "authorisedSignatoryIdNumber",
+    ];
+    for (const f of fields) {
+      if (req.body[f] !== undefined) allowed[f] = req.body[f];
+    }
+    if (Object.keys(allowed).length === 0) {
+      return res.status(400).json({ success: false, error: { code: 400, message: "No updatable fields supplied" } });
+    }
+
+    // Length sanity — kept loose; the client form enforces stricter rules.
+    if (allowed.companyName && (allowed.companyName.length < 2 || allowed.companyName.length > 150)) {
+      return res.status(400).json({ success: false, error: { code: 400, message: "Company name must be 2-150 chars" } });
+    }
+
+    const updated = await db.update(employers).set(allowed).where(eq(employers.id, row.id)).returning();
+    res.json({ success: true, data: updated[0] });
+  } catch (err) { next(err); }
+});
+
+// Submit profile + docs for admin review. Flips submittedForReviewAt and
+// clears any prior rejection reason. Idempotent — a second call after a
+// rejection re-submits. Auto-stubs the employer row so this endpoint is
+// always reachable from a freshly-registered account.
+router.post("/submit-for-review", async (req, res, next) => {
+  try {
+    const db = storage.db;
+    if (!db) return res.status(500).json({ success: false });
+    const user = (req as any).user;
+    if (user.role !== "employer") return res.status(403).json({ success: false, message: "Employer-only" });
+
+    const row = await getOrCreateEmployerRow(db, user.id);
+    if (row.verified) {
+      return res.status(400).json({ success: false, error: { code: 400, message: "Already verified" } });
+    }
+    // Require core KYB fields + at least one doc before allowing submit.
+    const missing: string[] = [];
+    if (!row.companyName || row.companyName === "(pending)") missing.push("Company name");
+    if (!row.cin) missing.push("CIN");
+    if (!row.pan) missing.push("PAN");
+    if (!row.contactEmail) missing.push("Contact email");
+    if (!row.authorisedSignatoryName) missing.push("Authorised signatory name");
+    if (missing.length) {
+      return res.status(400).json({
+        success: false,
+        error: { code: 400, message: `Complete these first: ${missing.join(", ")}` },
+      });
+    }
+    const docCount = await db.select({ id: employerDocuments.id }).from(employerDocuments)
+      .where(eq(employerDocuments.employerId, row.id));
+    if (docCount.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: { code: 400, message: "Upload at least one verification document before submitting." },
+      });
+    }
+    await db.update(employers).set({
+      submittedForReviewAt: new Date(),
+      rejectionReason: null,
+    }).where(eq(employers.id, row.id));
+    res.json({ success: true });
+  } catch (err) { next(err); }
+});
+
+// ── Documents ───────────────────────────────────────────────────────
+router.post("/documents",
+  employerDocUpload.single("file"), verifyUploadedFile,
+  async (req, res, next) => {
+    try {
+      const db = storage.db;
+      if (!db) return res.status(500).json({ success: false });
+      const user = (req as any).user;
+      if (user.role !== "employer") return res.status(403).json({ success: false, message: "Employer-only" });
+      if (!req.file) return res.status(400).json({ success: false, error: { code: 400, message: "No file uploaded" } });
+
+      const row = await getOrCreateEmployerRow(db, user.id);
+      const docType = req.body.type || "other";
+      if (!EMPLOYER_DOC_TYPES.includes(docType)) {
+        return res.status(400).json({ success: false, error: { code: 400, message: `Invalid type. Must be one of: ${EMPLOYER_DOC_TYPES.join(", ")}` } });
+      }
+
+      const inserted = await db.insert(employerDocuments).values({
+        employerId: row.id,
+        type: docType,
+        fileName: req.file.originalname,
+        fileUrl: `/uploads/hs/employers/docs/${req.file.filename}`,
+        fileSize: req.file.size,
+      }).returning();
+      logger.info(`Employer doc uploaded: ${inserted[0].id} by employer ${row.id}`);
+      res.status(201).json({ success: true, data: inserted[0] });
+    } catch (err) { next(err); }
+  },
+);
+
+router.get("/documents", async (req, res, next) => {
+  try {
+    const db = storage.db;
+    if (!db) return res.status(500).json({ success: false });
+    const user = (req as any).user;
+    if (user.role !== "employer") return res.status(403).json({ success: false, message: "Employer-only" });
+
+    const empRows = await db.select().from(employers).where(eq(employers.userId, user.id)).limit(1);
+    if (empRows.length === 0) return res.json({ success: true, data: [] });
+    const docs = await db.select().from(employerDocuments)
+      .where(eq(employerDocuments.employerId, empRows[0].id))
+      .orderBy(employerDocuments.uploadedAt);
+    res.json({ success: true, data: docs });
+  } catch (err) { next(err); }
+});
+
+router.delete("/documents/:id", async (req, res, next) => {
+  try {
+    const db = storage.db;
+    if (!db) return res.status(500).json({ success: false });
+    const user = (req as any).user;
+    if (user.role !== "employer") return res.status(403).json({ success: false, message: "Employer-only" });
+
+    const docRows = await db.select().from(employerDocuments).where(eq(employerDocuments.id, req.params.id)).limit(1);
+    if (docRows.length === 0) return res.status(404).json({ success: false });
+    const doc = docRows[0];
+    // Ownership check via employer row
+    const empRows = await db.select().from(employers).where(eq(employers.id, doc.employerId)).limit(1);
+    if (!empRows.length || empRows[0].userId !== user.id) {
+      return res.status(403).json({ success: false, message: "Not your document" });
+    }
+    // Can't delete an already-approved doc; admin owns that lifecycle.
+    if (doc.status === "approved") {
+      return res.status(400).json({ success: false, error: { code: 400, message: "Cannot remove an approved document. Contact admin." } });
+    }
+
+    // Disk cleanup (best-effort; URL is /uploads/hs/employers/docs/<file>)
+    const rel = (doc.fileUrl || "").replace(/^\/uploads\//, "");
+    const filePath = rel.startsWith("hs/")
+      ? path.join(UPLOAD_DIR, rel)
+      : path.join(HS_EMPLOYER_DOCS_DIR, path.basename(rel));
+    try { await fs.unlink(filePath); } catch { /* tolerate */ }
+
+    await db.delete(employerDocuments).where(eq(employerDocuments.id, doc.id));
+    res.json({ success: true });
+  } catch (err) { next(err); }
+});
+
+router.get("/documents/:id/download", async (req, res, next) => {
+  try {
+    const db = storage.db;
+    if (!db) return res.status(500).json({ success: false });
+    const user = (req as any).user;
+    const docRows = await db.select().from(employerDocuments).where(eq(employerDocuments.id, req.params.id)).limit(1);
+    if (docRows.length === 0) return res.status(404).json({ success: false });
+    const doc = docRows[0];
+    // Authorisation: the owning employer OR admin/superadmin
+    if (user.role === "employer") {
+      const empRows = await db.select().from(employers).where(eq(employers.id, doc.employerId)).limit(1);
+      if (!empRows.length || empRows[0].userId !== user.id) {
+        return res.status(403).json({ success: false });
+      }
+    } else if (!["admin", "superadmin"].includes(user.role)) {
+      return res.status(403).json({ success: false });
+    }
+    const rel = (doc.fileUrl || "").replace(/^\/uploads\//, "");
+    const filePath = rel.startsWith("hs/")
+      ? path.join(UPLOAD_DIR, rel)
+      : path.join(HS_EMPLOYER_DOCS_DIR, path.basename(rel));
+    try { await fs.access(filePath); } catch { return res.status(404).json({ success: false }); }
+    res.download(filePath, doc.fileName);
+  } catch (err) { next(err); }
+});
+
+// Multer-error catch — registered last so it sees errors from every
+// upload route in this file.
+router.use(handleUploadErrors);
 
 export default router;

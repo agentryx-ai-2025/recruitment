@@ -20,6 +20,7 @@ import {
   Copy, Trash2, PauseCircle, PlayCircle, ClipboardList, Route, Tag,
 } from "lucide-react";
 import { jobCategoryLabel } from "@/lib/reference-data";
+import { EmployerVerificationForm } from "@/components/employer/EmployerVerificationForm";
 
 async function fetchJson(url: string) {
   const res = await fetch(url);
@@ -57,6 +58,7 @@ export default function EmployerDashboard() {
   const { toast } = useToast();
   const { user } = useAuth();
   const [activeView, setActiveView] = useState("overview");
+  const [verifyOpen, setVerifyOpen] = useState(false);
   // Job list filter — settable by stat-card clicks (sidebar Quick Stats) so
   // "Closed", "Active", "All Posts" etc. open the My Jobs view already narrowed.
   // "all" = no filter. Persisted at dashboard level so switching tabs preserves it.
@@ -66,6 +68,14 @@ export default function EmployerDashboard() {
     queryKey: ["/api/v1/jobs", "employer-all", "mine"],
     queryFn: () => fetchJson("/api/v1/jobs?status=all&mine=true&limit=100"),
   });
+  // v0.4.32 (HPSEDC Item 1): pull KYB profile to drive the verification
+  // banner. Profile auto-stubs on first GET so a fresh employer still
+  // resolves to an object.
+  const { data: employerProfileRes } = useQuery({
+    queryKey: ["/api/v1/employer/profile"],
+    queryFn: () => fetchJson("/api/v1/employer/profile"),
+  });
+  const employerProfile = employerProfileRes?.data || {};
   const { data: notifsRes } = useQuery({
     queryKey: ["/api/v1/notifications"],
     queryFn: () => fetchJson("/api/v1/notifications?limit=10"),
@@ -100,8 +110,61 @@ export default function EmployerDashboard() {
     { key: "activity",     label: "Activity",             icon: Activity,        count: notifications.length, href: null },
   ];
 
+  // v0.4.32 (HPSEDC Item 1): verification status banner. Three states:
+  //   - verified            → no banner
+  //   - submitted, pending  → blue "under review" banner
+  //   - rejected or untouched → red/amber "complete verification" CTA
+  const isVerified = !!employerProfile.verified;
+  const isSubmitted = !isVerified && !!employerProfile.submittedForReviewAt;
+  const wasRejected = !isVerified && !!employerProfile.rejectionReason && !isSubmitted;
+
   return (
     <div className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 xl:px-8 2xl:px-12 py-5">
+      {!isVerified && (
+        <div className={`mb-4 rounded-xl border p-4 flex items-start gap-3 ${
+          isSubmitted ? "border-blue-200 bg-blue-50"
+          : wasRejected ? "border-red-200 bg-red-50"
+          : "border-amber-200 bg-amber-50"
+        }`}>
+          <AlertCircle className={`w-5 h-5 flex-shrink-0 mt-0.5 ${
+            isSubmitted ? "text-blue-600" : wasRejected ? "text-red-600" : "text-amber-600"
+          }`} />
+          <div className="flex-1 min-w-0">
+            <p className={`text-sm font-semibold ${
+              isSubmitted ? "text-blue-900" : wasRejected ? "text-red-900" : "text-amber-900"
+            }`}>
+              {isSubmitted ? "Verification under review"
+                : wasRejected ? "Verification was not approved"
+                : "Complete company verification"}
+            </p>
+            <p className={`text-xs mt-0.5 ${
+              isSubmitted ? "text-blue-700" : wasRejected ? "text-red-700" : "text-amber-700"
+            }`}>
+              {isSubmitted
+                ? `Submitted ${new Date(employerProfile.submittedForReviewAt).toLocaleDateString("en-IN")}. HPSEDC usually decides within 48 hours.`
+                : wasRejected
+                  ? `Reason: ${employerProfile.rejectionReason}. Update your submission and re-submit.`
+                  : "Upload your company documents and submit for HPSEDC review — required before you can publish requisitions."}
+            </p>
+          </div>
+          <Button size="sm" onClick={() => setVerifyOpen(true)} className="flex-shrink-0">
+            {isSubmitted ? "View details" : "Complete verification"}
+          </Button>
+        </div>
+      )}
+
+      <Dialog open={verifyOpen} onOpenChange={setVerifyOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Company Verification</DialogTitle>
+            <DialogDescription>
+              Provide your company KYB details + upload supporting documents. HPSEDC reviews submissions within 48 hours.
+            </DialogDescription>
+          </DialogHeader>
+          <EmployerVerificationForm onDone={() => setVerifyOpen(false)} />
+        </DialogContent>
+      </Dialog>
+
       {/* Mobile Nav */}
       <div className="lg:hidden mb-4">
         <div className="flex gap-1 overflow-x-auto bg-white rounded-xl border border-slate-200 p-1">

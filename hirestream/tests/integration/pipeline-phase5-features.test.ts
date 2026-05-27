@@ -39,6 +39,9 @@ async function makeAgent(email: string, lic: string): Promise<string[]> {
 }
 async function makeEmployer(email: string): Promise<string[]> {
   const reg = await request(app).post('/api/v1/auth/register').send({ email, password: 'Test@123', role: 'employer' });
+  // v0.4.32: pre-verify so the publish gate doesn't block tests
+  const db = getDb();
+  await db.execute(sql`UPDATE employers SET verified = true WHERE user_id = ${reg.body.data.id}`);
   return reg.headers['set-cookie'] as unknown as string[];
 }
 

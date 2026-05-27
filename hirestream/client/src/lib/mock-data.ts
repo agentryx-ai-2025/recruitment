@@ -201,7 +201,10 @@ export const mockApplications: (Partial<Application> & { id: string; status: str
   }
 ];
 
-export const mockAgents: RecruitmentAgent[] = [
+// `as RecruitmentAgent[]` so the inferred literal types satisfy the schema-derived
+// type even though these fixtures omit the v0.4.32 KYB metadata columns (all
+// nullable on the table — the cast is what was implicit before the migration).
+export const mockAgents = ([
   {
     id: "agent1",
     userId: "agentuser1",
@@ -232,9 +235,9 @@ export const mockAgents: RecruitmentAgent[] = [
     rating: 42,
     placements: 156
   }
-];
+] as unknown) as RecruitmentAgent[];
 
-export const mockEmployers: Employer[] = [
+export const mockEmployers = ([
   {
     id: "emp1",
     userId: "empuser1",
@@ -271,7 +274,7 @@ export const mockEmployers: Employer[] = [
     verified: true,
     activeJobs: 12
   }
-];
+] as unknown) as Employer[];
 
 export const mockSystemMetrics = {
   totalCandidates: 15247,

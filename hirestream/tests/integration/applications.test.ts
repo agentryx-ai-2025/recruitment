@@ -3,7 +3,7 @@ import request from 'supertest';
 import type { Express } from 'express';
 import { createTestApp, truncateAllTables, getDb } from '../helpers';
 import { recruitmentAgents, applications, interviews, placements } from '../../shared/schema';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 
 let app: Express;
 let agentCookie: string[];
@@ -471,6 +471,8 @@ describe('GET /api/v1/agent/placements — employer derivative scope', () => {
     const empReg = await request(app).post('/api/v1/auth/register')
       .send({ email: 'emp-pl@test.com', password: 'Test@123', role: 'employer' });
     const empCookie = empReg.headers['set-cookie'] as unknown as string[];
+    // v0.4.32: must verify before publish — same gate as production.
+    await db.execute(sql`UPDATE employers SET verified = true WHERE user_id = ${empReg.body.data.id}`);
 
     const reqRes = await request(app).post('/api/v1/jobs')
       .set('Cookie', empCookie)

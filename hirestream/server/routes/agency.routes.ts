@@ -1,10 +1,26 @@
 import { Router } from "express";
+import path from "path";
+import fs from "fs/promises";
 import { protect } from "../middleware/auth.middleware";
 import { storage } from "../storage";
 import { logger } from "../config/logger.config";
 import { insertRecruitmentAgentSchema, recruitmentAgents, candidates, agencyReviews,
-  candidateEducation, candidateExperience, documents, applications, jobs } from "@shared/schema";
+  candidateEducation, candidateExperience, documents, applications, jobs,
+  agencyDocuments } from "@shared/schema";
 import { eq } from "drizzle-orm";
+import {
+  agencyDocUpload, verifyUploadedFile, handleUploadErrors,
+  HS_AGENCY_DOCS_DIR, UPLOAD_DIR,
+} from "../middleware/upload.middleware";
+
+// v0.4.32 (HPSEDC Item 3): the 9 doc classes HPSEDC listed for an MEA RA
+// licensed agency, plus "other". Kept inline here so the route file is
+// self-contained.
+const AGENCY_DOC_TYPES = [
+  "mea_ra_license", "incorporation_certificate", "pan_card", "gst_certificate",
+  "address_proof", "signatory_id", "labour_permission", "experience_proof",
+  "agreement", "other",
+];
 
 const router = Router();
 
@@ -320,6 +336,173 @@ router.get("/leaderboard/top", async (_req, res, next) => {
     next(err);
   }
 });
+
+// ─────────────────────────────────────────────────────────────────────
+// v0.4.32 (HPSEDC Item 3): Agency KYB profile updates + documents
+// ─────────────────────────────────────────────────────────────────────
+
+// PATCH /me — agent updates their KYB fields (post-register fill-in).
+router.patch("/me", protect, async (req, res, next) => {
+  try {
+    const userId = (req.user as any)?.id;
+    if (!userId) return res.status(401).json({ success: false });
+    if ((req.user as any)?.role !== "agent") {
+      return res.status(403).json({ success: false, message: "Only agents have agency profiles." });
+    }
+    if (!storage.db) return res.status(500).json({ success: false });
+
+    const existing = await storage.db.select().from(recruitmentAgents).where(eq(recruitmentAgents.userId, userId)).limit(1);
+    if (!existing.length) return res.status(404).json({ success: false, message: "Register the agency first." });
+
+    const fields = [
+      "agencyName", "licenseNumber", "specializations",
+      "contactEmail", "contactPhone",
+      "registeredAddressLine1", "registeredAddressLine2", "registeredCity",
+      "registeredState", "registeredPinCode",
+      "authorisedSignatoryName", "authorisedSignatoryDesignation",
+      "meaLicenseExpiry",
+    ];
+    const update: any = {};
+    for (const f of fields) if (req.body[f] !== undefined) update[f] = req.body[f];
+    if (!Object.keys(update).length) {
+      return res.status(400).json({ success: false, message: "No updatable fields supplied" });
+    }
+    const updated = await storage.db.update(recruitmentAgents).set(update)
+      .where(eq(recruitmentAgents.id, existing[0].id)).returning();
+    res.json({ success: true, data: updated[0] });
+  } catch (err) { next(err); }
+});
+
+// Submit for admin review — same shape as employer flow.
+router.post("/submit-for-review", protect, async (req, res, next) => {
+  try {
+    const userId = (req.user as any)?.id;
+    if (!userId) return res.status(401).json({ success: false });
+    if ((req.user as any)?.role !== "agent") {
+      return res.status(403).json({ success: false, message: "Only agents" });
+    }
+    if (!storage.db) return res.status(500).json({ success: false });
+
+    const rows = await storage.db.select().from(recruitmentAgents).where(eq(recruitmentAgents.userId, userId)).limit(1);
+    if (!rows.length) return res.status(404).json({ success: false, message: "Register the agency first." });
+    if (rows[0].verified) return res.status(400).json({ success: false, error: { code: 400, message: "Already verified" } });
+
+    // Require MEA RA license doc before submit
+    const docs = await storage.db.select().from(agencyDocuments)
+      .where(eq(agencyDocuments.agencyId, rows[0].id));
+    const hasLicense = docs.some((d: any) => d.type === "mea_ra_license");
+    if (!hasLicense) {
+      return res.status(400).json({
+        success: false,
+        error: { code: 400, message: "Upload your MEA RA Licence before submitting for review." },
+      });
+    }
+    await storage.db.update(recruitmentAgents).set({
+      submittedForReviewAt: new Date(),
+      rejectionReason: null,
+    }).where(eq(recruitmentAgents.id, rows[0].id));
+    res.json({ success: true });
+  } catch (err) { next(err); }
+});
+
+// ── Documents (agent uploads, lists, deletes) ──
+router.post("/documents",
+  protect, agencyDocUpload.single("file"), verifyUploadedFile,
+  async (req, res, next) => {
+    try {
+      const userId = (req.user as any)?.id;
+      if (!userId) return res.status(401).json({ success: false });
+      if ((req.user as any)?.role !== "agent") return res.status(403).json({ success: false });
+      if (!storage.db) return res.status(500).json({ success: false });
+      if (!req.file) return res.status(400).json({ success: false, error: { code: 400, message: "No file uploaded" } });
+
+      const agentRows = await storage.db.select().from(recruitmentAgents).where(eq(recruitmentAgents.userId, userId)).limit(1);
+      if (!agentRows.length) return res.status(404).json({ success: false, message: "Register the agency first." });
+
+      const docType = req.body.type || "other";
+      if (!AGENCY_DOC_TYPES.includes(docType)) {
+        return res.status(400).json({ success: false, error: { code: 400, message: `Invalid type. Must be one of: ${AGENCY_DOC_TYPES.join(", ")}` } });
+      }
+      const inserted = await storage.db.insert(agencyDocuments).values({
+        agencyId: agentRows[0].id,
+        type: docType,
+        fileName: req.file.originalname,
+        fileUrl: `/uploads/hs/agencies/docs/${req.file.filename}`,
+        fileSize: req.file.size,
+      }).returning();
+      logger.info(`Agency doc uploaded: ${inserted[0].id} by agency ${agentRows[0].id}`);
+      res.status(201).json({ success: true, data: inserted[0] });
+    } catch (err) { next(err); }
+  },
+);
+
+router.get("/documents", protect, async (req, res, next) => {
+  try {
+    const userId = (req.user as any)?.id;
+    if (!userId) return res.status(401).json({ success: false });
+    if ((req.user as any)?.role !== "agent") return res.status(403).json({ success: false });
+    if (!storage.db) return res.status(500).json({ success: false });
+    const agentRows = await storage.db.select().from(recruitmentAgents).where(eq(recruitmentAgents.userId, userId)).limit(1);
+    if (!agentRows.length) return res.json({ success: true, data: [] });
+    const docs = await storage.db.select().from(agencyDocuments)
+      .where(eq(agencyDocuments.agencyId, agentRows[0].id))
+      .orderBy(agencyDocuments.uploadedAt);
+    res.json({ success: true, data: docs });
+  } catch (err) { next(err); }
+});
+
+router.delete("/documents/:id", protect, async (req, res, next) => {
+  try {
+    const userId = (req.user as any)?.id;
+    if (!userId) return res.status(401).json({ success: false });
+    if ((req.user as any)?.role !== "agent") return res.status(403).json({ success: false });
+    if (!storage.db) return res.status(500).json({ success: false });
+
+    const docRows = await storage.db.select().from(agencyDocuments).where(eq(agencyDocuments.id, req.params.id)).limit(1);
+    if (!docRows.length) return res.status(404).json({ success: false });
+    const doc = docRows[0];
+    const agentRows = await storage.db.select().from(recruitmentAgents).where(eq(recruitmentAgents.id, doc.agencyId)).limit(1);
+    if (!agentRows.length || agentRows[0].userId !== userId) {
+      return res.status(403).json({ success: false, message: "Not your document" });
+    }
+    if (doc.status === "approved") {
+      return res.status(400).json({ success: false, error: { code: 400, message: "Cannot remove an approved document. Contact admin." } });
+    }
+    const rel = (doc.fileUrl || "").replace(/^\/uploads\//, "");
+    const filePath = rel.startsWith("hs/")
+      ? path.join(UPLOAD_DIR, rel)
+      : path.join(HS_AGENCY_DOCS_DIR, path.basename(rel));
+    try { await fs.unlink(filePath); } catch { /* tolerate */ }
+    await storage.db.delete(agencyDocuments).where(eq(agencyDocuments.id, doc.id));
+    res.json({ success: true });
+  } catch (err) { next(err); }
+});
+
+router.get("/documents/:id/download", protect, async (req, res, next) => {
+  try {
+    if (!storage.db) return res.status(500).json({ success: false });
+    const user = req.user as any;
+    const docRows = await storage.db.select().from(agencyDocuments).where(eq(agencyDocuments.id, req.params.id)).limit(1);
+    if (!docRows.length) return res.status(404).json({ success: false });
+    const doc = docRows[0];
+    if (user.role === "agent") {
+      const agentRows = await storage.db.select().from(recruitmentAgents).where(eq(recruitmentAgents.id, doc.agencyId)).limit(1);
+      if (!agentRows.length || agentRows[0].userId !== user.id) {
+        return res.status(403).json({ success: false });
+      }
+    } else if (!["admin", "superadmin"].includes(user.role)) {
+      return res.status(403).json({ success: false });
+    }
+    const rel = (doc.fileUrl || "").replace(/^\/uploads\//, "");
+    const filePath = rel.startsWith("hs/")
+      ? path.join(UPLOAD_DIR, rel)
+      : path.join(HS_AGENCY_DOCS_DIR, path.basename(rel));
+    try { await fs.access(filePath); } catch { return res.status(404).json({ success: false }); }
+    res.download(filePath, doc.fileName);
+  } catch (err) { next(err); }
+});
+
+router.use(handleUploadErrors);
 
 export default router;
 

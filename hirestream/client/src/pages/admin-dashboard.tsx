@@ -18,6 +18,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { AgencyApprovalList } from "@/components/admin/agency-approval-list";
+import { KYBReviewList } from "@/components/admin/KYBReviewList";
 
 async function fetchJson(url: string) {
   const res = await fetch(url);
@@ -122,6 +123,7 @@ export default function AdminDashboard() {
         <TabsList className="bg-white border shadow-sm flex-wrap h-auto">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="agencies">Agencies</TabsTrigger>
+          <TabsTrigger value="employers">Employers</TabsTrigger>
           <TabsTrigger value="compliance">Compliance</TabsTrigger>
           <TabsTrigger value="welfare">Welfare SLA</TabsTrigger>
           <TabsTrigger value="reports">Reports</TabsTrigger>
@@ -298,8 +300,39 @@ export default function AdminDashboard() {
         </TabsContent>
 
         {/* ── Agencies Tab ─────────────────────────────── */}
+        {/* v0.4.32 (HPSEDC Item 3): swapped from minimal approve-only list to
+            full KYB doc review queue. The legacy AgencyApprovalList stays
+            exported but is no longer mounted — kept around for the e2e tests
+            that import it directly until they migrate. */}
         <TabsContent value="agencies">
-          <AgencyApprovalList />
+          <KYBReviewList subject={{
+            kind: "agency",
+            label: "Agency",
+            listUrl: "/api/v1/admin/agencies",
+            verifyUrl: (id) => `/api/v1/admin/agencies/${id}/verify`,
+            docsListUrl: (id) => `/api/v1/admin/agencies/${id}/documents`,
+            docVerifyUrl: (rowId, docId) => `/api/v1/admin/agencies/${rowId}/documents/${docId}`,
+            docDownloadUrl: (_rowId, docId) => `/api/v1/agencies/documents/${docId}/download`,
+            nameField: "agencyName",
+            secondaryLabel: "Licence",
+            secondaryField: "licenseNumber",
+          }} />
+        </TabsContent>
+
+        {/* ── Employers Tab (v0.4.32 HPSEDC Item 1) ────── */}
+        <TabsContent value="employers">
+          <KYBReviewList subject={{
+            kind: "employer",
+            label: "Company",
+            listUrl: "/api/v1/admin/employers",
+            verifyUrl: (id) => `/api/v1/admin/employers/${id}/verify`,
+            docsListUrl: (id) => `/api/v1/admin/employers/${id}/documents`,
+            docVerifyUrl: (rowId, docId) => `/api/v1/admin/employers/${rowId}/documents/${docId}`,
+            docDownloadUrl: (_rowId, docId) => `/api/v1/employer/documents/${docId}/download`,
+            nameField: "companyName",
+            secondaryLabel: "CIN",
+            secondaryField: "cin",
+          }} />
         </TabsContent>
 
         {/* ── Reports Tab ──────────────────────────────── */}

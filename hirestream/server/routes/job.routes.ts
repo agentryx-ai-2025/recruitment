@@ -57,6 +57,23 @@ router.post("/", protect, async (req, res, next) => {
       }
     }
 
+    // v0.4.32 (HPSEDC Item 1): same gate for employers, runtime-configurable
+    // via setting `employer.require_verification_to_post`. Drafts are still
+    // allowed so an unverified employer can prepare a requisition while their
+    // KYB is in review — the publish step is what gets blocked.
+    if (userRole === "employer") {
+      const { getSetting } = await import("../services/settings.service");
+      const requireVerified: boolean = await getSetting("employer.require_verification_to_post");
+      const isDraftPost = req.body?.isDraft === true;
+      if (requireVerified && !isDraftPost) {
+        const { employers } = await import("@shared/schema");
+        const empResult = await db.select().from(employers).where(eq(employers.userId, userId)).limit(1);
+        if (!empResult.length || !empResult[0].verified) {
+          return res.status(403).json({ success: false, error: { code: 403, message: "Your company must be verified before publishing requisitions. You can still save drafts." } });
+        }
+      }
+    }
+
     const isDraft = req.body?.isDraft === true;
     const { isDraft: _discard, ...payload } = req.body ?? {};
     // safeParse so Zod issues surface as a clean 400 with the first

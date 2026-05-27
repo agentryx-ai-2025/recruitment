@@ -91,6 +91,17 @@ export const SETTING_SPECS: SettingSpec[] = [
     default: true,
   },
   {
+    // v0.4.32 (HPSEDC Item 1): mirror gate for employers. Default ON so
+    // staging is HPSEDC-compliant out of the box; admins can flip OFF
+    // during early pilots if needed.
+    key: "employer.require_verification_to_post",
+    category: "access",
+    label: "Require company verification to publish requisitions",
+    description: "Unverified employers can save drafts but cannot publish requisitions until HPSEDC approves their company KYB.",
+    type: "boolean",
+    default: true,
+  },
+  {
     key: "drive.require_admin_approval",
     category: "access",
     label: "Require admin approval for drives",
