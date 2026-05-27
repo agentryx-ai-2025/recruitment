@@ -336,7 +336,12 @@ router.get("/interviews/:id.ics", async (req, res, next) => {
 router.get("/placements/:id/offer-letter.pdf", async (req, res, next) => {
   // Delegate to the agent endpoint — it already allows candidate-owner download.
   // Keeping a candidate-facing URL for discoverability.
-  res.redirect(`/api/v1/agent/placements/${req.params.id}/offer-letter.pdf`);
+  // v0.4.16: preserve `?token=` query param across the redirect so the
+  // mobile media-download path (Linking.openURL → device browser, no
+  // Authorization header) still authenticates after the redirect.
+  const token = typeof req.query.token === "string" ? req.query.token : null;
+  const target = `/api/v1/agent/placements/${req.params.id}/offer-letter.pdf${token ? `?token=${encodeURIComponent(token)}` : ""}`;
+  res.redirect(target);
 });
 
 // Catch multer-specific errors (LIMIT_FILE_SIZE → 413; file-filter type

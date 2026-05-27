@@ -25,7 +25,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { colors, spacing, radius, fontSize, fontWeight } from "../theme";
 import { api } from "../api";
-import { API_BASE_URL } from "../config";
+import { API_BASE_URL, STORAGE_KEYS } from "../config";
+import { getItem } from "../storage";
 
 interface ApplicationDetailProps {
   application: any;
@@ -68,6 +69,30 @@ export default function ApplicationDetailScreen({
   const ageDays = getAgingDays();
   const isStale = ageDays >= 14;
   const isAging = ageDays >= 7 && ageDays < 14;
+
+  // v0.4.16: viewing the offer-letter PDF needs the user's access token
+  // because Linking.openURL hands the URL to the device's default browser,
+  // which won't carry our Authorization header. We append ?token=... to
+  // the URL; the server's mobileBearer middleware now accepts that.
+  const handleViewOfferLetter = async () => {
+    if (!app.placement?.id) return;
+    try {
+      const token = await getItem(STORAGE_KEYS.ACCESS_TOKEN);
+      if (!token) {
+        Alert.alert("Please log in again", "Your session has expired. Sign in and try again.");
+        return;
+      }
+      const url = `${API_BASE_URL}/api/v1/me/placements/${app.placement.id}/offer-letter.pdf?token=${encodeURIComponent(token)}`;
+      const canOpen = await Linking.canOpenURL(url);
+      if (!canOpen) {
+        Alert.alert("Cannot open PDF", "Your device doesn't have a PDF viewer or browser available.");
+        return;
+      }
+      await Linking.openURL(url);
+    } catch (e: any) {
+      Alert.alert("Couldn't open offer letter", e?.message || "Please try again.");
+    }
+  };
 
   const handleWithdraw = () => {
     Alert.alert(
@@ -234,7 +259,7 @@ export default function ApplicationDetailScreen({
               <TouchableOpacity
                 style={styles.offerSecondaryBtn}
                 activeOpacity={0.8}
-                onPress={() => Linking.openURL(`${API_BASE_URL}/api/v1/me/placements/${app.placement.id}/offer-letter.pdf`)}
+                onPress={handleViewOfferLetter}
               >
                 <Ionicons name="document-text-outline" size={16} color={colors.primary} />
                 <Text style={styles.offerSecondaryText}>View offer letter (PDF)</Text>

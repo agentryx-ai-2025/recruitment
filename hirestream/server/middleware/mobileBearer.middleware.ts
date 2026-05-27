@@ -31,13 +31,32 @@ export interface MobileAccessPayload {
 }
 
 export async function mobileBearer(req: Request, res: Response, next: NextFunction) {
+  // v0.4.16: the mobile app opens media URLs (offer-letter PDF, CV
+  // download, etc.) via Linking.openURL — which hands the URL to the
+  // device's default browser. The browser doesn't carry the mobile
+  // app's Authorization header, so the request would 401. To make
+  // these download URLs usable, we ALSO accept the same mobile_access
+  // JWT in a `?token=...` query parameter. The token is the user's
+  // own short-lived access token (~15 min) so leak surface is small;
+  // we additionally set no-store + no-referrer headers on responses
+  // that serve media via this path. See /api/v1/me/placements/:id/
+  // offer-letter.pdf for one consumer.
   const header = req.headers.authorization;
-  if (!header?.startsWith("Bearer ")) return next(); // skip — falls through to session
+  const queryToken = typeof req.query.token === "string" ? req.query.token : null;
+
+  let rawToken: string | null = null;
+  if (header?.startsWith("Bearer ")) {
+    rawToken = header.slice(7);
+  } else if (queryToken) {
+    rawToken = queryToken;
+  }
+
+  if (!rawToken) return next(); // skip — falls through to session
 
   // If JWT_SECRET is not configured, bearer tokens can't be verified
   if (!env.JWT_SECRET) return next();
 
-  const token = header.slice(7);
+  const token = rawToken;
 
   try {
     const payload = jwt.verify(token, env.JWT_SECRET) as MobileAccessPayload;
@@ -58,6 +77,10 @@ export async function mobileBearer(req: Request, res: Response, next: NextFuncti
     // Mark this request as mobile-authenticated so downstream code can
     // distinguish if needed (e.g. audit log: "source: mobile")
     (req as any).isMobileAuth = true;
+    // Flag query-param auth so handlers can add no-store / no-referrer
+    // headers to media responses (the token shouldn't be cached or
+    // bounced via Referer to other origins).
+    (req as any).isMobileQueryAuth = !!queryToken && !header;
 
     return next();
   } catch (e: any) {

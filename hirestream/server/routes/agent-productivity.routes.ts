@@ -362,7 +362,21 @@ router.get("/placements/:id/offer-letter.pdf", async (req, res, next) => {
     }
 
     res.setHeader("Content-Type", "application/pdf");
-    res.setHeader("Content-Disposition", `attachment; filename="offer-letter-${c.fullName.replace(/\s+/g, "-").toLowerCase()}.pdf"`);
+    // v0.4.16: inline so mobile browsers preview the PDF in-place instead
+    // of silently downloading it. The "Download" intent in the UI is
+    // served by an explicit download link with `download` attribute on
+    // web, and by the system PDF viewer's share/save on mobile.
+    res.setHeader("Content-Disposition", `inline; filename="offer-letter-${c.fullName.replace(/\s+/g, "-").toLowerCase()}.pdf"`);
+
+    // If this request was authenticated via ?token= query (mobile media
+    // download path), tighten cache + referrer headers so the token in
+    // the URL doesn't get cached by intermediaries or bounced to other
+    // origins via the Referer header on subsequent navigations.
+    if ((req as any).isMobileQueryAuth) {
+      res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, private");
+      res.setHeader("Pragma", "no-cache");
+      res.setHeader("Referrer-Policy", "no-referrer");
+    }
 
     const doc = new PDFDocument({ size: "A4", margin: 56 });
     doc.pipe(res);

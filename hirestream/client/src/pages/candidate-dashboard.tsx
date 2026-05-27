@@ -442,13 +442,23 @@ function OverviewView({ appCount, shortlisted, docs, savedCount, completion, app
           everything to find the most actionable item in their life. */}
       <OffersBanner applications={applications} setActiveView={setActiveView} />
 
-      {/* Stat Cards — compact, aligned, info-rich */}
-      <motion.div variants={fadeUp} className="grid grid-cols-2 xl:grid-cols-4 gap-3">
-        <StatCard icon={Briefcase} gradient="from-blue-500 to-blue-600" lightBg="bg-blue-50" lightText="text-blue-600" value={appCount} label="Applications" subtitle={appCount === 0 ? "Browse jobs to apply" : `${appCount} submitted`} onClick={() => setActiveView("applications")} />
-        <StatCard icon={CheckCircle} gradient="from-emerald-500 to-emerald-600" lightBg="bg-emerald-50" lightText="text-emerald-600" value={shortlisted} label="Shortlisted" subtitle={shortlisted === 0 ? "None yet" : `${shortlisted} progressing`} onClick={() => setActiveView("applications")} />
-        <StatCard icon={Sparkles} gradient="from-amber-500 to-orange-500" lightBg="bg-amber-50" lightText="text-amber-600" value={recommendations.length} label="Recommended" subtitle={recommendations.length === 0 ? "Complete profile for matches" : "Based on your skills"} onClick={() => setActiveView("recommended")} />
-        <StatCard icon={FileText} gradient="from-purple-500 to-purple-600" lightBg="bg-purple-50" lightText="text-purple-600" value={docs} label="Documents" subtitle={docs === 0 ? "Upload CV to apply" : `${docs} uploaded`} onClick={() => setActiveView("documents")} />
-      </motion.div>
+      {/* Stat Cards — compact, aligned, info-rich
+          v0.4.16: added Offers card. UAT feedback: even with the hero
+          banner at the top, candidates wanted a stat-grid summary of
+          pending offers so they could see the count at a glance and
+          drill in. Grid now 2-up on mobile, 5-up on xl. */}
+      {(() => {
+        const offersCount = (applications ?? []).filter((a: any) => a.placement?.status === "offered").length;
+        return (
+          <motion.div variants={fadeUp} className="grid grid-cols-2 xl:grid-cols-5 gap-3">
+            <StatCard icon={Briefcase} gradient="from-blue-500 to-blue-600" lightBg="bg-blue-50" lightText="text-blue-600" value={appCount} label="Applications" subtitle={appCount === 0 ? "Browse jobs to apply" : `${appCount} submitted`} onClick={() => setActiveView("applications")} />
+            <StatCard icon={CheckCircle} gradient="from-emerald-500 to-emerald-600" lightBg="bg-emerald-50" lightText="text-emerald-600" value={shortlisted} label="Shortlisted" subtitle={shortlisted === 0 ? "None yet" : `${shortlisted} progressing`} onClick={() => setActiveView("applications")} />
+            <StatCard icon={Award} gradient="from-green-600 to-emerald-700" lightBg="bg-green-50" lightText="text-green-700" value={offersCount} label="Offers" subtitle={offersCount === 0 ? "None pending" : offersCount === 1 ? "Awaiting your response" : `${offersCount} awaiting response`} onClick={() => setActiveView("applications")} />
+            <StatCard icon={Sparkles} gradient="from-amber-500 to-orange-500" lightBg="bg-amber-50" lightText="text-amber-600" value={recommendations.length} label="Recommended" subtitle={recommendations.length === 0 ? "Complete profile for matches" : "Based on your skills"} onClick={() => setActiveView("recommended")} />
+            <StatCard icon={FileText} gradient="from-purple-500 to-purple-600" lightBg="bg-purple-50" lightText="text-purple-600" value={docs} label="Documents" subtitle={docs === 0 ? "Upload CV to apply" : `${docs} uploaded`} onClick={() => setActiveView("documents")} />
+          </motion.div>
+        );
+      })()}
 
       {/* Your Journey — 3 next steps */}
       <JourneyStrip profile={profile} completion={completion} docs={docs} education={education} experience={experience} applications={applications} setActiveView={setActiveView} />
