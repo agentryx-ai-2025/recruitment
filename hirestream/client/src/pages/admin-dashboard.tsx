@@ -9,7 +9,8 @@ import {
   Users, Briefcase, Handshake, Building, Download, Settings,
   UserCheck, BarChart3, Shield, TrendingUp, Activity, AlertTriangle,
   CheckCircle, Clock, FileText, MessageSquare, GraduationCap,
-  Loader2, Mail, Phone, Fingerprint, KeyRound, FolderLock, PlugZap, XCircle, Globe
+  Loader2, Mail, Phone, Fingerprint, KeyRound, FolderLock, PlugZap, XCircle, Globe,
+  Printer,
 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -2108,6 +2109,9 @@ function AdminReport({ title, desc, endpoint, kind }: { title: string; desc: str
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState<any>(null);
+  // Each report card gets a unique DOM id so the print handler can
+  // isolate its content (vs printing the entire admin console).
+  const reportId = `admin-report-${endpoint}`;
 
   const fetchReport = async () => {
     setLoading(true);
@@ -2124,16 +2128,92 @@ function AdminReport({ title, desc, endpoint, kind }: { title: string; desc: str
     }
   };
 
+  const handleExportCsv = () => {
+    if (!data) return;
+    try {
+      const csv = reportToCsv(kind, data);
+      const stamp = new Date().toISOString().slice(0, 10);
+      const filename = `hirestream-${endpoint}-${stamp}.csv`;
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = filename;
+      document.body.appendChild(a); a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast({ title: "Exported", description: filename });
+    } catch (e: any) {
+      toast({ title: "Couldn't export CSV", description: e?.message ?? "—", variant: "destructive" });
+    }
+  };
+
+  const handlePrint = () => {
+    if (!data) return;
+    // Open a new window with just this report rendered in a clean,
+    // print-optimised layout and trigger the browser print dialog.
+    // Using innerHTML of the existing DOM node is the simplest path —
+    // recharts SVGs survive the copy and Chrome prints them fine.
+    const node = document.getElementById(reportId);
+    if (!node) return;
+    const win = window.open("", "_blank", "width=1024,height=768");
+    if (!win) {
+      toast({ title: "Popup blocked", description: "Allow popups to print this report.", variant: "destructive" });
+      return;
+    }
+    const today = new Date().toLocaleDateString("en-IN", { year: "numeric", month: "long", day: "numeric" });
+    win.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${title} — HireStream</title>
+      <style>
+        * { box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; color: #1e293b; padding: 24px 32px; }
+        header { border-bottom: 2px solid #1d4ed8; padding-bottom: 12px; margin-bottom: 18px; display: flex; justify-content: space-between; align-items: baseline; }
+        header h1 { font-size: 20px; font-weight: 800; color: #0f172a; margin: 0; }
+        header .sub { font-size: 11px; color: #64748b; }
+        header .brand { font-size: 11px; color: #64748b; }
+        h4, p.report-desc { display: none; }
+        table { width: 100%; border-collapse: collapse; font-size: 12px; }
+        th { background: #f1f5f9; padding: 6px 10px; text-align: left; font-size: 10px; text-transform: uppercase; color: #64748b; border-bottom: 1px solid #cbd5e1; }
+        td { padding: 5px 10px; border-bottom: 1px solid #e2e8f0; }
+        .tabular-nums { font-variant-numeric: tabular-nums; }
+        button { display: none !important; }
+        footer { margin-top: 24px; padding-top: 10px; border-top: 1px solid #e2e8f0; font-size: 10px; color: #94a3b8; display: flex; justify-content: space-between; }
+        @media print { @page { size: A4 landscape; margin: 12mm; } body { padding: 0; } }
+      </style></head>
+      <body>
+        <header>
+          <div>
+            <h1>${title}</h1>
+            <div class="sub">${desc}</div>
+          </div>
+          <div class="brand">HireStream · HPSEDC Overseas Placement · ${today}</div>
+        </header>
+        <main>${node.innerHTML}</main>
+        <footer>
+          <span>HireStream Admin Report — ${endpoint}</span>
+          <span>Government of Himachal Pradesh · HPSEDC</span>
+        </footer>
+        <script>window.onload = () => setTimeout(() => window.print(), 250);</script>
+      </body></html>`);
+    win.document.close();
+  };
+
   return (
     <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
       <div className="p-5 flex items-start justify-between flex-wrap gap-3">
         <div className="min-w-0">
           <h4 className="font-semibold text-gray-900">{title}</h4>
-          <p className="text-sm text-gray-500 mt-0.5">{desc}</p>
+          <p className="text-sm text-gray-500 mt-0.5 report-desc">{desc}</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           {open && data && (
-            <Button size="sm" variant="ghost" onClick={() => setOpen(false)}>Hide</Button>
+            <>
+              <Button size="sm" variant="outline" onClick={handleExportCsv} title="Download CSV of this report's data">
+                <Download className="w-4 h-4 mr-1" /> Export CSV
+              </Button>
+              <Button size="sm" variant="outline" onClick={handlePrint} title="Open a print-friendly view of this report">
+                <Printer className="w-4 h-4 mr-1" /> Print
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => setOpen(false)}>Hide</Button>
+            </>
           )}
           <Button size="sm" variant="outline" onClick={fetchReport} disabled={loading}>
             {loading
@@ -2143,12 +2223,68 @@ function AdminReport({ title, desc, endpoint, kind }: { title: string; desc: str
         </div>
       </div>
       {open && data && (
-        <div className="px-5 pb-5 border-t border-slate-100 pt-4">
+        <div id={reportId} className="px-5 pb-5 border-t border-slate-100 pt-4">
           <AdminReportBody kind={kind} data={data} />
         </div>
       )}
     </div>
   );
+}
+
+// Convert a report's response payload to CSV. Each report shape is
+// handled explicitly so we always emit clean, human-readable column
+// names rather than the raw API field names.
+function reportToCsv(kind: AdminReportKind, data: any): string {
+  const esc = (v: any): string => {
+    if (v === null || v === undefined) return "";
+    const s = Array.isArray(v) ? v.join("; ") : typeof v === "object" ? JSON.stringify(v) : String(v);
+    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+  const rowsToCsv = (headers: string[], rows: any[][]) => [headers.map(esc).join(","), ...rows.map(r => r.map(esc).join(","))].join("\n");
+
+  if (kind === "district") {
+    const rows: any[] = Array.isArray(data) ? data : [];
+    return rowsToCsv(["District", "Candidates", "Applications", "Placements"],
+      rows.map(r => [r.district, r.candidates, r.applications, r.placements]));
+  }
+  if (kind === "country") {
+    const rows: any[] = Array.isArray(data) ? data : [];
+    return rowsToCsv(["Country", "Total Jobs", "Total Applications", "Placements", "Avg Match Score"],
+      rows.map(r => [r.country, r.total_jobs, r.total_applications, r.placements, r.avg_match_score ?? ""]));
+  }
+  if (kind === "funnel") {
+    const funnel: any[] = data?.funnel ?? [];
+    const summary = data?.summary ?? {};
+    const out: string[] = [];
+    out.push("Section,Key,Value");
+    out.push(`Summary,Registered,${esc(summary.registered ?? 0)}`);
+    out.push(`Summary,Applied,${esc(summary.applied ?? 0)}`);
+    out.push(`Summary,Placed,${esc(summary.placed ?? 0)}`);
+    out.push("");
+    out.push("Status,Count");
+    funnel.forEach((f: any) => out.push(`${esc(f.status)},${esc(f.count)}`));
+    return out.join("\n");
+  }
+  if (kind === "agency") {
+    const rows: any[] = Array.isArray(data) ? data : [];
+    return rowsToCsv(["Agency", "Verified", "Rating", "Total Jobs", "Applications", "Selections", "Placements", "Avg Match Score"],
+      rows.map(r => [r.agency_name, r.verified ? "Yes" : "No", r.rating ?? "", r.total_jobs, r.total_applications, r.selections, r.placements, r.avg_match_score ?? ""]));
+  }
+  if (kind === "skill") {
+    const demand: any[] = data?.demand ?? [];
+    const supply: any[] = data?.supply ?? [];
+    const out: string[] = [];
+    out.push("Section,Skill,Count");
+    demand.forEach((d: any) => out.push(`Demand (jobs),${esc(d.skill)},${esc(d.job_count)}`));
+    supply.forEach((s: any) => out.push(`Supply (candidates),${esc(s.skill)},${esc(s.candidate_count)}`));
+    return out.join("\n");
+  }
+  if (kind === "sector") {
+    const rows: any[] = Array.isArray(data) ? data : [];
+    return rowsToCsv(["Company / Sector", "Total Jobs", "Total Applications", "Placements"],
+      rows.map(r => [r.sector, r.total_jobs, r.total_applications, r.placements]));
+  }
+  return "kind,data\n" + esc(kind) + "," + esc(JSON.stringify(data));
 }
 
 function AdminReportBody({ kind, data }: { kind: AdminReportKind; data: any }) {
