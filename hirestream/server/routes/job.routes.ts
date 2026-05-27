@@ -763,9 +763,25 @@ router.get("/:id/applicants", protect, async (req, res, next) => {
       }
     }
 
+    // v0.4.34 (Phase 4): batch-fetch the latest interview row per
+    // application so the agent UI can show "candidate confirmed / asked
+    // to reschedule / declined" badges without N+1 queries.
+    const { interviews: interviewsTable } = await import("@shared/schema");
+    const latestInterviewByApp: Record<string, any> = {};
+    if (appIds.length > 0) {
+      const intRows = await db.select().from(interviewsTable)
+        .where(inArray(interviewsTable.applicationId, appIds))
+        .orderBy(desc(interviewsTable.scheduledAt));
+      // First (newest scheduled_at) per application wins
+      for (const r of intRows as any[]) {
+        if (!latestInterviewByApp[r.applicationId]) latestInterviewByApp[r.applicationId] = r;
+      }
+    }
+
     const applicants = result.map((row: any) => {
       const stageEnteredAt = stageEntries[row.application.id] ?? row.application.appliedAt;
       const daysInStage = stageEnteredAt ? Math.floor((Date.now() - new Date(stageEnteredAt).getTime()) / 86_400_000) : null;
+      const iv = latestInterviewByApp[row.application.id] || null;
       return {
         applicationId: row.application.id,
         status: row.application.status,
@@ -783,6 +799,21 @@ router.get("/:id/applicants", protect, async (req, res, next) => {
           skills: row.candidate.skills,
           photoUrl: row.candidate.photoUrl,
         },
+        // v0.4.34: latest interview summary so the row can render badges
+        // for confirmation status, reschedule requests, and declines.
+        interview: iv ? {
+          id: iv.id,
+          scheduledAt: iv.scheduledAt,
+          mode: iv.mode,
+          location: iv.location,
+          interviewerName: iv.interviewerName,
+          meetingLink: iv.meetingLink,
+          candidateConfirmedStatus: iv.candidateConfirmedStatus,
+          candidateConfirmedAt: iv.candidateConfirmedAt,
+          candidateRescheduleReason: iv.candidateRescheduleReason,
+          candidateProposedAt: iv.candidateProposedAt,
+          candidateDeclineReason: iv.candidateDeclineReason,
+        } : null,
       };
     });
 

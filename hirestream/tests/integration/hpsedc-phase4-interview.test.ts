@@ -1,0 +1,177 @@
+/**
+ * Phase 4 — Candidate interview workflow (v0.4.34).
+ *
+ * Coverage:
+ *  - GET /api/v1/me/interviews/:id returns interview details for owning candidate
+ *  - POST confirm flips status to "confirmed" + notifies agent
+ *  - POST reschedule validates reason length + future-only proposedAt + notifies agent
+ *  - POST decline requires reason + flips status + notifies agent
+ *  - Non-owning candidate cannot operate on someone else's interview
+ *  - Agent's /jobs/:id/applicants response includes interview.candidateConfirmedStatus
+ *  - .ics download still works after the workflow additions (regression)
+ */
+import { describe, beforeAll, beforeEach, it, expect } from '@jest/globals';
+import request from 'supertest';
+import type { Express } from 'express';
+import { sql } from 'drizzle-orm';
+import { createTestApp, truncateAllTables, getDb } from '../helpers';
+import { interviews, applications, jobs as jobsTable, candidates, recruitmentAgents } from '../../shared/schema';
+import { eq } from 'drizzle-orm';
+
+let app: Express;
+let agentCookie: string[];
+let agentUserId: string;
+let candidateCookie: string[];
+let candidateUserId: string;
+let candidateId: string;
+let jobId: string;
+let applicationId: string;
+let interviewId: string;
+
+beforeAll(async () => {
+  app = createTestApp();
+});
+
+beforeEach(async () => {
+  await truncateAllTables();
+  const db = getDb();
+
+  const aReg = await request(app).post('/api/v1/auth/register').send({ email: 'ag.iv@test.com', password: 'Test@123', role: 'agent' });
+  agentCookie = aReg.headers['set-cookie'] as unknown as string[];
+  agentUserId = aReg.body.data.id;
+  await request(app).post('/api/v1/agencies/register').set('Cookie', agentCookie)
+    .send({ agencyName: 'IV Agency', licenseNumber: 'LIC-IV', specializations: ['IT'] });
+  await db.execute(sql`UPDATE recruitment_agents SET verified = true WHERE user_id = ${agentUserId}`);
+
+  const cReg = await request(app).post('/api/v1/auth/register').send({ email: 'cand.iv@test.com', password: 'Test@123', role: 'candidate' });
+  candidateCookie = cReg.headers['set-cookie'] as unknown as string[];
+  candidateUserId = cReg.body.data.id;
+  await request(app).patch('/api/v1/candidates/profile').set('Cookie', candidateCookie)
+    .send({ fullName: 'Interview Cand', email: 'cand.iv@test.com', skills: ['React'], experience: 3 });
+  const cRow = (await db.execute(sql`SELECT id FROM candidates WHERE user_id = ${candidateUserId}`) as any).rows?.[0]
+    ?? (await db.execute(sql`SELECT id FROM candidates WHERE user_id = ${candidateUserId}`) as any)[0];
+  candidateId = cRow.id;
+
+  const jobRes = await request(app).post('/api/v1/jobs').set('Cookie', agentCookie).send({
+    title: 'Senior Engineer', company: 'TestCo', location: 'Toronto', country: 'Canada',
+    skills: ['React'], experience: 2, category: 'it', description: 'Build stuff',
+  });
+  jobId = jobRes.body.data.id;
+
+  const applyRes = await request(app).post(`/api/v1/jobs/${jobId}/apply`).set('Cookie', candidateCookie);
+  applicationId = applyRes.body.data.id;
+
+  // Insert an interview row directly — simulates what the agent's
+  // "Schedule Interview" modal does. Schedule a week out so it counts
+  // as future.
+  const future = new Date(Date.now() + 7 * 86400 * 1000);
+  const ivIns = await db.insert(interviews).values({
+    applicationId,
+    scheduledAt: future,
+    mode: 'virtual',
+    location: 'Zoom call',
+    meetingLink: 'https://zoom.us/j/abc',
+    interviewerName: 'Sarah Recruiter',
+  }).returning();
+  interviewId = ivIns[0].id;
+
+  // Move application status to interview_scheduled
+  await db.update(applications).set({ status: 'interview_scheduled' }).where(eq(applications.id, applicationId));
+});
+
+describe('Phase 4 — GET /api/v1/me/interviews/:id', () => {
+  it('returns the interview for the owning candidate', async () => {
+    const r = await request(app).get(`/api/v1/me/interviews/${interviewId}`).set('Cookie', candidateCookie);
+    expect(r.status).toBe(200);
+    expect(r.body.data.id).toBe(interviewId);
+    expect(r.body.data.interviewerName).toBe('Sarah Recruiter');
+    expect(r.body.data.meetingLink).toBe('https://zoom.us/j/abc');
+  });
+
+  it('a different candidate cannot fetch this interview', async () => {
+    const otherReg = await request(app).post('/api/v1/auth/register').send({ email: 'other@test.com', password: 'Test@123', role: 'candidate' });
+    const otherCookie = otherReg.headers['set-cookie'] as unknown as string[];
+    await request(app).patch('/api/v1/candidates/profile').set('Cookie', otherCookie)
+      .send({ fullName: 'Other', email: 'other@test.com' });
+    const r = await request(app).get(`/api/v1/me/interviews/${interviewId}`).set('Cookie', otherCookie);
+    expect(r.status).toBe(404);
+  });
+});
+
+describe('Phase 4 — confirm / reschedule / decline', () => {
+  it('POST confirm sets candidateConfirmedStatus and writes notification for agent', async () => {
+    const r = await request(app).post(`/api/v1/me/interviews/${interviewId}/confirm`).set('Cookie', candidateCookie);
+    expect(r.status).toBe(200);
+    expect(r.body.data.candidateConfirmedStatus).toBe('confirmed');
+    expect(r.body.data.candidateConfirmedAt).toBeTruthy();
+
+    const notifs = await request(app).get('/api/v1/notifications').set('Cookie', agentCookie);
+    expect(notifs.status).toBe(200);
+    const titles = (notifs.body.data as any[]).map((n) => String(n.title));
+    expect(titles.some((t) => t.includes('confirmed interview'))).toBe(true);
+  });
+
+  it('POST reschedule requires a reason (min 5 chars)', async () => {
+    const r1 = await request(app).post(`/api/v1/me/interviews/${interviewId}/reschedule`)
+      .set('Cookie', candidateCookie).send({ reason: 'ok' });
+    expect(r1.status).toBe(400);
+
+    const r2 = await request(app).post(`/api/v1/me/interviews/${interviewId}/reschedule`)
+      .set('Cookie', candidateCookie).send({ reason: 'Visa appointment that day' });
+    expect(r2.status).toBe(200);
+    expect(r2.body.data.candidateConfirmedStatus).toBe('reschedule_requested');
+    expect(r2.body.data.candidateRescheduleReason).toMatch(/Visa/);
+  });
+
+  it('POST reschedule rejects past proposedAt', async () => {
+    const past = new Date(Date.now() - 86400 * 1000).toISOString();
+    const r = await request(app).post(`/api/v1/me/interviews/${interviewId}/reschedule`)
+      .set('Cookie', candidateCookie).send({ reason: 'Need different date', proposedAt: past });
+    expect(r.status).toBe(400);
+  });
+
+  it('POST decline requires a reason and flips status', async () => {
+    const r = await request(app).post(`/api/v1/me/interviews/${interviewId}/decline`)
+      .set('Cookie', candidateCookie).send({ reason: 'Accepted another offer at a different company' });
+    expect(r.status).toBe(200);
+    expect(r.body.data.candidateConfirmedStatus).toBe('declined');
+    expect(r.body.data.candidateDeclineReason).toMatch(/Accepted/);
+
+    const notifs = await request(app).get('/api/v1/notifications').set('Cookie', agentCookie);
+    const titles = (notifs.body.data as any[]).map((n) => String(n.title));
+    expect(titles.some((t) => t.includes('declined interview'))).toBe(true);
+  });
+});
+
+describe('Phase 4 — agent applicants endpoint surfaces interview status', () => {
+  it('GET /jobs/:id/applicants includes interview.candidateConfirmedStatus after candidate confirms', async () => {
+    await request(app).post(`/api/v1/me/interviews/${interviewId}/confirm`).set('Cookie', candidateCookie);
+    const r = await request(app).get(`/api/v1/jobs/${jobId}/applicants`).set('Cookie', agentCookie);
+    expect(r.status).toBe(200);
+    const row = (r.body.data as any[]).find((a) => a.applicationId === applicationId);
+    expect(row.interview).toBeDefined();
+    expect(row.interview.candidateConfirmedStatus).toBe('confirmed');
+    expect(row.interview.interviewerName).toBe('Sarah Recruiter');
+  });
+
+  it('agent sees reschedule reason after candidate requests one', async () => {
+    await request(app).post(`/api/v1/me/interviews/${interviewId}/reschedule`)
+      .set('Cookie', candidateCookie).send({ reason: 'Doctor appointment that morning' });
+    const r = await request(app).get(`/api/v1/jobs/${jobId}/applicants`).set('Cookie', agentCookie);
+    const row = (r.body.data as any[]).find((a) => a.applicationId === applicationId);
+    expect(row.interview.candidateConfirmedStatus).toBe('reschedule_requested');
+    expect(row.interview.candidateRescheduleReason).toMatch(/Doctor/);
+  });
+});
+
+describe('Phase 4 — .ics export regression', () => {
+  it('GET /api/v1/me/interviews/:id.ics returns valid calendar content', async () => {
+    const r = await request(app).get(`/api/v1/me/interviews/${interviewId}.ics`).set('Cookie', candidateCookie);
+    expect(r.status).toBe(200);
+    expect(String(r.headers['content-type'] || '')).toMatch(/text\/calendar/);
+    const body = String(r.text);
+    expect(body).toMatch(/BEGIN:VCALENDAR/);
+    expect(body).toMatch(/SUMMARY:Interview/);
+    expect(body).toMatch(/END:VCALENDAR/);
+  });
+});

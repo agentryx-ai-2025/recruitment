@@ -162,9 +162,19 @@ router.get("/applications", protect, async (req, res, next) => {
           salary: p.salary, visaStatus: p.visaStatus,
           appointmentLetterUrl: p.appointmentLetterUrl, declineReason: p.declineReason,
         } : null,
-        // Next scheduled interview for this application
+        // Next scheduled interview for this application.
+        // v0.4.34 (Phase 4): added interviewerName, meetingLink, and the
+        // candidate-confirmation workflow fields so the candidate UI can
+        // render the full interview panel + Confirm / Reschedule / Decline
+        // controls without an extra GET round-trip.
         nextInterview: i ? {
           id: i.id, scheduledAt: i.scheduledAt, location: i.location, mode: i.mode, result: i.result,
+          interviewerName: i.interviewerName, meetingLink: i.meetingLink,
+          candidateConfirmedStatus: i.candidateConfirmedStatus,
+          candidateConfirmedAt: i.candidateConfirmedAt,
+          candidateRescheduleReason: i.candidateRescheduleReason,
+          candidateProposedAt: i.candidateProposedAt,
+          candidateDeclineReason: i.candidateDeclineReason,
         } : null,
       };
     });

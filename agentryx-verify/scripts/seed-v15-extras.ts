@@ -971,6 +971,50 @@ const rows: Row[] = [
       "5. As superadmin, open Audit Log → filter resourceType=setting + prefix matching. Confirm the change is logged with actor + before/after.",
     ].join("\n"),
     expectedResult: "End-to-end live-effect of admin tuning. No deploy, no restart, no DB script. Audit log entry survives the page refresh and links back to the admin user." },
+
+  // ── v0.4.34 (Phase 4 — Interview workflow UX) ────────────────────────
+  { itemRef: "C1.48", section: 1, sectionTitle: SECTIONS[1],
+    description: "Candidate interview panel renders details (date, time, mode, location/link, interviewer)",
+    testSteps: "As demo_candidate, open My Applications → an application in 'Interview' stage. Inspect the cyan-bordered panel below the match score.",
+    expectedResult: "Shows: day-of-week + full date, time with timezone, virtual badge OR location, interviewer name, meeting link (clickable, opens new tab). No more 'just a static label' — all the fields recruiters were supposed to be sending are now surfaced." },
+  { itemRef: "C1.49", section: 1, sectionTitle: SECTIONS[1],
+    description: "Candidate can Confirm attendance — one click, fires agent notification",
+    testSteps: "On the interview panel, click 'Confirm attendance'.",
+    expectedResult: "Toast 'Attendance confirmed'. Banner badge flips to '✓ You confirmed'. Behind the scenes: POST /api/v1/me/interviews/:id/confirm sets candidateConfirmedStatus='confirmed' + candidateConfirmedAt, and the owning agent receives an in-app notification 'Candidate confirmed interview'." },
+  { itemRef: "C1.50", section: 1, sectionTitle: SECTIONS[1],
+    description: "Candidate can Request reschedule — reason required, optional alternate slot picker",
+    testSteps: "On the interview panel, click 'Request reschedule'. Try saving with empty reason (rejected). Type a reason (5+ chars) and an alternate datetime. Save.",
+    expectedResult: "Empty reason → 400 with 'Reason required'. Valid reason → toast 'Reschedule requested'. Banner flips to '⏰ Reschedule requested' with the reason + proposed time shown. Past proposedAt → 400 'Proposed time must be in the future'. Agent receives 'Candidate requested a reschedule for interview' notification with the reason in the message." },
+  { itemRef: "C1.51", section: 1, sectionTitle: SECTIONS[1],
+    description: "Candidate can Decline interview — reason required, withdraws from this round",
+    testSteps: "On the interview panel, click 'Decline'. Confirm with a reason.",
+    expectedResult: "Banner flips to red '✗ Declined' with reason shown. Agent receives 'Candidate declined interview' notification with the reason. Severity=warning on the notification record. Candidate can flip back via 'Confirm original time instead' button if they change their mind." },
+  { itemRef: "C1.52", section: 1, sectionTitle: SECTIONS[1],
+    description: ".ics calendar export — single-click download, valid iCalendar format",
+    testSteps: "Click 'Add to calendar (.ics)' on the interview panel. Open the file in Google Calendar / Apple Calendar / Outlook.",
+    expectedResult: "Downloads as interview-<id>.ics. Opens with correct date/time/title/location. (Pre-existing endpoint, regression-verified after the workflow additions.)" },
+  { itemRef: "A2.58", section: 2, sectionTitle: SECTIONS[2],
+    description: "Agent sees candidate's interview response as a badge on the applicant row",
+    testSteps: "As demo_agent, open the job whose candidate just confirmed. Look at the row in the applicants list (status=interview_scheduled).",
+    expectedResult: "An emerald 'Confirmed' badge appears next to the 'Interview Scheduled' pill. Amber 'Reschedule' badge if they asked to reschedule (hover shows reason). Red 'Declined' badge with reason on hover if declined. Same badges show on the cross-job /agent/applicants aggregate view." },
+  { itemRef: "A2.59", section: 2, sectionTitle: SECTIONS[2],
+    description: "Agent /jobs/:id/applicants endpoint now returns interview metadata in each row",
+    testSteps: "curl -b 'connect.sid=…' https://hirestream-stg.agentryx.dev/api/v1/jobs/<id>/applicants",
+    expectedResult: "Each applicant row has interview = { id, scheduledAt, mode, location, interviewerName, meetingLink, candidateConfirmedStatus, candidateConfirmedAt, candidateRescheduleReason, candidateProposedAt, candidateDeclineReason } OR interview = null if no interview has been scheduled." },
+  { itemRef: "E9.15", section: 9, sectionTitle: SECTIONS[9],
+    description: "Flow G — Interview lifecycle end-to-end: schedule → confirm → reschedule → decline",
+    testSteps: [
+      "1. As demo_agent, schedule an interview for Arjun Sharma on the 'Software Developer (Siemens)' job. Pick virtual mode, fill meeting link + interviewer name.",
+      "2. Log in as demo_candidate. Open the application. Confirm the interview details render (date, time, link, interviewer).",
+      "3. Click 'Confirm attendance'. Verify the green badge appears and the agent receives a notification.",
+      "4. Log in as demo_agent. Confirm the 'Confirmed' badge shows next to the candidate's row.",
+      "5. Switch back to candidate. Click 'Request reschedule' with reason 'Visa appointment that morning'. Save.",
+      "6. Verify status flips to amber 'Reschedule requested' on both candidate and agent sides.",
+      "7. Switch to candidate. Click 'Decline' with reason 'Found a better role'.",
+      "8. Verify red 'Declined' badge surfaces on the agent side with the reason on hover.",
+      "9. Download the .ics from any state — file opens cleanly in calendar app.",
+    ].join("\n"),
+    expectedResult: "All 9 steps succeed. Notifications fire on every candidate-side action. Badges + reasons surface bidirectionally. Agent has full visibility into who's coming + who's not without phone-tagging." },
 ];
 
 async function main() {
@@ -980,7 +1024,7 @@ async function main() {
     [project] = await db.insert(projects).values({
       slug,
       name: "HireStream — Beyond-FRS Enhancements (v1.5)",
-      buildRef: "v2.0.0",
+      buildRef: "v2.1.0",
       contractor: "HTIS",
       client: "HPSEDC",
       description:
@@ -991,7 +1035,7 @@ async function main() {
     // Update name/description in case reviewers see the old one
     await db.update(projects).set({
       name: "HireStream — Beyond-FRS Enhancements (v1.5)",
-      buildRef: "v2.0.0",
+      buildRef: "v2.1.0",
       description:
         "Value-add features delivered above the contracted FRS scope. Organised by stakeholder role so each reviewer can sign off the sections relevant to their domain.",
     }).where(eq(projects.id, project.id));

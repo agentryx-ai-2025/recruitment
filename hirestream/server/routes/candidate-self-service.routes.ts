@@ -19,6 +19,7 @@ import { eq, and, desc } from "drizzle-orm";
 import PDFDocument from "pdfkit";
 import { logger } from "../config/logger.config";
 import { upload, verifyUploadedFile, handleUploadErrors, UPLOAD_DIR, HS_PHOTOS_DIR } from "../middleware/upload.middleware";
+import { notify } from "../services/notification.service";
 import fsNode from "fs";
 import pathNode from "path";
 
@@ -329,6 +330,136 @@ router.get("/interviews/:id.ics", async (req, res, next) => {
     res.setHeader("Content-Type", "text/calendar; charset=utf-8");
     res.setHeader("Content-Disposition", `attachment; filename="interview-${i.id}.ics"`);
     res.send(lines.join("\r\n"));
+  } catch (err) { next(err); }
+});
+
+// ─────────────────────────────────────────────────────────────────────
+// v0.4.34 (Phase 4): Candidate interview workflow
+// ─────────────────────────────────────────────────────────────────────
+// Three actions a candidate can take once an interview has been
+// scheduled: confirm attendance, request reschedule (with reason +
+// proposed alternate time), or decline (with reason). Each action
+// writes back to the interviews row + drops an in-app notification on
+// the agent (and employer, if the job is a derivative requisition).
+
+async function loadOwnedInterview(userId: string, interviewId: string) {
+  if (!storage.db) return null;
+  const candId = await getMyCandidateId(userId);
+  if (!candId) return null;
+  const [row] = await storage.db
+    .select({ interview: interviews, application: applications, job: jobs })
+    .from(interviews)
+    .innerJoin(applications, eq(interviews.applicationId, applications.id))
+    .innerJoin(jobs, eq(applications.jobId, jobs.id))
+    .where(and(eq(interviews.id, interviewId), eq(applications.candidateId, candId))).limit(1);
+  return row || null;
+}
+
+async function notifyAgentOfInterviewAction(row: any, action: "confirmed" | "reschedule_requested" | "declined", reason?: string) {
+  if (!storage.db) return;
+  const j = row.job;
+  // Recipient: agent owner (always), employer owner (if a requisition is involved)
+  const recipients = new Set<string>();
+  if (j.agentId) recipients.add(j.agentId);
+  if (j.employerId) recipients.add(j.employerId);
+  if (j.parentRequisitionId) {
+    const [parent] = await storage.db.select({ employerId: jobs.employerId }).from(jobs)
+      .where(eq(jobs.id, j.parentRequisitionId)).limit(1);
+    if (parent?.employerId) recipients.add(parent.employerId);
+  }
+  const verb = action === "confirmed" ? "confirmed" : action === "declined" ? "declined" : "requested a reschedule for";
+  for (const r of recipients) {
+    notify({
+      userId: r,
+      type: "application_update",
+      title: `Candidate ${verb} interview`,
+      message: `Candidate has ${verb} the interview for "${j.title}".${reason ? ` Reason: ${reason}` : ""}`,
+      severity: action === "confirmed" ? "positive" : "warning",
+      metadata: { interviewId: row.interview.id, applicationId: row.application.id, jobId: j.id, action },
+    }).catch(() => { /* notifications are best-effort */ });
+  }
+}
+
+// POST /api/v1/me/interviews/:id/confirm — candidate confirms attendance
+router.post("/interviews/:id/confirm", async (req, res, next) => {
+  try {
+    const user = (req as any).user;
+    if (user.role !== "candidate") return res.status(403).json({ success: false, message: "Candidate-only" });
+    const row = await loadOwnedInterview(user.id, req.params.id);
+    if (!row) return res.status(404).json({ success: false, message: "Interview not found" });
+    if (row.interview.candidateConfirmedStatus === "confirmed") {
+      return res.json({ success: true, data: row.interview, alreadyConfirmed: true });
+    }
+    const updated = await storage.db!.update(interviews).set({
+      candidateConfirmedStatus: "confirmed",
+      candidateConfirmedAt: new Date(),
+      candidateRescheduleReason: null,
+      candidateProposedAt: null,
+      candidateDeclineReason: null,
+    }).where(eq(interviews.id, req.params.id)).returning();
+    await notifyAgentOfInterviewAction(row, "confirmed");
+    res.json({ success: true, data: updated[0] });
+  } catch (err) { next(err); }
+});
+
+// POST /api/v1/me/interviews/:id/reschedule — candidate requests reschedule
+router.post("/interviews/:id/reschedule", async (req, res, next) => {
+  try {
+    const user = (req as any).user;
+    if (user.role !== "candidate") return res.status(403).json({ success: false, message: "Candidate-only" });
+    const { reason, proposedAt } = req.body || {};
+    if (!reason || String(reason).trim().length < 5) {
+      return res.status(400).json({ success: false, error: { code: 400, message: "Reason required (min 5 chars)." } });
+    }
+    const proposed = proposedAt ? new Date(proposedAt) : null;
+    if (proposedAt && (Number.isNaN(proposed!.getTime()) || proposed! < new Date())) {
+      return res.status(400).json({ success: false, error: { code: 400, message: "Proposed time must be in the future." } });
+    }
+    const row = await loadOwnedInterview(user.id, req.params.id);
+    if (!row) return res.status(404).json({ success: false, message: "Interview not found" });
+    const updated = await storage.db!.update(interviews).set({
+      candidateConfirmedStatus: "reschedule_requested",
+      candidateConfirmedAt: new Date(),
+      candidateRescheduleReason: String(reason).slice(0, 1000),
+      candidateProposedAt: proposed,
+      candidateDeclineReason: null,
+    }).where(eq(interviews.id, req.params.id)).returning();
+    await notifyAgentOfInterviewAction(row, "reschedule_requested", String(reason).slice(0, 200));
+    res.json({ success: true, data: updated[0] });
+  } catch (err) { next(err); }
+});
+
+// POST /api/v1/me/interviews/:id/decline — candidate declines (effectively withdraws from this round)
+router.post("/interviews/:id/decline", async (req, res, next) => {
+  try {
+    const user = (req as any).user;
+    if (user.role !== "candidate") return res.status(403).json({ success: false, message: "Candidate-only" });
+    const { reason } = req.body || {};
+    if (!reason || String(reason).trim().length < 5) {
+      return res.status(400).json({ success: false, error: { code: 400, message: "Reason required (min 5 chars)." } });
+    }
+    const row = await loadOwnedInterview(user.id, req.params.id);
+    if (!row) return res.status(404).json({ success: false, message: "Interview not found" });
+    const updated = await storage.db!.update(interviews).set({
+      candidateConfirmedStatus: "declined",
+      candidateConfirmedAt: new Date(),
+      candidateDeclineReason: String(reason).slice(0, 1000),
+      candidateRescheduleReason: null,
+      candidateProposedAt: null,
+    }).where(eq(interviews.id, req.params.id)).returning();
+    await notifyAgentOfInterviewAction(row, "declined", String(reason).slice(0, 200));
+    res.json({ success: true, data: updated[0] });
+  } catch (err) { next(err); }
+});
+
+// GET /api/v1/me/interviews/:id — full interview details for the candidate panel
+router.get("/interviews/:id", async (req, res, next) => {
+  try {
+    const user = (req as any).user;
+    if (user.role !== "candidate") return res.status(403).json({ success: false });
+    const row = await loadOwnedInterview(user.id, req.params.id);
+    if (!row) return res.status(404).json({ success: false, message: "Interview not found" });
+    res.json({ success: true, data: row.interview });
   } catch (err) { next(err); }
 });
 

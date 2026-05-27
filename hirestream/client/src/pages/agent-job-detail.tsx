@@ -610,6 +610,24 @@ export default function AgentJobDetailPage() {
                         <Badge variant="outline" className="bg-cyan-50 text-cyan-700 border-cyan-200 text-[11px] gap-1">
                           <Clock className="w-3 h-3" /> Interview Scheduled
                         </Badge>
+                        {/* v0.4.34 (Phase 4): surface candidate's response so
+                            the agent can see who confirmed / asked to
+                            reschedule / declined without opening the row. */}
+                        {a.interview?.candidateConfirmedStatus === "confirmed" && (
+                          <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200 text-[11px] gap-1" title="Candidate confirmed attendance">
+                            <CheckCircle className="w-3 h-3" /> Confirmed
+                          </Badge>
+                        )}
+                        {a.interview?.candidateConfirmedStatus === "reschedule_requested" && (
+                          <Badge className="bg-amber-100 text-amber-700 border-amber-200 text-[11px] gap-1" title={`Reason: ${a.interview.candidateRescheduleReason || ""}`}>
+                            <Clock className="w-3 h-3" /> Reschedule requested
+                          </Badge>
+                        )}
+                        {a.interview?.candidateConfirmedStatus === "declined" && (
+                          <Badge className="bg-red-100 text-red-700 border-red-200 text-[11px] gap-1" title={`Reason: ${a.interview.candidateDeclineReason || ""}`}>
+                            <XCircle className="w-3 h-3" /> Declined
+                          </Badge>
+                        )}
                         <Button size="sm" disabled={isBusy}
                           onClick={() => setOutcomeFor({ applicationId: a.applicationId, candidateName: a.candidate.fullName })}
                           className="gap-1 bg-emerald-600 hover:bg-emerald-700 text-white">

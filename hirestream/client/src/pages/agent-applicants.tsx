@@ -394,11 +394,29 @@ export default function AgentApplicantsPage() {
                           </Button>
                         )}
                         {a.status === "interview_scheduled" && (
-                          <Button size="sm" disabled={updateStatus.isPending}
-                            onClick={() => setOutcomeFor({ applicationId: a.applicationId, candidateName: a.candidate.fullName })}
-                            className="gap-1 h-8 bg-emerald-600 hover:bg-emerald-700 text-white">
-                            <CheckCircle className="w-3.5 h-3.5" /> Outcome
-                          </Button>
+                          <>
+                            {/* v0.4.34: candidate confirmation badge */}
+                            {a.interview?.candidateConfirmedStatus === "confirmed" && (
+                              <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200 text-[10px] gap-1" title="Candidate confirmed">
+                                <CheckCircle className="w-3 h-3" /> Confirmed
+                              </Badge>
+                            )}
+                            {a.interview?.candidateConfirmedStatus === "reschedule_requested" && (
+                              <Badge className="bg-amber-100 text-amber-700 border-amber-200 text-[10px] gap-1" title={`Reason: ${a.interview.candidateRescheduleReason || ""}`}>
+                                <Clock className="w-3 h-3" /> Reschedule
+                              </Badge>
+                            )}
+                            {a.interview?.candidateConfirmedStatus === "declined" && (
+                              <Badge className="bg-red-100 text-red-700 border-red-200 text-[10px] gap-1" title={`Reason: ${a.interview.candidateDeclineReason || ""}`}>
+                                <XCircle className="w-3 h-3" /> Declined
+                              </Badge>
+                            )}
+                            <Button size="sm" disabled={updateStatus.isPending}
+                              onClick={() => setOutcomeFor({ applicationId: a.applicationId, candidateName: a.candidate.fullName })}
+                              className="gap-1 h-8 bg-emerald-600 hover:bg-emerald-700 text-white">
+                              <CheckCircle className="w-3.5 h-3.5" /> Outcome
+                            </Button>
+                          </>
                         )}
                         {!["rejected", "selected", "placed", "interview_scheduled", "withdrawn"].includes(a.status) && (
                           <Button size="sm" variant="outline" disabled={updateStatus.isPending}

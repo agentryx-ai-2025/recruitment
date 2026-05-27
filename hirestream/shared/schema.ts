@@ -424,6 +424,16 @@ export const interviews = pgTable("interviews", {
   // admin-defined template dictates which dimensions are shown in the UI.
   scorecard: jsonb("scorecard"),
   conductedBy: varchar("conducted_by").references(() => users.id),
+  // v0.4.34 (Phase 4): candidate-side interview workflow. When agent
+  // schedules an interview, candidate sees the slot and can confirm /
+  // request reschedule / decline. All nullable for back-compat.
+  interviewerName: text("interviewer_name"),          // surfaced on candidate panel ("who will I meet")
+  meetingLink: text("meeting_link"),                  // for mode="virtual" — zoom/meet/teams URL
+  candidateConfirmedStatus: text("candidate_confirmed_status"), // null = no response | "confirmed" | "reschedule_requested" | "declined"
+  candidateConfirmedAt: timestamp("candidate_confirmed_at"),
+  candidateRescheduleReason: text("candidate_reschedule_reason"),
+  candidateProposedAt: timestamp("candidate_proposed_at"),
+  candidateDeclineReason: text("candidate_decline_reason"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

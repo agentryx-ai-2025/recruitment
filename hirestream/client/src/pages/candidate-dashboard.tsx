@@ -19,6 +19,7 @@ import { ReportJobDialog } from "@/components/shared/report-job-dialog";
 import { PhotoAvatar } from "@/components/shared/PhotoAvatar";
 import { JOB_CATEGORIES, jobCategoryLabel } from "@/lib/reference-data";
 import { MatchBreakdownPanel } from "@/components/shared/MatchBreakdownPanel";
+import { InterviewActionsPanel } from "@/components/candidate/InterviewActionsPanel";
 
 async function fetchJson(url: string) {
   const res = await fetch(url);
@@ -1351,27 +1352,17 @@ function ApplicationsView({ applications, initialIntent }: { applications: any[]
                 </div>
               </div>
 
-              {/* Next scheduled interview */}
-              {selectedApp.nextInterview && !["rejected", "placed"].includes(selectedApp.status) && (
-                <div className="mt-5 bg-gradient-to-r from-cyan-50 to-blue-50 border border-cyan-200/60 rounded-xl p-4">
-                  <div className="flex items-start gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-cyan-100 flex items-center justify-center flex-shrink-0">
-                      <Calendar className="w-5 h-5 text-cyan-600" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-bold text-slate-900">Upcoming interview</p>
-                      <p className="text-sm text-slate-700 mt-0.5">
-                        {new Date(selectedApp.nextInterview.scheduledAt).toLocaleString("en-IN", {
-                          weekday: "short", day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit",
-                        })}
-                      </p>
-                      <p className="text-xs text-slate-500 mt-0.5">
-                        {selectedApp.nextInterview.mode === "virtual" ? "Virtual interview" : "In-person"}
-                        {selectedApp.nextInterview.location ? ` · ${selectedApp.nextInterview.location}` : ""}
-                      </p>
-                    </div>
-                  </div>
-                </div>
+              {/* v0.4.34 (Phase 4): full interview panel — details +
+                  Confirm / Reschedule / Decline / .ics. Replaces the
+                  static read-only block. Conducted/result populated only
+                  AFTER the interview happens, so we hide the actions
+                  panel for past interviews (status moved past
+                  interview_scheduled into selected/placed/rejected). */}
+              {selectedApp.nextInterview && !["rejected", "placed", "selected"].includes(selectedApp.status) && (
+                <InterviewActionsPanel
+                  interview={selectedApp.nextInterview}
+                  invalidateKey={["/api/v1/candidates/applications"]}
+                />
               )}
 
               {/* v0.4.33.2: Selected but no offer issued yet — bridge state.
