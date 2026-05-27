@@ -7,7 +7,12 @@
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
   
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  
+
+  /* Force A4 paper so Chromium headless doesn't default to Letter
+     (216×279mm) and clip our 297mm-tall .page divs into two physical
+     pages each — that was producing 6 PDF pages instead of 3. */
+  @page { size: A4; margin: 0; }
+
   body {
     font-family: 'Inter', -apple-system, sans-serif;
     color: #1e293b;
@@ -17,10 +22,12 @@
   
   .page {
     width: 210mm;
-    min-height: 297mm;
-    padding: 18mm 20mm 15mm 20mm;
+    height: 297mm;
+    padding: 12mm 18mm 12mm 18mm;
     page-break-after: always;
+    page-break-inside: avoid;
     position: relative;
+    overflow: hidden;
   }
   .page:last-child { page-break-after: auto; }
 
@@ -28,12 +35,12 @@
   .header {
     background: linear-gradient(135deg, #7c3aed, #4f46e5);
     color: white;
-    padding: 14px 20px;
+    padding: 12px 20px;
     border-radius: 10px;
     display: flex;
     align-items: center;
     gap: 12px;
-    margin-bottom: 18px;
+    margin-bottom: 12px;
   }
   .header-icon { font-size: 22px; }
   .header h1 { font-size: 16px; font-weight: 800; letter-spacing: -0.3px; }
@@ -55,7 +62,7 @@
     font-size: 14px;
     font-weight: 700;
     color: #4f46e5;
-    margin: 16px 0 8px 0;
+    margin: 10px 0 6px 0;
     display: flex;
     align-items: center;
     gap: 8px;
@@ -272,7 +279,7 @@
   .divider {
     border: none;
     border-top: 1px solid #e2e8f0;
-    margin: 14px 0;
+    margin: 8px 0;
   }
 
   @media print {
@@ -294,15 +301,8 @@
     <span class="badge">HTIS Testing</span>
   </div>
 
-  <div style="background:#ecfdf5; border:1.5px solid #6ee7b7; border-radius:8px; padding:10px 14px; margin-bottom:14px;">
-    <div style="font-size:10px; font-weight:700; color:#065f46; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:4px;">✅ What's new in v0.4.16</div>
-    <div style="font-size:10.5px; color:#064e3b; line-height:1.5;">
-      <strong>Web dashboard — new "Offers" stat card</strong> — fifth tile in the top stats grid shows the count of placement offers awaiting candidate response, alongside Applications / Shortlisted / Recommended / Documents. Single-glance pending-action view.<br>
-      <strong>Mobile — offer-letter PDF now opens correctly</strong> — fixed the auth handoff between the mobile app and the device's default browser. The <em>View offer letter (PDF)</em> button opens an inline preview in the browser, no more "broken link". Token-protected URL with no-store cache + no-referrer headers.<br>
-      <strong>Carries over from v0.4.15:</strong> hero offer banner at top of dashboard; Accept / Decline on every Application Detail page; mobile offer-letter view + deep-link to web for response.<br>
-      <strong>Carries over from v0.4.14:</strong> mobile timeline dots fill correctly; placements auto-create on selection so employers can issue offers immediately.<br>
-      <strong>How to confirm latest build:</strong> open the <em>Applications</em> tab on mobile — top-right of the dark blue header shows <code class="mono" style="background:#fff; padding:1px 4px; border-radius:3px; color:#065f46;">v0.4.16.0</code>. If you see an older version, run the force-refresh on page 3.
-    </div>
+  <div style="background:#ecfdf5; border:1px solid #6ee7b7; border-radius:6px; padding:6px 12px; margin-bottom:10px; font-size:10px; color:#064e3b;">
+    <strong>Current build:</strong> v0.4.16.0 — confirm on mobile by checking the small <code class="mono" style="background:#fff; padding:1px 3px; border-radius:2px;">v0.4.16.0</code> tag at the top-right of the <em>Applications</em> screen header. Older tag? See <strong>Page 3 → Old build / stale screen?</strong>
   </div>
 
   <h2 style="color:#f59e0b;"><span class="num" style="background:#f59e0b;">1</span> Getting Started — Open the Verify Portal</h2>

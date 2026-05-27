@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import { HelpCircle, Search, ChevronDown, ChevronUp, Smartphone, Download, ExternalLink } from "lucide-react";
+import { HelpCircle, Search, ChevronDown, ChevronUp, Smartphone, Download, ExternalLink, CheckCircle, RefreshCw } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -113,9 +113,38 @@ export default function FaqPage() {
                 <ExternalLink className="w-4 h-4" /> Install Expo Go
               </a>
             </div>
-            <p className="text-[11px] text-slate-500 mt-2">
-              The PDF covers Android &amp; iOS setup, test accounts, troubleshooting, and force-refresh steps. Use it as a tester onboarding handout.
-            </p>
+          </div>
+        </div>
+
+        {/* How to check version + force-refresh — same info as the PDF
+            page 3, surfaced inline because most users won't open the
+            PDF until they hit a problem. */}
+        <div className="mt-5 grid sm:grid-cols-2 gap-3">
+          <div className="bg-white rounded-lg border border-indigo-100 p-3">
+            <div className="flex items-center gap-2 mb-1.5">
+              <CheckCircle className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+              <h3 className="text-sm font-bold text-slate-900">Confirm you're on the latest build</h3>
+            </div>
+            <ol className="text-[12px] text-slate-700 list-decimal pl-5 space-y-1">
+              <li>Open Expo Go → tap the HireStream entry → wait for the app to load.</li>
+              <li>Tap the <strong>Applications</strong> tab at the bottom.</li>
+              <li>Look at the <strong>top-right of the dark blue header</strong>. A small grey version tag appears, e.g. <code className="font-mono bg-slate-100 px-1 rounded text-[11px]">v0.4.16.0</code>.</li>
+              <li>Today's build is <strong className="text-emerald-700">v0.4.16.0</strong>. If you see an older number, follow the force-refresh steps →</li>
+            </ol>
+          </div>
+          <div className="bg-white rounded-lg border border-amber-200 p-3">
+            <div className="flex items-center gap-2 mb-1.5">
+              <RefreshCw className="w-4 h-4 text-amber-600 flex-shrink-0" />
+              <h3 className="text-sm font-bold text-slate-900">Force-refresh the bundle</h3>
+            </div>
+            <ol className="text-[12px] text-slate-700 list-decimal pl-5 space-y-1">
+              <li>Open Expo Go on your phone.</li>
+              <li><strong>Long-press</strong> the HireStream entry in the recent projects list.</li>
+              <li>Tap <strong>"Remove from list"</strong> — this clears the cached manifest.</li>
+              <li>Tap <strong>"Enter URL manually"</strong> at the bottom.</li>
+              <li>Paste <code className="font-mono bg-slate-100 px-1 rounded text-[11px] break-all">exps://hirestream-mobile.agentryx.dev</code> → Connect.</li>
+              <li>Fresh download takes ~30s. Re-check the version tag.</li>
+            </ol>
           </div>
         </div>
       </div>
