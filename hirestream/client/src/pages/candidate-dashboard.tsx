@@ -52,12 +52,24 @@ export default function CandidateDashboard() {
     const v = new URLSearchParams(window.location.search).get("view");
     return v || "overview";
   });
-  const setActiveView = React.useCallback((next: string) => {
+  // v0.4.20: `intent` is a hint the source navigation passes to the
+  // target view (e.g. "shortlisted" / "offers" / "all"). Targets read
+  // it on mount to pre-apply a sensible filter so clicking the
+  // Shortlisted stat card actually shows shortlisted rows — not the
+  // whole Applications list with an auto-enabled "awaiting" filter.
+  const [intent, setIntentState] = useState<string | null>(() => {
+    if (typeof window === "undefined") return null;
+    return new URLSearchParams(window.location.search).get("intent");
+  });
+  const setActiveView = React.useCallback((next: string, nextIntent?: string) => {
     setActiveViewState(next);
+    setIntentState(nextIntent ?? null);
     if (typeof window === "undefined") return;
     const url = new URL(window.location.href);
     if (next && next !== "overview") url.searchParams.set("view", next);
     else url.searchParams.delete("view");
+    if (nextIntent) url.searchParams.set("intent", nextIntent);
+    else url.searchParams.delete("intent");
     window.history.pushState({}, "", url.toString());
   }, []);
   // Handle native browser back/forward — if the user navigates history, sync
@@ -293,7 +305,7 @@ export default function CandidateDashboard() {
             <motion.div key={activeView} variants={scaleIn} initial="initial" animate="animate" exit="exit">
               {activeView === "overview" && <OverviewView appCount={appCount} shortlisted={shortlistedCount} docs={docs.length} savedCount={savedJobsList.length} completion={completion} applications={applications} recommendations={recommendations} setActiveView={setActiveView} profile={profile} education={education} experience={experience} />}
               {activeView === "jobs" && <JobsView allJobs={allJobs} appliedJobIds={appliedJobIds} savedJobIds={savedJobIds} recommendations={recommendations} completion={completion} />}
-              {activeView === "applications" && <ApplicationsView applications={applications} />}
+              {activeView === "applications" && <ApplicationsView applications={applications} initialIntent={intent} />}
               {activeView === "journey" && <JourneyView profile={profile} applications={applications} completion={completion} docs={docs} education={education} experience={experience} />}
               {activeView === "recommended" && <RecommendedView recommendations={recommendations} savedJobIds={savedJobIds} setActiveView={setActiveView} />}
               {activeView === "saved" && <SavedJobsView savedJobs={savedJobsList} appliedJobIds={appliedJobIds} setActiveView={setActiveView} />}
@@ -451,9 +463,9 @@ function OverviewView({ appCount, shortlisted, docs, savedCount, completion, app
         const offersCount = (applications ?? []).filter((a: any) => a.placement?.status === "offered").length;
         return (
           <motion.div variants={fadeUp} className="grid grid-cols-2 xl:grid-cols-5 gap-3">
-            <StatCard icon={Briefcase} gradient="from-blue-500 to-blue-600" lightBg="bg-blue-50" lightText="text-blue-600" value={appCount} label="Applications" subtitle={appCount === 0 ? "Browse jobs to apply" : `${appCount} submitted`} onClick={() => setActiveView("applications")} />
-            <StatCard icon={CheckCircle} gradient="from-emerald-500 to-emerald-600" lightBg="bg-emerald-50" lightText="text-emerald-600" value={shortlisted} label="Shortlisted" subtitle={shortlisted === 0 ? "None yet" : `${shortlisted} progressing`} onClick={() => setActiveView("applications")} />
-            <StatCard icon={Award} gradient="from-green-600 to-emerald-700" lightBg="bg-green-50" lightText="text-green-700" value={offersCount} label="Offers" subtitle={offersCount === 0 ? "None pending" : offersCount === 1 ? "Awaiting your response" : `${offersCount} awaiting response`} onClick={() => setActiveView("applications")} />
+            <StatCard icon={Briefcase} gradient="from-blue-500 to-blue-600" lightBg="bg-blue-50" lightText="text-blue-600" value={appCount} label="Applications" subtitle={appCount === 0 ? "Browse jobs to apply" : `${appCount} submitted`} onClick={() => setActiveView("applications", "all")} />
+            <StatCard icon={CheckCircle} gradient="from-emerald-500 to-emerald-600" lightBg="bg-emerald-50" lightText="text-emerald-600" value={shortlisted} label="Shortlisted" subtitle={shortlisted === 0 ? "None yet" : `${shortlisted} progressing`} onClick={() => setActiveView("applications", "in_progress")} />
+            <StatCard icon={Award} gradient="from-green-600 to-emerald-700" lightBg="bg-green-50" lightText="text-green-700" value={offersCount} label="Offers" subtitle={offersCount === 0 ? "None pending" : offersCount === 1 ? "Awaiting your response" : `${offersCount} awaiting response`} onClick={() => setActiveView("applications", "offers")} />
             <StatCard icon={Sparkles} gradient="from-amber-500 to-orange-500" lightBg="bg-amber-50" lightText="text-amber-600" value={recommendations.length} label="Recommended" subtitle={recommendations.length === 0 ? "Complete profile for matches" : "Based on your skills"} onClick={() => setActiveView("recommended")} />
             <StatCard icon={FileText} gradient="from-purple-500 to-purple-600" lightBg="bg-purple-50" lightText="text-purple-600" value={docs} label="Documents" subtitle={docs === 0 ? "Upload CV to apply" : `${docs} uploaded`} onClick={() => setActiveView("documents")} />
           </motion.div>
@@ -1092,14 +1104,23 @@ function renderAppCard(app: any, selectedApp: any, setSelectedApp: (a: any) => v
   );
 }
 
-function ApplicationsView({ applications }: { applications: any[] }) {
-  const [statusFilter, setStatusFilter] = useState("all");
+function ApplicationsView({ applications, initialIntent }: { applications: any[]; initialIntent?: string | null }) {
+  // v0.4.20: initial filter state honors the `intent` hint passed from
+  // the Overview stat cards so each card lands the user on the rows the
+  // card was about — instead of always dumping them on the same list.
+  //   intent="in_progress" → status filter = "shortlisted" (clicking
+  //       the Shortlisted card; user can broaden via dropdown if they
+  //       want interview_scheduled / selected rows too)
+  //   intent="offers" → enable the awaiting-action quick filter
+  //   intent="all" → no pre-filter (clicking the Applications card)
+  //   no intent → existing auto-awaiting behavior (landing fresh)
+  const [statusFilter, setStatusFilter] = useState(initialIntent === "in_progress" ? "shortlisted" : "all");
   // Quick-filter: "Awaiting your action" — apps where the next move is on the
   // candidate (offer awaiting accept/decline). Default ON once we detect an
   // offer; candidates need to see the decision first. They can click it off to
   // see the full inventory.
-  const [awaitingMe, setAwaitingMe] = useState(false);
-  const autoAwaitingApplied = useRef(false);
+  const [awaitingMe, setAwaitingMe] = useState(initialIntent === "offers");
+  const autoAwaitingApplied = useRef(!!initialIntent);  // suppress auto-enable when explicit intent passed
   const [collapsed, setCollapsed] = useState<Record<GroupKey, boolean>>({ active: false, offers: false, closed: false });
   const [selectedApp, setSelectedApp] = useState<any>(null);
   const [showDeclineForm, setShowDeclineForm] = useState(false);
