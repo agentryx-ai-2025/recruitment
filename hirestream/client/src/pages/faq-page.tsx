@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import { HelpCircle, Search, ChevronDown, ChevronUp } from "lucide-react";
+import { HelpCircle, Search, ChevronDown, ChevronUp, Smartphone, Download, ExternalLink } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -84,6 +84,40 @@ export default function FaqPage() {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
+      </div>
+
+      {/* Mobile App quick-start panel — the Play Store listing isn't live
+          yet, so the app ships via Expo Go pointing at a branded URL.
+          Anyone on this page (candidates, agency staff, HPSEDC testers)
+          can install + connect in under 2 minutes. */}
+      <div className="mb-10 rounded-2xl border-2 border-indigo-200 bg-gradient-to-br from-indigo-50 via-violet-50 to-white p-5 shadow-sm">
+        <div className="flex items-start gap-4 flex-wrap">
+          <div className="w-12 h-12 rounded-xl bg-indigo-600 flex items-center justify-center flex-shrink-0">
+            <Smartphone className="w-6 h-6 text-white" />
+          </div>
+          <div className="flex-1 min-w-[260px]">
+            <h2 className="text-lg font-bold text-slate-900">Using the HireStream Mobile App</h2>
+            <p className="text-sm text-slate-600 mt-1">
+              Install <strong>Expo Go</strong> from the Play Store, then connect to the HireStream URL below to load the app on your phone. No APK install needed.
+            </p>
+            <div className="mt-3 bg-white border border-indigo-200 rounded-lg px-3 py-2 font-mono text-sm text-indigo-700 break-all select-all">
+              exps://hirestream-mobile.agentryx.dev
+            </div>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <a href="/docs/HireStream_Mobile_Quick_Testing_Guide.pdf" target="_blank" rel="noopener noreferrer"
+                 className="inline-flex items-center gap-1.5 text-sm font-semibold px-3 py-2 rounded-md bg-indigo-600 text-white hover:bg-indigo-700 transition">
+                <Download className="w-4 h-4" /> Mobile App Guide (PDF)
+              </a>
+              <a href="https://play.google.com/store/apps/details?id=host.exp.exponent" target="_blank" rel="noopener noreferrer"
+                 className="inline-flex items-center gap-1.5 text-sm font-medium px-3 py-2 rounded-md border border-slate-300 bg-white text-slate-700 hover:border-indigo-400 hover:text-indigo-700 transition">
+                <ExternalLink className="w-4 h-4" /> Install Expo Go
+              </a>
+            </div>
+            <p className="text-[11px] text-slate-500 mt-2">
+              The PDF covers Android &amp; iOS setup, test accounts, troubleshooting, and force-refresh steps. Use it as a tester onboarding handout.
+            </p>
+          </div>
+        </div>
       </div>
 
       {allFaqs.length === 0 ? (

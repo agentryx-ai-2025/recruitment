@@ -419,17 +419,27 @@ function MobileSetupGuide() {
           <button className="absolute top-6 right-8 text-white/80 hover:text-white text-3xl font-light" onClick={() => setLightbox(null)}>✕</button>
         </div>
       )}
-      <button onClick={() => setOpen(v => !v)}
-        className="w-full flex items-center justify-between px-5 py-3.5 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 transition">
-        <div className="flex items-center gap-3">
-          <span className="text-xl">📱</span>
-          <div className="text-left">
-            <div className="text-base font-bold text-white">HireStream Mobile — Mobile App</div>
-            <div className="text-[11px] text-violet-100">Setup your test environment · Scan QR code · Start testing</div>
+      <div className="w-full flex items-stretch bg-gradient-to-r from-violet-600 to-indigo-600">
+        <button onClick={() => setOpen(v => !v)}
+          className="flex-1 flex items-center justify-between px-5 py-3.5 hover:from-violet-700 hover:to-indigo-700 transition">
+          <div className="flex items-center gap-3">
+            <span className="text-xl">📱</span>
+            <div className="text-left">
+              <div className="text-base font-bold text-white">HireStream Mobile — Mobile App</div>
+              <div className="text-[11px] text-violet-100">Setup your test environment · Scan QR code · Start testing</div>
+            </div>
           </div>
-        </div>
-        <span className={`text-white/70 text-sm transition-transform ${open ? "rotate-180" : ""}`}>▼</span>
-      </button>
+          <span className={`text-white/70 text-sm transition-transform mr-2 ${open ? "rotate-180" : ""}`}>▼</span>
+        </button>
+        {/* PDF guide — same content as this panel, printable. Useful for
+            sharing with HPSEDC testers who prefer a hard copy or want
+            offline access. */}
+        <a href="/docs/HireStream_Mobile_Quick_Testing_Guide.pdf" target="_blank" rel="noopener noreferrer"
+           onClick={(e) => e.stopPropagation()}
+           className="flex items-center gap-1.5 px-4 py-3.5 bg-white/15 hover:bg-white/25 transition border-l border-white/20 text-white text-xs font-semibold whitespace-nowrap">
+          <span className="text-base">📄</span> PDF guide
+        </a>
+      </div>
 
       {open && (
         <div className="border-t border-slate-100">

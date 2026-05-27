@@ -59,6 +59,12 @@ export function Footer() {
             <ul className="space-y-2 text-sm text-gray-400">
               <li><button onClick={() => setLocation("/faq")} className="hover:text-white transition-colors">{t("nav.faq")}</button></li>
               <li><button onClick={() => setLocation("/grievances")} className="hover:text-white transition-colors">{t("footer.fileGrievance")}</button></li>
+              <li>
+                <a href="/docs/HireStream_Mobile_Quick_Testing_Guide.pdf" target="_blank" rel="noopener noreferrer"
+                   className="hover:text-white transition-colors inline-flex items-center gap-1">
+                  Mobile App Guide (PDF)
+                </a>
+              </li>
               <li><button onClick={() => setLocation("/")} className="hover:text-white transition-colors">{t("footer.contactHPSEDC")}</button></li>
             </ul>
           </div>
