@@ -38,6 +38,9 @@ type Applicant = {
 
 type SortKey = "newest" | "oldest" | "match" | "longest_in_stage";
 
+// v0.4.23: added Withdrawn pill so "All" = sum of all pills. Before
+// this, withdrawn applications were counted in "All" but had no pill —
+// making the math look broken on the UI.
 const PIPELINE = [
   { key: "submitted",           label: "Submitted",  color: "bg-blue-100 text-blue-700" },
   { key: "reviewed",            label: "Reviewed",   color: "bg-amber-100 text-amber-700" },
@@ -46,9 +49,10 @@ const PIPELINE = [
   { key: "selected",            label: "Selected",   color: "bg-emerald-100 text-emerald-700" },
   { key: "placed",              label: "Placed",     color: "bg-green-100 text-green-700" },
   { key: "rejected",            label: "Rejected",   color: "bg-red-100 text-red-700" },
+  { key: "withdrawn",           label: "Withdrawn",  color: "bg-slate-100 text-slate-600" },
 ] as const;
 
-const VALID_STATUSES = ["submitted", "reviewed", "shortlisted", "interview_scheduled", "selected", "placed", "rejected"];
+const VALID_STATUSES = ["submitted", "reviewed", "shortlisted", "interview_scheduled", "selected", "placed", "rejected", "withdrawn"];
 
 export default function AgentApplicantsPage() {
   const [, setLocation] = useLocation();
@@ -182,7 +186,7 @@ export default function AgentApplicantsPage() {
   }
 
   return (
-    <div className="max-w-6xl mx-auto px-4 md:px-6 py-6">
+    <div className="max-w-7xl mx-auto px-4 md:px-6 py-6">
       <div className="mb-4 flex items-center gap-3 text-sm">
         <button onClick={() => history.length > 1 ? history.back() : setLocation("/")}
           className="inline-flex items-center gap-1.5 text-slate-500 hover:text-slate-900">
@@ -348,51 +352,62 @@ export default function AgentApplicantsPage() {
                         )}
                       </div>
                     </Link>
-                    {/* Right-side action buttons — fill the right gutter */}
-                    <div className="flex flex-wrap gap-1.5 justify-end shrink-0 ml-auto">
-                      <Link href={`/agent/candidates/${a.candidate.id}`}>
-                        <Button size="sm" variant="outline" className="gap-1 h-8">
-                          <Eye className="w-3.5 h-3.5" /> View
-                        </Button>
-                      </Link>
-                      {a.status === "submitted" && (
-                        <Button size="sm" variant="outline" disabled={updateStatus.isPending}
-                          onClick={() => updateStatus.mutate({ applicationId: a.applicationId, status: "reviewed" })}
-                          className="gap-1 h-8 border-amber-200 text-amber-700 hover:bg-amber-50">
-                          Reviewed
-                        </Button>
+                    {/* v0.4.23: anchored right column with applied-date
+                        meta + buttons. Min-width ensures the right side
+                        has visual weight even on rows with one button.
+                        Date row reuses the otherwise-wasted vertical
+                        space above/below the button row. */}
+                    <div className="shrink-0 ml-auto flex flex-col items-end gap-1.5 min-w-[280px]">
+                      {a.appliedAt && (
+                        <span className="text-[10px] text-slate-400 font-medium">
+                          Applied {new Date(a.appliedAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+                        </span>
                       )}
-                      {["submitted", "reviewed"].includes(a.status) && (
-                        <Button size="sm" disabled={updateStatus.isPending}
-                          onClick={() => updateStatus.mutate({ applicationId: a.applicationId, status: "shortlisted" })}
-                          className="gap-1 h-8 bg-purple-600 hover:bg-purple-700 text-white">
-                          <Star className="w-3.5 h-3.5" /> Shortlist
-                        </Button>
-                      )}
-                      {a.status === "shortlisted" && (
-                        <Button size="sm"
-                          onClick={() => setInterviewFor({ applicationId: a.applicationId, candidateName: a.candidate.fullName })}
-                          className="gap-1 h-8 bg-cyan-600 hover:bg-cyan-700 text-white">
-                          <Clock className="w-3.5 h-3.5" /> Schedule
-                        </Button>
-                      )}
-                      {a.status === "interview_scheduled" && (
-                        <Button size="sm" disabled={updateStatus.isPending}
-                          onClick={() => setOutcomeFor({ applicationId: a.applicationId, candidateName: a.candidate.fullName })}
-                          className="gap-1 h-8 bg-emerald-600 hover:bg-emerald-700 text-white">
-                          <CheckCircle className="w-3.5 h-3.5" /> Outcome
-                        </Button>
-                      )}
-                      {!["rejected", "selected", "placed", "interview_scheduled"].includes(a.status) && (
-                        <Button size="sm" variant="outline" disabled={updateStatus.isPending}
-                          onClick={() => {
-                            const feedback = window.prompt("Feedback for candidate (optional):") || "";
-                            updateStatus.mutate({ applicationId: a.applicationId, status: "rejected", feedback });
-                          }}
-                          className="gap-1 h-8 border-red-200 text-red-700 hover:bg-red-50">
-                          <XCircle className="w-3.5 h-3.5" /> Reject
-                        </Button>
-                      )}
+                      <div className="flex flex-wrap gap-1.5 justify-end">
+                        <Link href={`/agent/candidates/${a.candidate.id}`}>
+                          <Button size="sm" variant="outline" className="gap-1 h-8">
+                            <Eye className="w-3.5 h-3.5" /> View
+                          </Button>
+                        </Link>
+                        {a.status === "submitted" && (
+                          <Button size="sm" variant="outline" disabled={updateStatus.isPending}
+                            onClick={() => updateStatus.mutate({ applicationId: a.applicationId, status: "reviewed" })}
+                            className="gap-1 h-8 border-amber-200 text-amber-700 hover:bg-amber-50">
+                            Reviewed
+                          </Button>
+                        )}
+                        {["submitted", "reviewed"].includes(a.status) && (
+                          <Button size="sm" disabled={updateStatus.isPending}
+                            onClick={() => updateStatus.mutate({ applicationId: a.applicationId, status: "shortlisted" })}
+                            className="gap-1 h-8 bg-purple-600 hover:bg-purple-700 text-white">
+                            <Star className="w-3.5 h-3.5" /> Shortlist
+                          </Button>
+                        )}
+                        {a.status === "shortlisted" && (
+                          <Button size="sm"
+                            onClick={() => setInterviewFor({ applicationId: a.applicationId, candidateName: a.candidate.fullName })}
+                            className="gap-1 h-8 bg-cyan-600 hover:bg-cyan-700 text-white">
+                            <Clock className="w-3.5 h-3.5" /> Schedule
+                          </Button>
+                        )}
+                        {a.status === "interview_scheduled" && (
+                          <Button size="sm" disabled={updateStatus.isPending}
+                            onClick={() => setOutcomeFor({ applicationId: a.applicationId, candidateName: a.candidate.fullName })}
+                            className="gap-1 h-8 bg-emerald-600 hover:bg-emerald-700 text-white">
+                            <CheckCircle className="w-3.5 h-3.5" /> Outcome
+                          </Button>
+                        )}
+                        {!["rejected", "selected", "placed", "interview_scheduled", "withdrawn"].includes(a.status) && (
+                          <Button size="sm" variant="outline" disabled={updateStatus.isPending}
+                            onClick={() => {
+                              const feedback = window.prompt("Feedback for candidate (optional):") || "";
+                              updateStatus.mutate({ applicationId: a.applicationId, status: "rejected", feedback });
+                            }}
+                            className="gap-1 h-8 border-red-200 text-red-700 hover:bg-red-50">
+                            <XCircle className="w-3.5 h-3.5" /> Reject
+                          </Button>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
