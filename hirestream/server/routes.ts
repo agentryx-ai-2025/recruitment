@@ -56,12 +56,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       secret: env.SESSION_SECRET,
       resave: false,
       saveUninitialized: false,
+      // v0.4.36.3: `rolling: true` makes the 30-min window an IDLE timeout
+      // (the cookie's maxAge is reset on every response) instead of an
+      // ABSOLUTE one. Without it, a user was hard-logged-out 30 minutes
+      // after LOGIN even while actively working — surfaced as a surprise
+      // "Authentication required" 401 mid-task. Idle-timeout is the
+      // intended reading of the HTIS T5 "30-minute session timeout"
+      // requirement: 30 min of inactivity, not 30 min of wall-clock.
+      rolling: true,
       store: sessionStore,
       cookie: {
         secure: cookieSecure,
         httpOnly: true,
         sameSite: "strict",
-        maxAge: 30 * 60 * 1000, // 30 minutes (HTIS T5 compliance)
+        maxAge: 30 * 60 * 1000, // 30 min idle timeout (HTIS T5 compliance)
       },
     })
   );
