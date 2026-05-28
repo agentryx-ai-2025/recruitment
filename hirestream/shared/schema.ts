@@ -588,6 +588,10 @@ export const insertJobSchema = createInsertSchema(jobs).omit({
   experience: z.number().int().min(0).max(60).optional().nullable(),
   targetHires: z.number().int().min(1).max(500).optional().nullable(),
   hiringDeadline: z.union([futureOrTodayDate, z.null()]).optional(),
+  // v0.4.36.1: jobs.required_ielts_band is a decimal → z.string() by
+  // default, but the job-poster form sends a NUMBER. Coerce both.
+  requiredIeltsBand: z.union([z.string(), z.number()]).optional().nullable()
+    .transform((v) => (v === null || v === undefined || v === "" ? null : String(v))),
 });
 
 // Draft job: only title required, all other fields optional but still length-bounded.
@@ -606,6 +610,8 @@ export const draftJobSchema = createInsertSchema(jobs).omit({
   experience: z.number().int().min(0).max(60).optional().nullable(),
   targetHires: z.number().int().min(1).max(500).optional().nullable(),
   hiringDeadline: z.union([futureOrTodayDate, z.null()]).optional(),
+  requiredIeltsBand: z.union([z.string(), z.number()]).optional().nullable()
+    .transform((v) => (v === null || v === undefined || v === "" ? null : String(v))),
 }).partial({ company: true, location: true, country: true });
 
 export const insertRecruitmentAgentSchema = createInsertSchema(recruitmentAgents).omit({
@@ -659,6 +665,12 @@ export const updateCandidateSchema = createInsertSchema(candidates).omit({
     z.null(),
   ]).optional(),
   experience: z.number().int().min(0, { message: "Experience cannot be negative." }).optional().nullable(),
+  // v0.4.36.1: `ielts_band` is a Postgres decimal → drizzle-zod infers
+  // z.string(), but the wizard sends a NUMBER. That mismatch 400'd the
+  // Personal-Info save (and, with no client onError handler, did it
+  // silently). Coerce number-or-string → string so either input works.
+  ieltsBand: z.union([z.string(), z.number()]).optional().nullable()
+    .transform((v) => (v === null || v === undefined || v === "" ? null : String(v))),
 });
 
 export const insertApplicationSchema = createInsertSchema(applications).omit({

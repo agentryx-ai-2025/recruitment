@@ -475,10 +475,18 @@ function BasicInfoStep({ profile, onNext }: { profile: any; onNext: () => void }
           passportNumber: passportNumber || null,
           passportExpiry: passportExpiry || null,
           ecrStatus: ecrStatus || null,
-          ieltsBand: ieltsBand ? Number(ieltsBand) : null,
+          // ielts_band is a decimal column → send as string (schema also
+          // coerces defensively, but keep the client honest).
+          ieltsBand: ieltsBand ? String(ieltsBand) : null,
         }),
       });
-      if (!res.ok) throw new Error("Failed to save");
+      if (!res.ok) {
+        // Surface the server's field-level message instead of a generic
+        // throw — a silent failure here (no onError) is exactly what hid
+        // the ieltsBand type bug and made "Save does nothing" so confusing.
+        const err = await res.json().catch(() => ({} as any));
+        throw new Error(err?.message || err?.error?.message || "Failed to save personal info");
+      }
       return res.json();
     },
     onSuccess: () => {
@@ -487,6 +495,7 @@ function BasicInfoStep({ profile, onNext }: { profile: any; onNext: () => void }
       toast({ title: "Personal info saved" });
       onNext();
     },
+    onError: (e: any) => toast({ title: "Couldn't save", description: e.message, variant: "destructive" }),
   });
 
   return (
