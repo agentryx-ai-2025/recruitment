@@ -682,6 +682,75 @@ router.patch("/placements/:id/welfare", async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// ── Visa/passport assistance status (FRS 2.2 — agency-driven) ─────────
+// The agency assists the placed candidate with visa/passport. This lets
+// the agent/employer move that status forward and notify the candidate.
+// Foundation for a fuller pre-departure module later (document checklist,
+// milestone timestamps, SLA alerts) — that would extend this same record.
+const VISA_STATUSES = ["not_applied", "applied", "approved", "rejected"] as const;
+const VISA_LABEL: Record<string, string> = {
+  not_applied: "Not applied yet",
+  applied: "Application submitted",
+  approved: "Approved",
+  rejected: "Rejected",
+};
+router.patch("/placements/:id/visa-status", async (req, res, next) => {
+  try {
+    const db = storage.db;
+    if (!db) return res.status(500).json({ success: false });
+    const user = (req as any).user;
+    if (!["agent", "employer", "admin", "superadmin"].includes(user.role)) {
+      return res.status(403).json({ success: false, message: "Forbidden" });
+    }
+    const { visaStatus, note } = req.body ?? {};
+    if (!VISA_STATUSES.includes(visaStatus)) {
+      return res.status(400).json({ success: false, message: `visaStatus must be one of ${VISA_STATUSES.join(", ")}` });
+    }
+
+    // Load placement + application + job (ownership) + candidate (notify).
+    const [row] = await db
+      .select({ placement: placements, application: applications, job: jobs })
+      .from(placements)
+      .innerJoin(applications, eq(placements.applicationId, applications.id))
+      .innerJoin(jobs, eq(applications.jobId, jobs.id))
+      .where(eq(placements.id, req.params.id)).limit(1);
+    if (!row) return res.status(404).json({ success: false, message: "Placement not found" });
+
+    // IDOR guard mirrors respond-reschedule: agent owns the job; employer
+    // owns it directly or via parent requisition; admin/superadmin bypass.
+    if (user.role === "agent" && row.job.agentId !== user.id) {
+      return res.status(403).json({ success: false, message: "Not your placement" });
+    }
+    if (user.role === "employer") {
+      let owns = row.job.employerId === user.id;
+      if (!owns && row.job.parentRequisitionId) {
+        const [parent] = await db.select({ employerId: jobs.employerId }).from(jobs)
+          .where(eq(jobs.id, row.job.parentRequisitionId)).limit(1);
+        owns = !!parent && parent.employerId === user.id;
+      }
+      if (!owns) return res.status(403).json({ success: false, message: "Not your placement" });
+    }
+
+    const [updated] = await db.update(placements).set({ visaStatus }).where(eq(placements.id, row.placement.id)).returning();
+
+    // Notify the candidate.
+    const candRows = await db.select().from(candidates).where(eq(candidates.id, row.application.candidateId!)).limit(1);
+    if (candRows.length && candRows[0].userId) {
+      notify({
+        userId: candRows[0].userId,
+        type: "application_update",
+        title: `Visa status: ${VISA_LABEL[visaStatus]}`,
+        message: `Your agency updated the visa/passport status for ${row.job.title}: ${VISA_LABEL[visaStatus]}.${note ? ` Note: ${note}` : ""}`,
+        severity: visaStatus === "rejected" ? "warning" : visaStatus === "approved" ? "positive" : "info",
+        metadata: { placementId: row.placement.id, applicationId: row.application.id, jobId: row.job.id, visaStatus },
+      }).catch(() => { /* best-effort */ });
+    }
+
+    logger.info(`Visa status for placement ${row.placement.id} set to ${visaStatus} by ${user.role} ${user.id}`);
+    res.json({ success: true, data: updated });
+  } catch (err) { next(err); }
+});
+
 // ── Candidate compliance fields (ECR, PDO, PBBY, passport) ───────────
 router.patch("/candidates/:id/compliance", async (req, res, next) => {
   try {

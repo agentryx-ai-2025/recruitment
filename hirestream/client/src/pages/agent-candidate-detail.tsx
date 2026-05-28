@@ -383,9 +383,75 @@ function ComplianceAndWelfarePanel({ candidate, applications }: { candidate: any
         </Button>
       </div>
 
-      {/* Welfare panel if candidate has an active placement */}
-      {activePlacement?.placementId && <WelfarePanel placementId={activePlacement.placementId} />}
+      {/* Visa/passport assistance + welfare — only when a placement exists */}
+      {activePlacement?.placementId && (
+        <>
+          <VisaStatusPanel placementId={activePlacement.placementId} current={activePlacement.visaStatus} />
+          <WelfarePanel placementId={activePlacement.placementId} />
+        </>
+      )}
     </section>
+  );
+}
+
+// ── Visa/passport assistance (FRS 2.2 — agency-driven) ───────────────
+// The agency moves the visa/passport status forward; the candidate is
+// notified on every change. Foundation for a fuller pre-departure module.
+const VISA_STEPS: { value: string; label: string; tone: string }[] = [
+  { value: "not_applied", label: "Not applied yet", tone: "text-slate-600" },
+  { value: "applied",     label: "Application submitted", tone: "text-blue-700" },
+  { value: "approved",    label: "Approved", tone: "text-emerald-700" },
+  { value: "rejected",    label: "Rejected", tone: "text-red-700" },
+];
+function VisaStatusPanel({ placementId, current }: { placementId: string; current?: string | null }) {
+  const { toast } = useToast();
+  const qc = useQueryClient();
+  const [value, setValue] = useState<string>(current || "not_applied");
+  const [note, setNote] = useState("");
+  const save = useMutation({
+    mutationFn: async () => {
+      const r = await fetch(`/api/v1/agent/placements/${placementId}/visa-status`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ visaStatus: value, note: note.trim() || undefined }),
+      });
+      if (!r.ok) throw new Error((await r.json().catch(() => ({})))?.message || "Failed");
+      return r.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Visa status updated", description: "The candidate has been notified." });
+      setNote("");
+      qc.invalidateQueries({});
+    },
+    onError: (e: any) => toast({ title: "Couldn't update visa status", description: e.message, variant: "destructive" }),
+  });
+  const dirty = value !== (current || "not_applied") || note.trim().length > 0;
+  return (
+    <div className="border-t border-slate-100 p-5">
+      <h3 className="text-sm font-bold text-slate-900 mb-1 flex items-center gap-2">
+        <Plane className="w-4 h-4 text-indigo-600" /> Visa / passport assistance
+      </h3>
+      <p className="text-xs text-slate-500 mb-3">Agency-maintained. The candidate sees this on their application and is notified on every change.</p>
+      <div className="flex flex-wrap items-end gap-3">
+        <div className="min-w-[200px]">
+          <label className="text-[11px] font-semibold text-slate-600">Status</label>
+          <Select value={value} onValueChange={setValue}>
+            <SelectTrigger className="h-9 mt-1"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {VISA_STEPS.map((s) => (
+                <SelectItem key={s.value} value={s.value}><span className={s.tone}>{s.label}</span></SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="flex-1 min-w-[220px]">
+          <label className="text-[11px] font-semibold text-slate-600">Note to candidate (optional)</label>
+          <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="e.g. Embassy appointment on 12 June" className="h-9 mt-1 text-sm" />
+        </div>
+        <Button size="sm" onClick={() => save.mutate()} disabled={!dirty || save.isPending} className="gap-1 bg-indigo-600 hover:bg-indigo-700 text-white">
+          {save.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />} Update & notify
+        </Button>
+      </div>
+    </div>
   );
 }
 

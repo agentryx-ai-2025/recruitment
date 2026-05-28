@@ -6,7 +6,7 @@ import { storage } from "../storage";
 import { logger } from "../config/logger.config";
 import { insertRecruitmentAgentSchema, recruitmentAgents, candidates, agencyReviews,
   candidateEducation, candidateExperience, documents, applications, jobs,
-  agencyDocuments } from "@shared/schema";
+  agencyDocuments, placements } from "@shared/schema";
 import { eq } from "drizzle-orm";
 import {
   agencyDocUpload, verifyUploadedFile, handleUploadErrors,
@@ -135,9 +135,10 @@ router.get("/candidates/:id", protect, async (req, res, next) => {
     // candidate they just got a notification about.
     const { desc } = await import("drizzle-orm");
     const apps = await storage.db
-      .select({ application: applications, job: jobs })
+      .select({ application: applications, job: jobs, placement: placements })
       .from(applications)
       .innerJoin(jobs, eq(applications.jobId, jobs.id))
+      .leftJoin(placements, eq(placements.applicationId, applications.id))
       .where(eq(applications.candidateId, candidate.id))
       .orderBy(desc(applications.appliedAt));
     const applicationsList = apps.map((r: any) => ({
@@ -149,6 +150,9 @@ router.get("/candidates/:id", protect, async (req, res, next) => {
       jobTitle: r.job.title,
       company: r.job.company,
       country: r.job.country,
+      placementId: r.placement?.id ?? null,
+      visaStatus: r.placement?.visaStatus ?? null,
+      placementStatus: r.placement?.status ?? null,
     }));
 
     res.json({

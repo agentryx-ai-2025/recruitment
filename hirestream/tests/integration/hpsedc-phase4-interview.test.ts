@@ -15,7 +15,7 @@ import request from 'supertest';
 import type { Express } from 'express';
 import { sql } from 'drizzle-orm';
 import { createTestApp, truncateAllTables, getDb } from '../helpers';
-import { interviews, applications, jobs as jobsTable, candidates, recruitmentAgents } from '../../shared/schema';
+import { interviews, applications, jobs as jobsTable, candidates, recruitmentAgents, placements } from '../../shared/schema';
 import { eq } from 'drizzle-orm';
 
 let app: Express;
@@ -248,5 +248,55 @@ describe('Phase 4 — agent reschedule response', () => {
     expect(r.status).toBe(200);
     const row = (r.body.data as any[]).find((a) => a.applicationId === applicationId);
     expect(row.interview?.candidateConfirmedStatus).toBe('reschedule_requested');
+  });
+});
+
+describe('Phase 4 — agent visa/passport status (placement)', () => {
+  let placementId: string;
+
+  beforeEach(async () => {
+    const db = getDb();
+    await db.update(applications).set({ status: 'placed' }).where(eq(applications.id, applicationId));
+    const pIns = await db.insert(placements).values({ applicationId, country: 'Canada' }).returning();
+    placementId = pIns[0].id;
+  });
+
+  it('agent updates visa status, candidate is notified', async () => {
+    const r = await request(app).patch(`/api/v1/agent/placements/${placementId}/visa-status`)
+      .set('Cookie', agentCookie).send({ visaStatus: 'applied', note: 'Embassy appt 12 June' });
+    expect(r.status).toBe(200);
+    expect(r.body.data.visaStatus).toBe('applied');
+
+    const notifs = await request(app).get('/api/v1/notifications').set('Cookie', candidateCookie);
+    const titles = (notifs.body.data as any[]).map((n) => String(n.title));
+    expect(titles.some((t) => t.startsWith('Visa status'))).toBe(true);
+  });
+
+  it('rejects an invalid visa status', async () => {
+    const r = await request(app).patch(`/api/v1/agent/placements/${placementId}/visa-status`)
+      .set('Cookie', agentCookie).send({ visaStatus: 'maybe' });
+    expect(r.status).toBe(400);
+  });
+
+  it('a different agent cannot update the visa status (IDOR guard)', async () => {
+    const otherReg = await request(app).post('/api/v1/auth/register').send({ email: 'other-visa@test.com', password: 'Test@123', role: 'agent' });
+    const otherCookie = otherReg.headers['set-cookie'] as unknown as string[];
+    const db = getDb();
+    await request(app).post('/api/v1/agencies/register').set('Cookie', otherCookie)
+      .send({ agencyName: 'Other Visa Agency', licenseNumber: 'LIC-VISA-OTHER', specializations: ['IT'] });
+    await db.execute(sql`UPDATE recruitment_agents SET verified = true WHERE user_id = ${otherReg.body.data.id}`);
+    const r = await request(app).patch(`/api/v1/agent/placements/${placementId}/visa-status`)
+      .set('Cookie', otherCookie).send({ visaStatus: 'approved' });
+    expect(r.status).toBe(403);
+  });
+
+  it('candidate-detail endpoint surfaces placementId + visaStatus for the placed application', async () => {
+    await request(app).patch(`/api/v1/agent/placements/${placementId}/visa-status`)
+      .set('Cookie', agentCookie).send({ visaStatus: 'approved' });
+    const r = await request(app).get(`/api/v1/agencies/candidates/${candidateId}`).set('Cookie', agentCookie);
+    expect(r.status).toBe(200);
+    const placedApp = (r.body.data.applications as any[]).find((a) => a.id === applicationId);
+    expect(placedApp.placementId).toBe(placementId);
+    expect(placedApp.visaStatus).toBe('approved');
   });
 });
