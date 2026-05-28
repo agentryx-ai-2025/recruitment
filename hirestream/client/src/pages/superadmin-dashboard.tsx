@@ -737,140 +737,193 @@ function SystemView({ stats }: any) {
 }
 
 // ── Data Management (Reset & Reseed) ──
+// v0.4.36: rebuilt with 4 modes. The old version called a stale endpoint
+// that silently failed (wrong table names + missing FK-child tables).
+type ResetChoice =
+  | { kind: "reseed" }
+  | { kind: "full" }
+  | { kind: "activity" }
+  | { kind: "selective"; classes: string[] };
+
 function DataManagementPanel() {
-  const [confirmReset, setConfirmReset] = useState(false);
-  const [confirmReseed, setConfirmReseed] = useState(false);
+  const [pending, setPending] = useState<ResetChoice | null>(null);  // which action is awaiting confirm
+  const [selected, setSelected] = useState<string[]>([]);
   const [lastResult, setLastResult] = useState<any>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const resetMutation = useMutation({
-    mutationFn: async () => {
-      const res = await fetch("/api/v1/superadmin/reset", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ confirmation: "RESET_HIRESTREAM" }),
-      });
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.message || "Reset failed");
+  const { data: optionsRes } = useQuery({
+    queryKey: ["/api/v1/superadmin/reset/options"],
+    queryFn: () => fetchJson("/api/v1/superadmin/reset/options"),
+  });
+  const classes: { key: string; label: string; note: string }[] = optionsRes?.data || [];
+
+  const run = useMutation({
+    mutationFn: async (choice: ResetChoice) => {
+      if (choice.kind === "reseed") {
+        const res = await fetch("/api/v1/superadmin/reseed", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ confirmation: "RESEED_HIRESTREAM" }),
+        });
+        if (!res.ok) throw new Error((await res.json()).message || "Reseed failed");
+        return { type: "reseed", data: await res.json() };
       }
-      return res.json();
+      const body: any = { confirmation: "RESET_HIRESTREAM", mode: choice.kind };
+      if (choice.kind === "selective") body.classes = choice.classes;
+      const res = await fetch("/api/v1/superadmin/reset", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) throw new Error((await res.json()).message || "Reset failed");
+      return { type: choice.kind, data: await res.json() };
     },
-    onSuccess: (data) => {
-      setLastResult({ type: "reset", data });
+    onSuccess: (result) => {
+      setLastResult(result);
       queryClient.invalidateQueries();
-      toast({ title: "Database reset complete" });
-      setConfirmReset(false);
+      toast({ title: "Done", description: result.data?.message || "Completed" });
+      setPending(null);
     },
-    onError: (err: any) => toast({ title: "Reset failed", description: err.message, variant: "destructive" }),
+    onError: (err: any) => toast({ title: "Failed", description: err.message, variant: "destructive" }),
   });
 
-  const reseedMutation = useMutation({
-    mutationFn: async () => {
-      const res = await fetch("/api/v1/superadmin/reseed", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ confirmation: "RESEED_HIRESTREAM" }),
-      });
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.message || "Reseed failed");
-      }
-      return res.json();
-    },
-    onSuccess: (data) => {
-      setLastResult({ type: "reseed", data });
-      queryClient.invalidateQueries();
-      toast({ title: "Demo data reseeded" });
-      setConfirmReseed(false);
-    },
-    onError: (err: any) => toast({ title: "Reseed failed", description: err.message, variant: "destructive" }),
-  });
+  const cardBtn = "w-full rounded-lg text-xs font-semibold";
 
   return (
     <div className="bg-gradient-to-br from-red-50 to-orange-50 rounded-xl border-2 border-red-200 p-5 shadow-sm">
       <h3 className="text-sm font-bold text-red-900 flex items-center gap-2 mb-1">
         <AlertTriangle className="w-4 h-4 text-red-600" /> Danger Zone — Data Management
       </h3>
-      <p className="text-xs text-red-700/80 mb-4">Testing utilities — destructive actions that wipe database state. Super Admin users are always preserved.</p>
+      <p className="text-xs text-red-700/80 mb-4">Testing utilities — destructive, FK-safe wipes. Super Admin login + system config (settings, integrations, templates) are always preserved.</p>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        {/* Reset */}
-        <div className="bg-white rounded-lg border border-red-200 p-4">
-          <div className="flex items-center gap-2 mb-2">
-            <div className="w-9 h-9 rounded-lg bg-red-100 text-red-600 flex items-center justify-center">
-              <Database className="w-4 h-4" />
-            </div>
-            <div>
-              <p className="text-sm font-bold text-slate-900">Reset Database</p>
-              <p className="text-[11px] text-slate-500">Wipes all test data (users, jobs, applications, etc.)</p>
-            </div>
-          </div>
-          {!confirmReset ? (
-            <Button size="sm" variant="outline"
-              className="w-full rounded-lg text-red-600 border-red-200 hover:bg-red-50 text-xs"
-              onClick={() => setConfirmReset(true)}>
-              <AlertTriangle className="w-3.5 h-3.5 mr-1.5" /> Reset
-            </Button>
-          ) : (
-            <div className="space-y-2">
-              <p className="text-[11px] text-red-700 font-semibold">Are you absolutely sure? This cannot be undone.</p>
-              <div className="flex gap-2">
-                <Button size="sm" variant="outline" className="flex-1 rounded-lg text-xs" onClick={() => setConfirmReset(false)}>
-                  Cancel
-                </Button>
-                <Button size="sm" className="flex-1 rounded-lg bg-red-600 text-white hover:bg-red-700 text-xs"
-                  onClick={() => resetMutation.mutate()} disabled={resetMutation.isPending}>
-                  {resetMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "Confirm Reset"}
-                </Button>
-              </div>
-            </div>
-          )}
-        </div>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        {/* Full + Reseed */}
+        <ResetCard
+          icon={UserPlus} tone="orange"
+          title="Full wipe + reseed"
+          desc="Clear everything, then load the demo dataset (candidates, agencies, employers, jobs, applications)."
+          actionLabel="Wipe + Reseed"
+          confirmLabel="Confirm — wipe & reseed"
+          armed={pending?.kind === "reseed"}
+          onArm={() => setPending({ kind: "reseed" })}
+          onCancel={() => setPending(null)}
+          onConfirm={() => run.mutate({ kind: "reseed" })}
+          busy={run.isPending}
+        />
 
-        {/* Reseed */}
-        <div className="bg-white rounded-lg border border-orange-200 p-4">
-          <div className="flex items-center gap-2 mb-2">
-            <div className="w-9 h-9 rounded-lg bg-orange-100 text-orange-600 flex items-center justify-center">
-              <UserPlus className="w-4 h-4" />
-            </div>
-            <div>
-              <p className="text-sm font-bold text-slate-900">Reset + Reseed</p>
-              <p className="text-[11px] text-slate-500">Wipe + repopulate with demo accounts and jobs</p>
-            </div>
+        {/* Full empty */}
+        <ResetCard
+          icon={Database} tone="red"
+          title="Full wipe (empty)"
+          desc="Clear ALL data to a blank portal. No demo data — for testing onboarding from zero."
+          actionLabel="Wipe to empty"
+          confirmLabel="Confirm — wipe to empty"
+          armed={pending?.kind === "full"}
+          onArm={() => setPending({ kind: "full" })}
+          onCancel={() => setPending(null)}
+          onConfirm={() => run.mutate({ kind: "full" })}
+          busy={run.isPending}
+        />
+
+        {/* Activity only */}
+        <ResetCard
+          icon={Database} tone="amber"
+          title="Activity-only reset"
+          desc="Clear applications, interviews, placements, notifications, drives & grievances. Keep users, candidates, agencies, employers, jobs."
+          actionLabel="Clear activity"
+          confirmLabel="Confirm — clear activity"
+          armed={pending?.kind === "activity"}
+          onArm={() => setPending({ kind: "activity" })}
+          onCancel={() => setPending(null)}
+          onConfirm={() => run.mutate({ kind: "activity" })}
+          busy={run.isPending}
+        />
+      </div>
+
+      {/* Selective */}
+      <div className="mt-3 bg-white rounded-lg border border-slate-200 p-4">
+        <div className="flex items-center gap-2 mb-3">
+          <div className="w-9 h-9 rounded-lg bg-slate-100 text-slate-600 flex items-center justify-center"><Database className="w-4 h-4" /></div>
+          <div>
+            <p className="text-sm font-bold text-slate-900">Per-entity selective</p>
+            <p className="text-[11px] text-slate-500">Pick exactly which data classes to wipe. Each cascades to its dependents (e.g. Candidates also clears their applications & interviews).</p>
           </div>
-          {!confirmReseed ? (
-            <Button size="sm" variant="outline"
-              className="w-full rounded-lg text-orange-600 border-orange-200 hover:bg-orange-50 text-xs"
-              onClick={() => setConfirmReseed(true)}>
-              <AlertTriangle className="w-3.5 h-3.5 mr-1.5" /> Reset + Reseed
-            </Button>
-          ) : (
-            <div className="space-y-2">
-              <p className="text-[11px] text-orange-700 font-semibold">Confirm: wipes and reseeds demo data.</p>
-              <div className="flex gap-2">
-                <Button size="sm" variant="outline" className="flex-1 rounded-lg text-xs" onClick={() => setConfirmReseed(false)}>
-                  Cancel
-                </Button>
-                <Button size="sm" className="flex-1 rounded-lg bg-orange-600 text-white hover:bg-orange-700 text-xs"
-                  onClick={() => reseedMutation.mutate()} disabled={reseedMutation.isPending}>
-                  {reseedMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "Confirm Reseed"}
-                </Button>
-              </div>
-            </div>
-          )}
         </div>
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mb-3">
+          {classes.map((c) => {
+            const on = selected.includes(c.key);
+            return (
+              <button key={c.key} type="button"
+                onClick={() => setSelected(on ? selected.filter((x) => x !== c.key) : [...selected, c.key])}
+                className={`text-left p-2 rounded-lg border text-[11px] transition ${
+                  on ? "bg-red-50 border-red-300 text-red-800" : "bg-white border-slate-200 hover:border-slate-300 text-slate-600"
+                }`}>
+                <span className="font-semibold flex items-center gap-1">
+                  {on && <span className="text-red-500">✓</span>}{c.label}
+                </span>
+                <span className="block text-[10px] text-slate-400 mt-0.5">{c.note}</span>
+              </button>
+            );
+          })}
+        </div>
+        {pending?.kind !== "selective" ? (
+          <Button size="sm" variant="outline" disabled={selected.length === 0}
+            className="rounded-lg text-red-600 border-red-200 hover:bg-red-50 text-xs"
+            onClick={() => setPending({ kind: "selective", classes: selected })}>
+            <AlertTriangle className="w-3.5 h-3.5 mr-1.5" /> Wipe {selected.length} selected class{selected.length === 1 ? "" : "es"}
+          </Button>
+        ) : (
+          <div className="flex items-center gap-2">
+            <p className="text-[11px] text-red-700 font-semibold flex-1">Confirm wipe of: {selected.join(", ")}</p>
+            <Button size="sm" variant="outline" className="rounded-lg text-xs" onClick={() => setPending(null)}>Cancel</Button>
+            <Button size="sm" className="rounded-lg bg-red-600 text-white hover:bg-red-700 text-xs"
+              onClick={() => run.mutate({ kind: "selective", classes: selected })} disabled={run.isPending}>
+              {run.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "Confirm wipe"}
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* Last Result */}
       {lastResult && (
         <div className="mt-4 bg-slate-900 text-slate-100 rounded-lg p-3 font-mono text-[11px]">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-emerald-400 font-bold">{lastResult.type.toUpperCase()} · Success</span>
+            <span className="text-emerald-400 font-bold">{String(lastResult.type).toUpperCase()} · Success</span>
             <button onClick={() => setLastResult(null)} className="text-slate-400 hover:text-white">✕</button>
           </div>
           <pre className="whitespace-pre-wrap break-words overflow-auto max-h-48">{JSON.stringify(lastResult.data, null, 2)}</pre>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ResetCard({ icon: Icon, tone, title, desc, actionLabel, confirmLabel, armed, onArm, onCancel, onConfirm, busy }: any) {
+  const tones: any = {
+    red: { bg: "bg-red-100", text: "text-red-600", btn: "bg-red-600 hover:bg-red-700", border: "border-red-200", outline: "text-red-600 border-red-200 hover:bg-red-50" },
+    orange: { bg: "bg-orange-100", text: "text-orange-600", btn: "bg-orange-600 hover:bg-orange-700", border: "border-orange-200", outline: "text-orange-600 border-orange-200 hover:bg-orange-50" },
+    amber: { bg: "bg-amber-100", text: "text-amber-600", btn: "bg-amber-600 hover:bg-amber-700", border: "border-amber-200", outline: "text-amber-700 border-amber-200 hover:bg-amber-50" },
+  };
+  const t = tones[tone];
+  return (
+    <div className={`bg-white rounded-lg border ${t.border} p-4 flex flex-col`}>
+      <div className="flex items-center gap-2 mb-2">
+        <div className={`w-9 h-9 rounded-lg ${t.bg} ${t.text} flex items-center justify-center flex-shrink-0`}><Icon className="w-4 h-4" /></div>
+        <p className="text-sm font-bold text-slate-900">{title}</p>
+      </div>
+      <p className="text-[11px] text-slate-500 mb-3 flex-1">{desc}</p>
+      {!armed ? (
+        <Button size="sm" variant="outline" className={`w-full rounded-lg text-xs ${t.outline}`} onClick={onArm}>
+          <AlertTriangle className="w-3.5 h-3.5 mr-1.5" /> {actionLabel}
+        </Button>
+      ) : (
+        <div className="space-y-2">
+          <p className="text-[11px] text-slate-700 font-semibold">Cannot be undone.</p>
+          <div className="flex gap-2">
+            <Button size="sm" variant="outline" className="flex-1 rounded-lg text-xs" onClick={onCancel}>Cancel</Button>
+            <Button size="sm" className={`flex-1 rounded-lg text-white text-xs ${t.btn}`} onClick={onConfirm} disabled={busy}>
+              {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : confirmLabel}
+            </Button>
+          </div>
         </div>
       )}
     </div>

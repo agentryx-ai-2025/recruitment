@@ -160,52 +160,50 @@ router.get("/stats", async (req, res) => {
 
 // ─── DANGER ZONE: DB RESET / RESEED ────────────────────────────────────────
 // POST /api/v1/superadmin/reset — reset all non-user data and reseed demo data
+// GET /api/v1/superadmin/reset/options — list the selectable data classes
+// so the UI can render the per-entity checkboxes from a single source.
+router.get("/reset/options", async (_req, res) => {
+  const { DATA_CLASSES } = await import("../services/data-reset.service");
+  res.json({
+    success: true,
+    data: Object.entries(DATA_CLASSES).map(([key, v]) => ({ key, label: v.label, note: v.note })),
+  });
+});
+
+// POST /api/v1/superadmin/reset — wipe data. v0.4.36: rebuilt on the
+// data-reset service (TRUNCATE CASCADE, FK-safe, transactional).
+// Body: { confirmation: "RESET_HIRESTREAM", mode: "activity"|"full"|"selective",
+//         classes?: string[] }  — `classes` required when mode=selective.
 router.post("/reset", async (req, res) => {
   try {
-    const { confirmation } = req.body;
+    const { confirmation, mode = "full", classes } = req.body;
     if (confirmation !== "RESET_HIRESTREAM") {
       return res.status(400).json({
         success: false,
         message: "Missing confirmation. Send { confirmation: 'RESET_HIRESTREAM' } to proceed."
       });
     }
-
-    const { storage } = await import("../storage");
-    const schema = await import("@shared/schema");
-    if (!storage.db) return res.status(500).json({ success: false, message: "No db available" });
-
-    const db = storage.db;
-
-    // Order matters: delete child tables before parent tables due to FK constraints
-    const tablesToReset = [
-      "documents", "applications", "notifications", "grievances",
-      "drives", "jobs", "recruitmentAgents", "candidates",
-      "savedJobs", "jobViews", "auditLogs", "education", "experience",
-    ];
-    const deletedCounts: Record<string, number> = {};
-
-    for (const tableName of tablesToReset) {
-      const table = (schema as any)[tableName];
-      if (!table) continue;
-      try {
-        const deleted = await db.delete(table).returning();
-        deletedCounts[tableName] = deleted.length;
-      } catch (err: any) {
-        // Skip tables that don't exist yet
-        deletedCounts[tableName] = 0;
-      }
+    if (!["activity", "full", "selective"].includes(mode)) {
+      return res.status(400).json({ success: false, message: "mode must be activity / full / selective" });
+    }
+    if (mode === "selective" && (!Array.isArray(classes) || classes.length === 0)) {
+      return res.status(400).json({ success: false, message: "selective mode needs a non-empty classes[] array" });
     }
 
-    // Delete all non-superadmin users (preserve superadmins so we can log back in)
-    const { users } = schema as any;
-    const { ne } = await import("drizzle-orm");
-    const deletedUsers = await db.delete(users).where(ne(users.role, "superadmin")).returning();
-    deletedCounts["users (non-superadmin)"] = deletedUsers.length;
+    const { resetData } = await import("../services/data-reset.service");
+    const result = await resetData({ mode, classes });
 
     res.json({
       success: true,
-      message: "Database reset complete. Run `npm run db:seed` CLI to repopulate demo data.",
-      deleted: deletedCounts,
+      message: mode === "full"
+        ? "Full data wipe complete. Superadmin + system config preserved. Use Reset+Reseed to repopulate demo data."
+        : mode === "activity"
+          ? "Activity data cleared. Users, candidates, agencies, employers and jobs were kept."
+          : "Selected data classes cleared.",
+      mode: result.mode,
+      tablesTruncated: result.tablesTruncated,
+      deleted: result.rowsDeleted,
+      usersDeleted: result.usersDeleted,
     });
   } catch (err: any) {
     res.status(500).json({ success: false, message: "Reset failed", error: err.message });

@@ -6,7 +6,7 @@ import {
   recruitmentDrives, interviews, placements, notifications, agencyReviews,
   grievances, faq, announcements,
 } from "@shared/schema";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import bcrypt from "bcrypt";
 
 /**
@@ -61,24 +61,21 @@ async function seed() {
   }
   console.log(`Users: ${Object.keys(userIds).length}`);
 
-  // ── CLEAN SLATE (FK-safe order) ──────────────────────────────────────
-  await db.delete(placements);
-  await db.delete(interviews);
-  await db.delete(applications);
-  await db.delete(savedJobs);
-  await db.delete(notifications);
-  await db.delete(agencyReviews);
-  await db.delete(grievances);
-  await db.delete(recruitmentDrives);
-  await db.delete(jobs);
-  await db.delete(documents);
-  await db.delete(candidateExperience);
-  await db.delete(candidateEducation);
-  await db.delete(recruitmentAgents);
-  await db.delete(employers);
-  await db.delete(candidates);
-  await db.delete(faq);
-  await db.delete(announcements);
+  // ── CLEAN SLATE ──────────────────────────────────────────────────────
+  // v0.4.36: single TRUNCATE … CASCADE instead of a hand-ordered delete
+  // chain that kept drifting out of sync with the schema (it used to miss
+  // application_notes, employer_documents, agency_documents, etc. and
+  // throw FK errors mid-seed). CASCADE lets Postgres resolve the FK graph.
+  // We do NOT truncate `users` here — the user upsert above preserves IDs.
+  await db.execute(sql`TRUNCATE TABLE
+    candidates, recruitment_agents, employers, jobs, applications,
+    notifications, grievances, recruitment_drives, saved_jobs,
+    saved_searches, saved_segments, agency_reviews, documents,
+    candidate_education, candidate_experience, candidate_references,
+    candidate_agent_tags, agency_documents, employer_documents,
+    application_notes, interviews, placements, training_events,
+    faq, announcements
+    RESTART IDENTITY CASCADE`);
 
   // ── CANDIDATES ──────────────────────────────────────────────────────
   const candidateSeed = [
