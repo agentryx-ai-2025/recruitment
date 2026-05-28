@@ -93,7 +93,9 @@ describe('Phase 3 — GET /api/v1/matching/version', () => {
     expect(r.status).toBe(200);
     expect(r.body.data.version).toBe('v2');
     expect(r.body.data.weights).toMatchObject({ skill: 30, experience: 20, qualification: 10 });
-    expect(r.body.data.policy.skill).toBe('zero');
+    // v0.4.35.1: policy is per-direction. Skill candidate-missing = zero.
+    expect(r.body.data.policy.skill.candidateMissing).toBe('zero');
+    expect(r.body.data.policy.skill.jobMissing).toBe('half');
     expect(typeof r.body.data.thresholdPct).toBe('number');
     expect(r.body.data.ieltsCountries).toContain('UK');
   });
@@ -177,6 +179,63 @@ describe('Phase 3 — IELTS-country language routing', () => {
     const detail = await request(app).get(`/api/v1/applications/${apply.body.data.id}`).set('Cookie', candidateCookie);
     const lang = detail.body.data.scoreBreakdown.language;
     expect(lang.score).toBe(lang.max);
+  });
+
+  // v0.4.35.1: per-direction policy — the asymmetry the doc promised.
+  it('IELTS job requires a band but candidate has none → ZERO (candidate-missing policy)', async () => {
+    const db = getDb();
+    await db.execute(sql`UPDATE candidates SET ielts_band = NULL WHERE user_id = ${candidateUserId}`);
+    const job = await postJob({ country: 'UK', requiredIeltsBand: '6.0' });
+    const apply = await request(app).post(`/api/v1/jobs/${job.id}/apply`).set('Cookie', candidateCookie);
+    const detail = await request(app).get(`/api/v1/applications/${apply.body.data.id}`).set('Cookie', candidateCookie);
+    const lang = detail.body.data.scoreBreakdown.language;
+    expect(lang.score).toBe(0);  // language gaps MUST surface
+    expect(lang.policyApplied).toBe('zero');
+  });
+
+  it('IELTS country, job did NOT set a band, candidate has none → FULL (job-missing policy, both-missing → job-side wins)', async () => {
+    const db = getDb();
+    await db.execute(sql`UPDATE candidates SET ielts_band = NULL WHERE user_id = ${candidateUserId}`);
+    const job = await postJob({ country: 'UK' });  // no requiredIeltsBand
+    const apply = await request(app).post(`/api/v1/jobs/${job.id}/apply`).set('Cookie', candidateCookie);
+    const detail = await request(app).get(`/api/v1/applications/${apply.body.data.id}`).set('Cookie', candidateCookie);
+    const lang = detail.body.data.scoreBreakdown.language;
+    expect(lang.score).toBe(lang.max);  // not a constraint → full marks
+    expect(lang.policyApplied).toBe('full');
+  });
+
+  it('admin can set candidate-missing language policy to half and it takes effect', async () => {
+    // Override language candidate-missing → half
+    await request(app).put('/api/v1/admin/settings/matching.policy')
+      .set('Cookie', adminCookie)
+      .send({ value: {
+        skill: { jobMissing: 'half', candidateMissing: 'zero' },
+        experience: { jobMissing: 'full', candidateMissing: 'full' },
+        qualification: { jobMissing: 'full', candidateMissing: 'half' },
+        country: { jobMissing: 'full', candidateMissing: 'half' },
+        language: { jobMissing: 'full', candidateMissing: 'half' },  // ← changed
+        category: { jobMissing: 'full', candidateMissing: 'half' },
+        salary: { jobMissing: 'full', candidateMissing: 'full' },
+      } });
+    const db = getDb();
+    await db.execute(sql`UPDATE candidates SET ielts_band = NULL WHERE user_id = ${candidateUserId}`);
+    const job = await postJob({ country: 'UK', requiredIeltsBand: '6.0' });
+    const apply = await request(app).post(`/api/v1/jobs/${job.id}/apply`).set('Cookie', candidateCookie);
+    const detail = await request(app).get(`/api/v1/applications/${apply.body.data.id}`).set('Cookie', candidateCookie);
+    const lang = detail.body.data.scoreBreakdown.language;
+    expect(lang.score).toBe(Math.round(lang.max / 2));  // now half, not zero
+    // Restore default for downstream tests
+    await request(app).put('/api/v1/admin/settings/matching.policy')
+      .set('Cookie', adminCookie)
+      .send({ value: {
+        skill: { jobMissing: 'half', candidateMissing: 'zero' },
+        experience: { jobMissing: 'full', candidateMissing: 'full' },
+        qualification: { jobMissing: 'full', candidateMissing: 'half' },
+        country: { jobMissing: 'full', candidateMissing: 'half' },
+        language: { jobMissing: 'full', candidateMissing: 'zero' },
+        category: { jobMissing: 'full', candidateMissing: 'half' },
+        salary: { jobMissing: 'full', candidateMissing: 'full' },
+      } });
   });
 });
 

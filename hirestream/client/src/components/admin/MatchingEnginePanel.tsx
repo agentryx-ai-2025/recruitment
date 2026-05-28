@@ -43,15 +43,39 @@ const FACTORS = [
 
 type FactorKey = (typeof FACTORS)[number]["key"];
 type Policy = "full" | "half" | "zero";
+// v0.4.35.1: per-direction policy — job-side vs candidate-side missing.
+interface PolicyPair { jobMissing: Policy; candidateMissing: Policy; }
 
 const DEFAULT_WEIGHTS: Record<FactorKey, number> = {
   skill: 30, experience: 20, qualification: 10, country: 15,
   language: 10, category: 10, salary: 5,
 };
-const DEFAULT_POLICY: Record<FactorKey, Policy> = {
-  skill: "zero", experience: "full", qualification: "full",
-  country: "full", language: "full", category: "full", salary: "full",
+const DEFAULT_POLICY: Record<FactorKey, PolicyPair> = {
+  skill:         { jobMissing: "half", candidateMissing: "zero" },
+  experience:    { jobMissing: "full", candidateMissing: "full" },
+  qualification: { jobMissing: "full", candidateMissing: "half" },
+  country:       { jobMissing: "full", candidateMissing: "half" },
+  language:      { jobMissing: "full", candidateMissing: "zero" },
+  category:      { jobMissing: "full", candidateMissing: "half" },
+  salary:        { jobMissing: "full", candidateMissing: "full" },
 };
+
+// Normalise whatever the API returns (could be legacy string shape) into
+// the per-direction shape the editor expects.
+function coercePolicy(raw: any): Record<FactorKey, PolicyPair> {
+  const out: Record<FactorKey, PolicyPair> = JSON.parse(JSON.stringify(DEFAULT_POLICY));
+  if (!raw || typeof raw !== "object") return out;
+  for (const f of FACTORS) {
+    const v = raw[f.key];
+    if (v === "full" || v === "half" || v === "zero") {
+      out[f.key] = { jobMissing: v, candidateMissing: v };
+    } else if (v && typeof v === "object") {
+      if (["full","half","zero"].includes(v.jobMissing)) out[f.key].jobMissing = v.jobMissing;
+      if (["full","half","zero"].includes(v.candidateMissing)) out[f.key].candidateMissing = v.candidateMissing;
+    }
+  }
+  return out;
+}
 
 export function MatchingEnginePanel() {
   const qc = useQueryClient();
@@ -68,7 +92,7 @@ export function MatchingEnginePanel() {
   const live = versionRes?.data || {};
 
   const [weights, setWeights] = useState<Record<FactorKey, number>>(DEFAULT_WEIGHTS);
-  const [policy, setPolicy] = useState<Record<FactorKey, Policy>>(DEFAULT_POLICY);
+  const [policy, setPolicy] = useState<Record<FactorKey, PolicyPair>>(DEFAULT_POLICY);
   const [threshold, setThreshold] = useState<number>(40);
   const [engineVersion, setEngineVersion] = useState<"v1" | "v2">("v2");
   const [showBreakdown, setShowBreakdown] = useState<boolean>(true);
@@ -76,7 +100,7 @@ export function MatchingEnginePanel() {
   // Hydrate state from live settings on first load
   useEffect(() => {
     if (live.weights) setWeights({ ...DEFAULT_WEIGHTS, ...live.weights });
-    if (live.policy) setPolicy({ ...DEFAULT_POLICY, ...live.policy });
+    if (live.policy) setPolicy(coercePolicy(live.policy));
     if (typeof live.thresholdPct === "number") setThreshold(live.thresholdPct);
     if (live.version) setEngineVersion(live.version);
   }, [live.version]);
@@ -191,22 +215,39 @@ export function MatchingEnginePanel() {
         </div>
       </section>
 
-      {/* Panel 2 — Missing-criteria policy */}
+      {/* Panel 2 — Missing-criteria policy (per-direction) */}
       <section className="rounded-xl border border-slate-200 bg-white p-5">
-        <SectionHeader icon={ShieldCheck} title="Missing-criteria policy" subtitle="What to do when the job or candidate side is blank for a factor." />
+        <SectionHeader icon={ShieldCheck} title="Missing-criteria policy" subtitle="Per factor: what to award when the JOB didn't specify vs when the CANDIDATE didn't provide the data. (Both missing → job-side rule applies.)" />
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 mt-4">
           {FACTORS.map((f) => (
             <div key={f.key} className="rounded-lg border border-slate-200 p-3">
-              <p className={`text-xs font-bold ${f.accent}`}>{f.label}</p>
-              <p className="text-[10px] text-slate-500 mb-2">Default: <span className="font-mono">{DEFAULT_POLICY[f.key]}</span></p>
-              <Select value={policy[f.key]} onValueChange={(v) => setPolicy({ ...policy, [f.key]: v as Policy })}>
-                <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="full">Full marks (neutral)</SelectItem>
-                  <SelectItem value="half">Half marks (compromise)</SelectItem>
-                  <SelectItem value="zero">Zero marks (strict)</SelectItem>
-                </SelectContent>
-              </Select>
+              <p className={`text-xs font-bold ${f.accent} mb-2`}>{f.label}</p>
+              <div className="space-y-2">
+                <div>
+                  <p className="text-[10px] text-slate-500 mb-0.5">Job didn't specify <span className="font-mono text-slate-400">(def: {DEFAULT_POLICY[f.key].jobMissing})</span></p>
+                  <Select value={policy[f.key].jobMissing}
+                    onValueChange={(v) => setPolicy({ ...policy, [f.key]: { ...policy[f.key], jobMissing: v as Policy } })}>
+                    <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="full">Full (neutral)</SelectItem>
+                      <SelectItem value="half">Half</SelectItem>
+                      <SelectItem value="zero">Zero (strict)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <p className="text-[10px] text-slate-500 mb-0.5">Candidate didn't provide <span className="font-mono text-slate-400">(def: {DEFAULT_POLICY[f.key].candidateMissing})</span></p>
+                  <Select value={policy[f.key].candidateMissing}
+                    onValueChange={(v) => setPolicy({ ...policy, [f.key]: { ...policy[f.key], candidateMissing: v as Policy } })}>
+                    <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="full">Full (neutral)</SelectItem>
+                      <SelectItem value="half">Half</SelectItem>
+                      <SelectItem value="zero">Zero (strict)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
             </div>
           ))}
         </div>

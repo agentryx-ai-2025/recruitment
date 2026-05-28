@@ -157,17 +157,24 @@ export const SETTING_SPECS: SettingSpec[] = [
     },
   },
   {
-    // v0.4.33 (Phase 3): missing-criteria policy per factor. Values are
-    // "full" | "half" | "zero". See HireStream_Matching_Engine.pdf §4 for
-    // the rationale behind each default.
+    // v0.4.33 (Phase 3): missing-criteria policy per factor.
+    // v0.4.35.1: per-direction — each factor has separate jobMissing +
+    // candidateMissing knobs. Values "full" | "half" | "zero". Mirrors
+    // HireStream_Matching_Engine.pdf §4. Legacy single-string shape is
+    // auto-migrated by the engine's loadPolicy().
     key: "matching.policy",
     category: "matching",
     label: "Missing-criteria policy",
-    description: "How the engine treats each factor when the job-side or candidate-side input is missing. Values: full / half / zero per factor.",
+    description: "How the engine treats each factor when the job-side OR candidate-side input is missing. Per-direction: { jobMissing, candidateMissing } each full / half / zero.",
     type: "json",
     default: {
-      skill: "zero", experience: "full", qualification: "full",
-      country: "full", language: "full", category: "full", salary: "full",
+      skill:         { jobMissing: "half", candidateMissing: "zero" },
+      experience:    { jobMissing: "full", candidateMissing: "full" },
+      qualification: { jobMissing: "full", candidateMissing: "half" },
+      country:       { jobMissing: "full", candidateMissing: "half" },
+      language:      { jobMissing: "full", candidateMissing: "zero" },
+      category:      { jobMissing: "full", candidateMissing: "half" },
+      salary:        { jobMissing: "full", candidateMissing: "full" },
     },
   },
   {
