@@ -1159,6 +1159,19 @@ function ApplicationsView({ applications, initialIntent }: { applications: any[]
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
+  // v0.4.36.2: keep the open detail panel in sync with refetched data.
+  // `selectedApp` is a snapshot taken when the card was clicked; after
+  // accept/decline (or any status change) the list query refetches, but
+  // the snapshot stayed stale — so the panel kept showing the old
+  // "Offer received" buttons until a manual browser refresh. Re-derive
+  // the selected app from the fresh list whenever it changes.
+  useEffect(() => {
+    if (!selectedApp) return;
+    const fresh = applications?.find((a: any) => a.id === selectedApp.id);
+    if (fresh) setSelectedApp(fresh);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [applications]);
+
   const acceptMutation = useMutation({
     mutationFn: async (placementId: string) => {
       const res = await fetch(`/api/v1/drives/placements/${placementId}/accept`, { method: "PATCH" });
@@ -1434,9 +1447,14 @@ function ApplicationsView({ applications, initialIntent }: { applications: any[]
                         className="border-red-200 text-red-700 hover:bg-red-50">
                         <XCircle className="w-4 h-4 mr-1.5" /> Decline
                       </Button>
+                      {/* v0.4.36.2: open in a NEW TAB. The endpoint serves
+                          the PDF inline, so the browser's viewer opens with
+                          its own download + print controls — the dashboard
+                          stays open behind it. */}
                       <a href={`/api/v1/me/placements/${selectedApp.placement.id}/offer-letter.pdf`}
+                        target="_blank" rel="noopener noreferrer"
                         className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-2 rounded-md border border-slate-200 bg-white hover:border-emerald-400 hover:text-emerald-700 transition">
-                        <Download className="w-4 h-4" /> Download offer letter (PDF)
+                        <Download className="w-4 h-4" /> View / print offer letter (PDF)
                       </a>
                     </div>
                   ) : (

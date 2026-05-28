@@ -579,7 +579,7 @@ function BasicInfoStep({ profile, onNext }: { profile: any; onNext: () => void }
               </Select>
             </FormField>
             <FormField label="PIN Code">
-              <Input value={pinCode} onChange={e => setPinCode(e.target.value)} placeholder="171001" maxLength={6}
+              <Input value={pinCode} inputMode="numeric" onChange={e => setPinCode(e.target.value.replace(/\D/g, ""))} placeholder="171001" maxLength={6}
                 className="h-12 rounded-xl border-emerald-200/80 bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 transition-all" />
             </FormField>
           </div>
@@ -641,7 +641,7 @@ function BasicInfoStep({ profile, onNext }: { profile: any; onNext: () => void }
                 className="h-12 rounded-xl border-amber-200/80 bg-white focus:ring-2 focus:ring-amber-500/20 focus:border-amber-400 transition-all" />
             </FormField>
             <FormField label="PIN Code">
-              <Input value={permPinCode} onChange={e => setPermPinCode(e.target.value)} placeholder="171001" maxLength={6}
+              <Input value={permPinCode} inputMode="numeric" onChange={e => setPermPinCode(e.target.value.replace(/\D/g, ""))} placeholder="171001" maxLength={6}
                 disabled={sameAsCurrent}
                 className="h-12 rounded-xl border-amber-200/80 bg-white focus:ring-2 focus:ring-amber-500/20 focus:border-amber-400 transition-all" />
             </FormField>
@@ -840,11 +840,13 @@ function EducationStep({ onNext, onBack }: { onNext: () => void; onBack: () => v
                       </FormField>
                     )}
                     <FormField label="Year of Passing" icon={Calendar}>
-                      <Input type="number" value={year} onChange={e => setYear(e.target.value)} placeholder="2024"
+                      <Input type="number" min={1950} max={new Date().getFullYear() + 1} value={year}
+                        onChange={e => setYear(e.target.value)} placeholder="2024"
                         className="pl-11 h-12 rounded-xl border-violet-200/80 bg-white" />
                     </FormField>
                     <FormField label="Percentage / CGPA" icon={Star}>
-                      <Input value={percentage} onChange={e => setPercentage(e.target.value)} placeholder="85.5 or 8.5"
+                      <Input type="number" min={0} max={100} step="0.01" value={percentage}
+                        onChange={e => setPercentage(e.target.value)} placeholder="85.5 or 8.5"
                         className="pl-11 h-12 rounded-xl border-violet-200/80 bg-white" />
                     </FormField>
                   </div>
@@ -981,7 +983,7 @@ function ExperienceStep({ onNext, onBack }: { onNext: () => void; onBack: () => 
                         className="pl-11 h-12 rounded-xl border-emerald-200/80 bg-white" />
                     </FormField>
                     <FormField label="Years" icon={Calendar}>
-                      <Input type="number" value={years} onChange={e => setYears(e.target.value)} placeholder="3"
+                      <Input type="number" min={0} max={70} value={years} onChange={e => setYears(e.target.value)} placeholder="3"
                         className="pl-11 h-12 rounded-xl border-emerald-200/80 bg-white" />
                     </FormField>
                     <FormField label="Country" icon={Globe}>
@@ -1294,10 +1296,10 @@ function SkillsStep({ profile, onNext, onBack }: { profile: any; onNext: () => v
                 <span className="text-[10px] text-slate-400 ml-1 font-normal">— annualised</span>
               </label>
               <div className="flex items-center gap-2">
-                <Input type="number" placeholder="Min" value={preferredSalaryMin}
+                <Input type="number" min={0} step={1000} placeholder="Min" value={preferredSalaryMin}
                   onChange={(e) => setPreferredSalaryMin(e.target.value)} className="h-10 text-sm" />
                 <span className="text-slate-400">→</span>
-                <Input type="number" placeholder="Max" value={preferredSalaryMax}
+                <Input type="number" min={0} step={1000} placeholder="Max" value={preferredSalaryMax}
                   onChange={(e) => setPreferredSalaryMax(e.target.value)} className="h-10 text-sm" />
                 <Select value={preferredSalaryCurrency} onValueChange={setPreferredSalaryCurrency}>
                   <SelectTrigger className="h-10 w-20"><SelectValue /></SelectTrigger>
