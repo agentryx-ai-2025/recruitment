@@ -997,7 +997,14 @@ function FeatureFlagsView() {
 
   const flags = flagsRes?.data || [];
   const featureFlags = flags.filter((f: any) => f.category === "feature_flag");
-  const maintenanceSettings = flags.filter((f: any) => f.category === "maintenance");
+  // v0.4.35.2: `system.controls` is also category=maintenance but its value
+  // is a config OBJECT (pipeline pauses), managed on the System Controls
+  // surface — not a maintenance message. Rendering it here as a React child
+  // crashed the page with error #31. Exclude it + only keep the two intended
+  // maintenance keys (mode toggle + message string).
+  const maintenanceSettings = flags.filter((f: any) =>
+    f.category === "maintenance" && f.key !== "system.controls"
+  );
 
   const toggleMutation = useMutation({
     mutationFn: async ({ key, value }: { key: string; value: any }) => {
@@ -1081,7 +1088,8 @@ function FeatureFlagsView() {
             ) : (
               <div className="p-3 rounded-lg bg-white border border-red-200">
                 <p className="text-xs font-semibold text-slate-700 mb-1">Maintenance Message</p>
-                <p className="text-sm text-slate-600 italic">"{flag.value}"</p>
+                {/* Guard: never render a raw object as a React child (error #31). */}
+                <p className="text-sm text-slate-600 italic">"{typeof flag.value === "string" ? flag.value : JSON.stringify(flag.value)}"</p>
               </div>
             )}
           </div>
