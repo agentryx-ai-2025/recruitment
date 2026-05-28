@@ -24,6 +24,7 @@ import { alias } from "drizzle-orm/pg-core";
 import PDFDocument from "pdfkit";
 import { logger } from "../config/logger.config";
 import { getSetting } from "../services/settings.service";
+import { notify } from "../services/notification.service";
 
 const router = Router();
 router.use(protect);
@@ -135,6 +136,97 @@ router.patch("/interviews/:id/feedback", async (req, res, next) => {
 
     const [row] = await storage.db.update(interviews).set(updates).where(eq(interviews.id, req.params.id)).returning();
     res.json({ success: true, data: row });
+  } catch (err) { next(err); }
+});
+
+// ── Respond to a candidate's reschedule request (v0.4.37) ────────────
+// The candidate→agent direction (request) shipped in v0.4.34; this is the
+// agent→candidate response that was missing. Three actions:
+//   accept_proposed → move the interview to the candidate's proposed time
+//   set_time        → agent picks a different new time
+//   keep_original   → decline the request, original time stands
+// In every case the candidate-side reschedule flags are cleared and the
+// candidate is notified.
+router.post("/interviews/:id/respond-reschedule", async (req, res, next) => {
+  try {
+    const db = storage.db;
+    if (!db) return res.status(500).json({ success: false });
+    const user = (req as any).user;
+    if (!["agent", "employer", "admin", "superadmin"].includes(user.role)) {
+      return res.status(403).json({ success: false, message: "Forbidden" });
+    }
+    const { action, newTime } = req.body ?? {};
+    if (!["accept_proposed", "set_time", "keep_original"].includes(action)) {
+      return res.status(400).json({ success: false, error: { code: 400, message: "action must be accept_proposed / set_time / keep_original" } });
+    }
+
+    // Load interview + its application + job for ownership + notification.
+    const [row] = await db
+      .select({ interview: interviews, application: applications, job: jobs })
+      .from(interviews)
+      .innerJoin(applications, eq(interviews.applicationId, applications.id))
+      .innerJoin(jobs, eq(applications.jobId, jobs.id))
+      .where(eq(interviews.id, req.params.id)).limit(1);
+    if (!row) return res.status(404).json({ success: false, message: "Interview not found" });
+
+    // IDOR guard: agent must own the job; employer must own it (direct or
+    // via parent requisition); admin/superadmin bypass.
+    if (user.role === "agent" && row.job.agentId !== user.id) {
+      return res.status(403).json({ success: false, message: "Not your interview" });
+    }
+    if (user.role === "employer") {
+      let owns = row.job.employerId === user.id;
+      if (!owns && row.job.parentRequisitionId) {
+        const [parent] = await db.select({ employerId: jobs.employerId }).from(jobs)
+          .where(eq(jobs.id, row.job.parentRequisitionId)).limit(1);
+        owns = !!parent && parent.employerId === user.id;
+      }
+      if (!owns) return res.status(403).json({ success: false, message: "Not your interview" });
+    }
+
+    const iv = row.interview;
+    const updates: any = {
+      // Clear the candidate-side request regardless of action; status goes
+      // back to null so the candidate is asked to confirm the (new) time.
+      candidateConfirmedStatus: null,
+      candidateRescheduleReason: null,
+      candidateProposedAt: null,
+    };
+    let candidateMsg = "";
+    if (action === "accept_proposed") {
+      if (!iv.candidateProposedAt) {
+        return res.status(400).json({ success: false, error: { code: 400, message: "No proposed time on this request — use set_time instead." } });
+      }
+      updates.scheduledAt = new Date(iv.candidateProposedAt);
+      candidateMsg = `Your reschedule was accepted. New interview time: ${new Date(iv.candidateProposedAt).toLocaleString("en-IN")}. Please confirm.`;
+    } else if (action === "set_time") {
+      const t = newTime ? new Date(newTime) : null;
+      if (!t || Number.isNaN(t.getTime()) || t < new Date()) {
+        return res.status(400).json({ success: false, error: { code: 400, message: "newTime must be a valid future date/time." } });
+      }
+      updates.scheduledAt = t;
+      candidateMsg = `Your interview has been rescheduled to ${t.toLocaleString("en-IN")}. Please confirm.`;
+    } else {
+      // keep_original
+      candidateMsg = `Your reschedule request couldn't be accommodated — the original time (${new Date(iv.scheduledAt).toLocaleString("en-IN")}) stands. Please confirm or decline.`;
+    }
+
+    const [updated] = await db.update(interviews).set(updates).where(eq(interviews.id, iv.id)).returning();
+
+    // Notify the candidate.
+    const candRows = await db.select().from(candidates).where(eq(candidates.id, row.application.candidateId!)).limit(1);
+    if (candRows.length && candRows[0].userId) {
+      notify({
+        userId: candRows[0].userId,
+        type: "application_update",
+        title: action === "keep_original" ? "Reschedule not accommodated" : "Interview rescheduled",
+        message: `${candidateMsg} (${row.job.title})`,
+        severity: action === "keep_original" ? "warning" : "positive",
+        metadata: { interviewId: iv.id, applicationId: row.application.id, jobId: row.job.id, action },
+      }).catch(() => { /* best-effort */ });
+    }
+
+    res.json({ success: true, data: updated });
   } catch (err) { next(err); }
 });
 
@@ -1047,10 +1139,24 @@ router.get("/applicants", async (req, res, next) => {
       }
     }
 
+    // v0.4.37: batch-fetch latest interview per application so the
+    // Pipeline page can render the candidate's confirm/reschedule/decline
+    // status (was only on the per-job endpoint before).
+    const latestInterviewByApp: Record<string, any> = {};
+    if (appIds.length > 0) {
+      const intRows = await db.select().from(interviews)
+        .where(inArray(interviews.applicationId, appIds))
+        .orderBy(desc(interviews.scheduledAt));
+      for (const ir of intRows as any[]) {
+        if (!latestInterviewByApp[ir.applicationId]) latestInterviewByApp[ir.applicationId] = ir;
+      }
+    }
+
     const applicants = rows.map((r: any) => {
       const stageEnteredAt = stageEntries[r.application.id] ?? r.application.appliedAt;
       const daysInStage = stageEnteredAt ? Math.floor((Date.now() - new Date(stageEnteredAt).getTime()) / 86_400_000) : null;
       const jm = jobMeta[r.application.jobId] ?? { title: "(unknown job)", country: null, company: null, priority: null };
+      const iv = latestInterviewByApp[r.application.id] || null;
       return {
         applicationId: r.application.id,
         status: r.application.status,
@@ -1073,6 +1179,14 @@ router.get("/applicants", async (req, res, next) => {
           skills: r.candidate.skills,
           photoUrl: r.candidate.photoUrl,
         },
+        interview: iv ? {
+          id: iv.id, scheduledAt: iv.scheduledAt, mode: iv.mode, location: iv.location,
+          interviewerName: iv.interviewerName, meetingLink: iv.meetingLink,
+          candidateConfirmedStatus: iv.candidateConfirmedStatus,
+          candidateRescheduleReason: iv.candidateRescheduleReason,
+          candidateProposedAt: iv.candidateProposedAt,
+          candidateDeclineReason: iv.candidateDeclineReason,
+        } : null,
       };
     });
 

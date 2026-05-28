@@ -60,6 +60,7 @@ function InitialsAvatar({ name, size = "w-10 h-10" }: { name: string; size?: str
 export default function AgentDashboard() {
   const { toast } = useToast();
   const { user } = useAuth();
+  const [, setLocation] = useLocation();
   const [activeView, setActiveView] = useState("overview");
   const [jobStatusFilter, setJobStatusFilter] = useState<"all" | "active" | "closed" | "draft">("all");
   const [searchSkill, setSearchSkill] = useState("");
@@ -307,7 +308,8 @@ export default function AgentDashboard() {
                   candidateTotal={candidateTotal} activeJobs={activeJobs.length} allJobs={allJobs}
                   placements={agency.placements || 0} rating={agency.rating || "—"}
                   drives={drives} notifications={notifications}
-                  setActiveView={setActiveView} isVerified={isVerified}
+                  setActiveView={setActiveView} setJobStatusFilter={setJobStatusFilter}
+                  setLocation={setLocation} isVerified={isVerified}
                 />
               )}
               {activeView === "jobs" && <JobsContent allJobs={allJobs} isVerified={isVerified} statusFilter={jobStatusFilter} setStatusFilter={setJobStatusFilter} />}
@@ -367,7 +369,7 @@ function StatCard({ icon: Icon, color, lightBg, value, label, subtitle, onClick 
 }
 
 // ── Overview ──
-function OverviewContent({ candidateTotal, activeJobs, allJobs, placements, rating, drives, notifications, setActiveView, isVerified }: any) {
+function OverviewContent({ candidateTotal, activeJobs, allJobs, placements, rating, drives, notifications, setActiveView, setJobStatusFilter, setLocation, isVerified }: any) {
   return (
     <motion.div variants={stagger} initial="initial" animate="animate" className="space-y-5">
       <motion.div variants={fadeUp} className="grid grid-cols-2 xl:grid-cols-4 gap-3">

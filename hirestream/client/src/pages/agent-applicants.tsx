@@ -16,6 +16,7 @@ import { Input } from "@/components/ui/input";
 import { PhotoAvatar } from "@/components/shared/PhotoAvatar";
 import { ScheduleInterviewModal } from "@/components/shared/ScheduleInterviewModal";
 import { RecordOutcomeModal } from "@/components/shared/RecordOutcomeModal";
+import { RescheduleResponseModal } from "@/components/shared/RescheduleResponseModal";
 import { useToast } from "@/hooks/use-toast";
 
 type Applicant = {
@@ -34,6 +35,17 @@ type Applicant = {
     id: string; fullName: string; email: string; phone: string;
     location: string; experience: number; skills: string[]; photoUrl?: string | null;
   };
+  interview?: {
+    id: string;
+    scheduledAt: string;
+    mode?: string | null;
+    candidateConfirmedStatus?: string | null;
+    candidateRescheduleReason?: string | null;
+    candidateProposedAt?: string | null;
+    candidateDeclineReason?: string | null;
+    interviewerName?: string | null;
+    meetingLink?: string | null;
+  } | null;
 };
 
 type SortKey = "newest" | "oldest" | "match" | "longest_in_stage";
@@ -102,6 +114,7 @@ export default function AgentApplicantsPage() {
   const qc = useQueryClient();
   const [interviewFor, setInterviewFor] = useState<{ applicationId: string; candidateName: string } | null>(null);
   const [outcomeFor, setOutcomeFor] = useState<{ applicationId: string; candidateName: string } | null>(null);
+  const [rescheduleFor, setRescheduleFor] = useState<{ interview: any; candidateName: string } | null>(null);
 
   const updateStatus = useMutation({
     mutationFn: async ({ applicationId, status, feedback }: { applicationId: string; status: string; feedback?: string }) => {
@@ -402,9 +415,12 @@ export default function AgentApplicantsPage() {
                               </Badge>
                             )}
                             {a.interview?.candidateConfirmedStatus === "reschedule_requested" && (
-                              <Badge className="bg-amber-100 text-amber-700 border-amber-200 text-[10px] gap-1" title={`Reason: ${a.interview.candidateRescheduleReason || ""}`}>
-                                <Clock className="w-3 h-3" /> Reschedule
-                              </Badge>
+                              <Button size="sm" variant="outline"
+                                onClick={() => setRescheduleFor({ interview: a.interview, candidateName: a.candidate.fullName })}
+                                className="gap-1 h-8 border-amber-300 text-amber-700 hover:bg-amber-50 animate-pulse"
+                                title={`Reason: ${a.interview.candidateRescheduleReason || ""}`}>
+                                <Clock className="w-3.5 h-3.5" /> Respond to reschedule
+                              </Button>
                             )}
                             {a.interview?.candidateConfirmedStatus === "declined" && (
                               <Badge className="bg-red-100 text-red-700 border-red-200 text-[10px] gap-1" title={`Reason: ${a.interview.candidateDeclineReason || ""}`}>
@@ -461,6 +477,13 @@ export default function AgentApplicantsPage() {
           qc.invalidateQueries({ queryKey: ["/api/v1/agent/applicants"] });
           setOutcomeFor(null);
         }}
+      />
+      <RescheduleResponseModal
+        open={!!rescheduleFor}
+        onClose={() => setRescheduleFor(null)}
+        interview={rescheduleFor?.interview ?? null}
+        candidateName={rescheduleFor?.candidateName ?? ""}
+        onResponded={() => qc.invalidateQueries({ queryKey: ["/api/v1/agent/applicants"] })}
       />
     </div>
   );

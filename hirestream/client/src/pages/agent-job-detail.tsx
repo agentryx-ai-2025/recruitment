@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { JobPoster } from "@/components/agent/job-poster";
 import { RecordOutcomeModal } from "@/components/shared/RecordOutcomeModal";
+import { RescheduleResponseModal } from "@/components/shared/RescheduleResponseModal";
 import { ScheduleInterviewModal } from "@/components/shared/ScheduleInterviewModal";
 import { jobCategoryLabel } from "@/lib/reference-data";
 
@@ -57,6 +58,7 @@ export default function AgentJobDetailPage() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [interviewFor, setInterviewFor] = useState<{ applicationId: string; candidateName: string } | null>(null);
   const [outcomeFor, setOutcomeFor] = useState<{ applicationId: string; candidateName: string } | null>(null);
+  const [rescheduleFor, setRescheduleFor] = useState<{ interview: any; candidateName: string } | null>(null);
   const [editOpen, setEditOpen] = useState(false);
   const [descOpen, setDescOpen] = useState(false);
   const [compareOpen, setCompareOpen] = useState(false);
@@ -619,9 +621,12 @@ export default function AgentJobDetailPage() {
                           </Badge>
                         )}
                         {a.interview?.candidateConfirmedStatus === "reschedule_requested" && (
-                          <Badge className="bg-amber-100 text-amber-700 border-amber-200 text-[11px] gap-1" title={`Reason: ${a.interview.candidateRescheduleReason || ""}`}>
-                            <Clock className="w-3 h-3" /> Reschedule requested
-                          </Badge>
+                          <Button size="sm" variant="outline"
+                            onClick={() => setRescheduleFor({ interview: a.interview, candidateName: a.candidate.fullName })}
+                            className="gap-1 border-amber-300 text-amber-700 hover:bg-amber-50 animate-pulse"
+                            title={`Reason: ${a.interview.candidateRescheduleReason || ""}`}>
+                            <Clock className="w-3.5 h-3.5" /> Respond to reschedule
+                          </Button>
                         )}
                         {a.interview?.candidateConfirmedStatus === "declined" && (
                           <Badge className="bg-red-100 text-red-700 border-red-200 text-[11px] gap-1" title={`Reason: ${a.interview.candidateDeclineReason || ""}`}>
@@ -678,6 +683,15 @@ export default function AgentJobDetailPage() {
           qc.invalidateQueries({ queryKey: [`/api/v1/jobs/${id}/applicants`] });
           setOutcomeFor(null);
         }}
+      />
+
+      {/* Reschedule response modal (v0.4.37) */}
+      <RescheduleResponseModal
+        open={!!rescheduleFor}
+        onClose={() => setRescheduleFor(null)}
+        interview={rescheduleFor?.interview ?? null}
+        candidateName={rescheduleFor?.candidateName ?? ""}
+        onResponded={() => qc.invalidateQueries({ queryKey: [`/api/v1/jobs/${id}/applicants`] })}
       />
     </div>
   );

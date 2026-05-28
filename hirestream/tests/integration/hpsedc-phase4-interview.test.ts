@@ -175,3 +175,78 @@ describe('Phase 4 — .ics export regression', () => {
     expect(body).toMatch(/END:VCALENDAR/);
   });
 });
+
+// v0.4.37 — agent responds to the candidate's reschedule request.
+describe('Phase 4 — agent reschedule response', () => {
+  async function requestReschedule(proposedAt?: string) {
+    return request(app).post(`/api/v1/me/interviews/${interviewId}/reschedule`)
+      .set('Cookie', candidateCookie)
+      .send({ reason: 'Visa appointment that morning', proposedAt });
+  }
+
+  it('accept_proposed moves the interview to the candidate proposed time + clears the request + notifies candidate', async () => {
+    const proposed = new Date(Date.now() + 10 * 86400000).toISOString();
+    await requestReschedule(proposed);
+
+    const r = await request(app).post(`/api/v1/agent/interviews/${interviewId}/respond-reschedule`)
+      .set('Cookie', agentCookie).send({ action: 'accept_proposed' });
+    expect(r.status).toBe(200);
+    expect(r.body.data.candidateConfirmedStatus).toBeNull();
+    // scheduledAt now equals the proposed time (to the minute)
+    expect(new Date(r.body.data.scheduledAt).toISOString().slice(0, 16)).toBe(proposed.slice(0, 16));
+
+    const notifs = await request(app).get('/api/v1/notifications').set('Cookie', candidateCookie);
+    const titles = (notifs.body.data as any[]).map((n) => String(n.title));
+    expect(titles).toContain('Interview rescheduled');
+  });
+
+  it('set_time reschedules to an agent-chosen future time', async () => {
+    await requestReschedule();
+    const newTime = new Date(Date.now() + 20 * 86400000).toISOString();
+    const r = await request(app).post(`/api/v1/agent/interviews/${interviewId}/respond-reschedule`)
+      .set('Cookie', agentCookie).send({ action: 'set_time', newTime });
+    expect(r.status).toBe(200);
+    expect(new Date(r.body.data.scheduledAt).toISOString().slice(0, 16)).toBe(newTime.slice(0, 16));
+    expect(r.body.data.candidateConfirmedStatus).toBeNull();
+  });
+
+  it('set_time rejects a past time', async () => {
+    await requestReschedule();
+    const r = await request(app).post(`/api/v1/agent/interviews/${interviewId}/respond-reschedule`)
+      .set('Cookie', agentCookie).send({ action: 'set_time', newTime: new Date(Date.now() - 86400000).toISOString() });
+    expect(r.status).toBe(400);
+  });
+
+  it('keep_original clears the request but keeps the time', async () => {
+    const before = await request(app).get(`/api/v1/me/interviews/${interviewId}`).set('Cookie', candidateCookie);
+    const originalTime = before.body.data.scheduledAt;
+    await requestReschedule();
+    const r = await request(app).post(`/api/v1/agent/interviews/${interviewId}/respond-reschedule`)
+      .set('Cookie', agentCookie).send({ action: 'keep_original' });
+    expect(r.status).toBe(200);
+    expect(r.body.data.candidateConfirmedStatus).toBeNull();
+    expect(new Date(r.body.data.scheduledAt).toISOString()).toBe(new Date(originalTime).toISOString());
+  });
+
+  it('a different agent cannot respond (IDOR guard)', async () => {
+    await requestReschedule();
+    // Register a second agent who does not own this job
+    const otherReg = await request(app).post('/api/v1/auth/register').send({ email: 'other-ag@test.com', password: 'Test@123', role: 'agent' });
+    const otherCookie = otherReg.headers['set-cookie'] as unknown as string[];
+    const db = getDb();
+    await request(app).post('/api/v1/agencies/register').set('Cookie', otherCookie)
+      .send({ agencyName: 'Other Agency', licenseNumber: 'LIC-OTHER', specializations: ['IT'] });
+    await db.execute(sql`UPDATE recruitment_agents SET verified = true WHERE user_id = ${otherReg.body.data.id}`);
+    const r = await request(app).post(`/api/v1/agent/interviews/${interviewId}/respond-reschedule`)
+      .set('Cookie', otherCookie).send({ action: 'keep_original' });
+    expect(r.status).toBe(403);
+  });
+
+  it('aggregate /agent/applicants exposes the interview reschedule status', async () => {
+    await requestReschedule();
+    const r = await request(app).get('/api/v1/agent/applicants').set('Cookie', agentCookie);
+    expect(r.status).toBe(200);
+    const row = (r.body.data as any[]).find((a) => a.applicationId === applicationId);
+    expect(row.interview?.candidateConfirmedStatus).toBe('reschedule_requested');
+  });
+});
