@@ -481,7 +481,20 @@ function AppointmentTravelPanel({ placementId, startDate, appointmentLetterUrl }
   const { toast } = useToast();
   const qc = useQueryClient();
   const [date, setDate] = useState<string>(startDate ? String(startDate).slice(0, 10) : "");
-  const [url, setUrl] = useState<string>(appointmentLetterUrl || "");
+  const [url, setUrl] = useState<string>(appointmentLetterUrl && /^https?:\/\//i.test(appointmentLetterUrl) ? appointmentLetterUrl : "");
+  const hasLetter = !!appointmentLetterUrl;
+
+  const uploadFile = useMutation({
+    mutationFn: async (file: File) => {
+      const fd = new FormData();
+      fd.append("file", file);
+      const r = await fetch(`/api/v1/agent/placements/${placementId}/appointment-letter-file`, { method: "POST", body: fd });
+      if (!r.ok) throw new Error((await r.json().catch(() => ({})))?.error?.message || (await r.json().catch(() => ({})))?.message || "Upload failed");
+      return r.json();
+    },
+    onSuccess: () => { toast({ title: "Appointment letter uploaded" }); qc.invalidateQueries({}); },
+    onError: (e: any) => toast({ title: "Couldn't upload letter", description: e.message, variant: "destructive" }),
+  });
 
   const saveDate = useMutation({
     mutationFn: async () => {
@@ -527,10 +540,23 @@ function AppointmentTravelPanel({ placementId, startDate, appointmentLetterUrl }
           </div>
         </div>
         <div>
-          <label className="text-[11px] font-semibold text-slate-600">Appointment letter URL</label>
-          <div className="flex gap-2 mt-1">
-            <Input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://… signed PDF" className="h-9 text-sm" />
-            <Button size="sm" disabled={!url.trim() || saveUrl.isPending || url.trim() === (appointmentLetterUrl || "")}
+          <label className="text-[11px] font-semibold text-slate-600">Appointment letter</label>
+          <div className="flex items-center gap-2 mt-1">
+            <label className={`inline-flex items-center gap-1.5 h-9 px-3 text-xs font-semibold rounded-md border cursor-pointer ${uploadFile.isPending ? "opacity-60" : "border-emerald-300 text-emerald-700 hover:bg-emerald-50"}`}>
+              {uploadFile.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileText className="w-3.5 h-3.5" />}
+              {hasLetter ? "Replace file" : "Upload signed file"}
+              <input type="file" accept="application/pdf,image/jpeg,image/png" className="hidden"
+                disabled={uploadFile.isPending}
+                onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadFile.mutate(f); e.currentTarget.value = ""; }} />
+            </label>
+            {hasLetter && (
+              <a href={`/api/v1/agent/placements/${placementId}/appointment-letter`} target="_blank" rel="noreferrer"
+                className="text-[11px] font-semibold text-indigo-600 hover:underline">View current</a>
+            )}
+          </div>
+          <div className="flex gap-2 mt-2">
+            <Input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="…or paste an external link" className="h-9 text-sm" />
+            <Button size="sm" variant="outline" disabled={!url.trim() || saveUrl.isPending || url.trim() === (appointmentLetterUrl || "")}
               onClick={() => saveUrl.mutate()} className="gap-1">
               {saveUrl.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
             </Button>

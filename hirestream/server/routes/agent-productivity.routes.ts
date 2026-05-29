@@ -26,6 +26,9 @@ import { logger } from "../config/logger.config";
 import { getSetting } from "../services/settings.service";
 import { notify } from "../services/notification.service";
 import { buildDeploymentChecklist, readinessSummary } from "../services/deployment.service";
+import { placementDocUpload, verifyUploadedFile, handleUploadErrors, HS_PLACEMENT_DOCS_DIR, UPLOAD_DIR } from "../middleware/upload.middleware";
+import fs from "fs/promises";
+import path from "path";
 
 const router = Router();
 router.use(protect);
@@ -626,6 +629,77 @@ router.patch("/placements/:id/appointment-letter", async (req, res, next) => {
       .set({ appointmentLetterUrl })
       .where(eq(placements.id, req.params.id)).returning();
     res.json({ success: true, data: row });
+  } catch (err) { next(err); }
+});
+
+// ── Upload the SIGNED appointment letter as a file (FRS 2.2) ─────────
+// The employer's/agency's authoritative document (their letterhead). This
+// supersedes the paste-a-URL path; we keep both — uploaded file OR external
+// link — behind the same appointmentLetterUrl field and download route.
+router.post("/placements/:id/appointment-letter-file",
+  placementDocUpload.single("file"), verifyUploadedFile,
+  async (req, res, next) => {
+    try {
+      const db = storage.db;
+      if (!db) return res.status(500).json({ success: false });
+      const user = (req as any).user;
+      const cleanup = async () => { if (req.file) await fs.unlink(req.file.path).catch(() => {}); };
+      if (!["employer", "agent", "admin", "superadmin"].includes(user.role)) {
+        await cleanup();
+        return res.status(403).json({ success: false, message: "Forbidden" });
+      }
+      if (!req.file) return res.status(400).json({ success: false, error: { code: 400, message: "No file uploaded" } });
+
+      const [owner] = await db.select({ job: jobs }).from(placements)
+        .innerJoin(applications, eq(placements.applicationId, applications.id))
+        .innerJoin(jobs, eq(applications.jobId, jobs.id))
+        .where(eq(placements.id, req.params.id)).limit(1);
+      const isAdmin = user.role === "admin" || user.role === "superadmin";
+      const owns = !!owner && (isAdmin
+        || (user.role === "agent" && owner.job.agentId === user.id)
+        || (user.role === "employer" && owner.job.employerId === user.id));
+      if (!owner || !owns) {
+        await cleanup();
+        return res.status(owner ? 403 : 404).json({ success: false, message: owner ? "Not your placement" : "Placement not found" });
+      }
+
+      const url = `/uploads/hs/placements/docs/${req.file.filename}`;
+      const [row] = await db.update(placements).set({ appointmentLetterUrl: url })
+        .where(eq(placements.id, req.params.id)).returning();
+      logger.info(`Appointment letter file uploaded for placement ${req.params.id} by ${user.role} ${user.id}`);
+      res.status(201).json({ success: true, data: row });
+    } catch (err) { next(err); }
+  },
+);
+
+// ── Download the appointment letter (staff: agent/employer owner + admin) ──
+// Serves an uploaded file, or redirects to an external pasted link.
+async function serveAppointmentLetter(res: any, p: any) {
+  const url: string | null = p.appointmentLetterUrl;
+  if (!url) return res.status(404).json({ success: false, message: "No appointment letter on file" });
+  if (/^https?:\/\//i.test(url)) return res.redirect(url);
+  const rel = url.replace(/^\/uploads\//, "");
+  const filePath = rel.startsWith("hs/") ? path.join(UPLOAD_DIR, rel) : path.join(HS_PLACEMENT_DOCS_DIR, path.basename(rel));
+  try { await fs.access(filePath); } catch { return res.status(404).json({ success: false }); }
+  return res.download(filePath, `appointment-letter${path.extname(filePath)}`);
+}
+
+router.get("/placements/:id/appointment-letter", async (req, res, next) => {
+  try {
+    const db = storage.db;
+    if (!db) return res.status(500).json({ success: false });
+    const user = (req as any).user;
+    const [row] = await db.select({ p: placements, job: jobs }).from(placements)
+      .innerJoin(applications, eq(placements.applicationId, applications.id))
+      .innerJoin(jobs, eq(applications.jobId, jobs.id))
+      .where(eq(placements.id, req.params.id)).limit(1);
+    if (!row) return res.status(404).json({ success: false });
+    const isAdmin = user.role === "admin" || user.role === "superadmin";
+    const owns = isAdmin
+      || (user.role === "agent" && row.job.agentId === user.id)
+      || (user.role === "employer" && row.job.employerId === user.id);
+    if (!owns) return res.status(403).json({ success: false });
+    return serveAppointmentLetter(res, row.p);
   } catch (err) { next(err); }
 });
 
@@ -1442,5 +1516,8 @@ router.delete("/candidates/:id/tags/:tagId", async (req, res, next) => {
     res.json({ success: true });
   } catch (err) { next(err); }
 });
+
+// Clean multer errors (file too large / wrong type) from the upload route.
+router.use(handleUploadErrors);
 
 export default router;

@@ -809,6 +809,21 @@ function EmployerPlacements() {
     onError: () => toast({ title: "Couldn't save note", variant: "destructive" }),
   });
 
+  const uploadLetterFile = useMutation({
+    mutationFn: async ({ id, file }: { id: string; file: File }) => {
+      const fd = new FormData();
+      fd.append("file", file);
+      const r = await fetch(`/api/v1/agent/placements/${id}/appointment-letter-file`, { method: "POST", body: fd });
+      if (!r.ok) throw new Error((await r.json().catch(() => ({})))?.error?.message || (await r.json().catch(() => ({})))?.message || "Upload failed");
+      return r.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Appointment letter uploaded", description: "The candidate can now download it." });
+      qc.invalidateQueries({ queryKey: ["/api/v1/agent/placements"] });
+    },
+    onError: (e: any) => toast({ title: "Couldn't upload letter", description: e.message, variant: "destructive" }),
+  });
+
   if (isLoading) return <div className="p-10 text-center"><Loader2 className="w-6 h-6 animate-spin text-blue-600 inline" /></div>;
 
   return (
@@ -887,20 +902,29 @@ function EmployerPlacements() {
                     <FileText className="w-4 h-4 text-indigo-600" />
                     <span className="text-sm font-semibold text-indigo-900">Appointment letter</span>
                     {r.placement.appointmentLetterUrl
-                      ? <a href={r.placement.appointmentLetterUrl} target="_blank" rel="noreferrer" className="text-xs text-indigo-600 hover:underline font-medium">View current</a>
+                      ? <a href={`/api/v1/agent/placements/${r.placement.id}/appointment-letter`} target="_blank" rel="noreferrer" className="text-xs text-indigo-600 hover:underline font-medium">View signed letter</a>
                       : <Badge variant="outline" className="bg-white text-[10px]">Not uploaded</Badge>}
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 flex-wrap">
+                    <label className={`inline-flex items-center gap-1 text-xs font-semibold px-3 py-1.5 rounded border cursor-pointer ${uploadLetterFile.isPending ? "opacity-60" : "border-emerald-300 bg-white text-emerald-700 hover:bg-emerald-50"}`}
+                      title="Attach your signed appointment letter (PDF/JPG/PNG)">
+                      {uploadLetterFile.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5 rotate-180" />}
+                      {r.placement.appointmentLetterUrl ? "Replace signed letter" : "Upload signed letter"}
+                      <input type="file" accept="application/pdf,image/jpeg,image/png" className="hidden"
+                        disabled={uploadLetterFile.isPending}
+                        onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadLetterFile.mutate({ id: r.placement.id, file: f }); e.currentTarget.value = ""; }} />
+                    </label>
                     <a href={`/api/v1/agent/placements/${r.placement.id}/offer-letter.pdf`}
-                      className="inline-flex items-center gap-1 text-xs font-medium px-3 py-1.5 rounded border border-indigo-200 bg-white hover:border-indigo-500 text-indigo-700">
-                      <Download className="w-3.5 h-3.5" /> Download template PDF
+                      className="inline-flex items-center gap-1 text-xs font-medium px-3 py-1.5 rounded border border-slate-200 bg-white hover:border-slate-400 text-slate-600"
+                      title="System-generated portal template — not the signed contract">
+                      <Download className="w-3.5 h-3.5" /> Portal template
                     </a>
                     <Button size="sm" variant="outline" onClick={() => setEditDetailsFor(r)}
                       title="Edit country, salary, and start date">
                       <Edit className="w-3.5 h-3.5 mr-1" /> Edit details
                     </Button>
-                    <Button size="sm" variant="outline" onClick={() => { setEditing(r.placement.id); setLetterUrl(r.placement.appointmentLetterUrl || ""); }}>
-                      <Edit className="w-3.5 h-3.5 mr-1" /> Set URL
+                    <Button size="sm" variant="ghost" onClick={() => { setEditing(r.placement.id); setLetterUrl(r.placement.appointmentLetterUrl || ""); }}>
+                      or paste link
                     </Button>
                   </div>
                 </div>

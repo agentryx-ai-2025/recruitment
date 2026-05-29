@@ -20,7 +20,7 @@ import { buildDeploymentChecklist, readinessSummary } from "../services/deployme
 import { eq, and, desc } from "drizzle-orm";
 import PDFDocument from "pdfkit";
 import { logger } from "../config/logger.config";
-import { upload, verifyUploadedFile, handleUploadErrors, UPLOAD_DIR, HS_PHOTOS_DIR } from "../middleware/upload.middleware";
+import { upload, verifyUploadedFile, handleUploadErrors, UPLOAD_DIR, HS_PHOTOS_DIR, HS_PLACEMENT_DOCS_DIR } from "../middleware/upload.middleware";
 import { notify } from "../services/notification.service";
 import fsNode from "fs";
 import pathNode from "path";
@@ -257,6 +257,28 @@ router.get("/placements/:id/deployment", async (req, res, next) => {
         },
       },
     });
+  } catch (err) { next(err); }
+});
+
+// ── Download the candidate's own signed appointment letter ───────────
+// Serves the uploaded file, or redirects to an external pasted link.
+router.get("/placements/:id/appointment-letter", async (req, res, next) => {
+  try {
+    if (!storage.db) return res.status(500).json({ success: false });
+    const user = (req as any).user;
+    const candId = await getMyCandidateId(user.id);
+    if (!candId) return res.status(404).json({ success: false });
+    const [row] = await storage.db.select({ p: placements }).from(placements)
+      .innerJoin(applications, eq(placements.applicationId, applications.id))
+      .where(and(eq(placements.id, req.params.id), eq(applications.candidateId, candId))).limit(1);
+    if (!row) return res.status(404).json({ success: false });
+    const url: string | null = row.p.appointmentLetterUrl;
+    if (!url) return res.status(404).json({ success: false, message: "No appointment letter on file" });
+    if (/^https?:\/\//i.test(url)) return res.redirect(url);
+    const rel = url.replace(/^\/uploads\//, "");
+    const filePath = rel.startsWith("hs/") ? pathNode.join(UPLOAD_DIR, rel) : pathNode.join(HS_PLACEMENT_DOCS_DIR, pathNode.basename(rel));
+    if (!fsNode.existsSync(filePath)) return res.status(404).json({ success: false });
+    return res.download(filePath, `appointment-letter${pathNode.extname(filePath)}`);
   } catch (err) { next(err); }
 });
 

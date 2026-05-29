@@ -349,6 +349,30 @@ describe('Phase 4 — agent visa/passport status (placement)', () => {
       .set('Cookie', otherCookie).send({ appointmentLetterUrl: 'https://evil.example.com/x.pdf' });
     expect(r.status).toBe(403);
   });
+
+  it('agent uploads a signed appointment-letter file; candidate can download it', async () => {
+    const up = await request(app).post(`/api/v1/agent/placements/${placementId}/appointment-letter-file`)
+      .set('Cookie', agentCookie)
+      .attach('file', Buffer.from('%PDF-1.4 signed letter'), { filename: 'letter.pdf', contentType: 'application/pdf' });
+    expect(up.status).toBe(201);
+    expect(up.body.data.appointmentLetterUrl).toMatch(/^\/uploads\/hs\/placements\/docs\//);
+
+    const dl = await request(app).get(`/api/v1/me/placements/${placementId}/appointment-letter`).set('Cookie', candidateCookie);
+    expect(dl.status).toBe(200);
+  });
+
+  it('a different agent cannot upload an appointment-letter file (IDOR guard)', async () => {
+    const otherReg = await request(app).post('/api/v1/auth/register').send({ email: 'other-file@test.com', password: 'Test@123', role: 'agent' });
+    const otherCookie = otherReg.headers['set-cookie'] as unknown as string[];
+    const db = getDb();
+    await request(app).post('/api/v1/agencies/register').set('Cookie', otherCookie)
+      .send({ agencyName: 'Other File Agency', licenseNumber: 'LIC-FILE-OTHER', specializations: ['IT'] });
+    await db.execute(sql`UPDATE recruitment_agents SET verified = true WHERE user_id = ${otherReg.body.data.id}`);
+    const r = await request(app).post(`/api/v1/agent/placements/${placementId}/appointment-letter-file`)
+      .set('Cookie', otherCookie)
+      .attach('file', Buffer.from('%PDF-1.4 x'), { filename: 'x.pdf', contentType: 'application/pdf' });
+    expect(r.status).toBe(403);
+  });
 });
 
 describe('Phase 2 — deployment phase (candidate tracker + HPSEDC oversight)', () => {

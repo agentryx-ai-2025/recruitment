@@ -3232,12 +3232,18 @@ function CandidateDeploymentTracker({ placementId, onAction }: { placementId: st
         )}
       </div>
 
-      {d.placement.appointmentLetterUrl && (
+      <div className="mt-3 flex flex-wrap gap-2">
+        {d.placement.appointmentLetterUrl && (
+          <a href={`/api/v1/me/placements/${placementId}/appointment-letter`} target="_blank" rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-md border border-indigo-200 bg-indigo-50 text-indigo-700 hover:border-indigo-400 transition">
+            <Download className="w-4 h-4" /> Signed appointment letter
+          </a>
+        )}
         <a href={`/api/v1/me/placements/${placementId}/offer-letter.pdf`} target="_blank" rel="noopener noreferrer"
-          className="mt-3 inline-flex items-center gap-1.5 text-xs font-medium px-3 py-2 rounded-md border border-slate-200 hover:border-indigo-400 hover:text-indigo-700 transition">
-          <Download className="w-4 h-4" /> Appointment letter (PDF)
+          className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-2 rounded-md border border-slate-200 hover:border-slate-400 hover:text-slate-700 transition">
+          <Download className="w-4 h-4" /> Offer letter (portal copy)
         </a>
-      )}
+      </div>
 
       {(d.welfare.d30.status || d.welfare.d60.status || d.welfare.d90.status) && (
         <div className="mt-4 border-t border-slate-100 pt-3">

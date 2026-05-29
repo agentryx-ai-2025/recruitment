@@ -20,7 +20,10 @@ export const HS_PHOTOS_DIR = path.join(UPLOAD_DIR, "hs", "candidates", "photos")
 // the wrong owner type. All three leaves are auth-gated download-only.
 export const HS_EMPLOYER_DOCS_DIR = path.join(UPLOAD_DIR, "hs", "employers", "docs");
 export const HS_AGENCY_DOCS_DIR = path.join(UPLOAD_DIR, "hs", "agencies", "docs");
-for (const d of [UPLOAD_DIR, HS_DOCS_DIR, HS_PHOTOS_DIR, HS_EMPLOYER_DOCS_DIR, HS_AGENCY_DOCS_DIR]) {
+// v0.4.42: signed appointment letters live on the placement, not an owner —
+// own leaf, auth-gated download-only (the candidate's contract document).
+export const HS_PLACEMENT_DOCS_DIR = path.join(UPLOAD_DIR, "hs", "placements", "docs");
+for (const d of [UPLOAD_DIR, HS_DOCS_DIR, HS_PHOTOS_DIR, HS_EMPLOYER_DOCS_DIR, HS_AGENCY_DOCS_DIR, HS_PLACEMENT_DOCS_DIR]) {
   if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true });
 }
 
@@ -172,6 +175,12 @@ export const employerDocUpload = multer({
 
 export const agencyDocUpload = multer({
   storage: makeRoleStorage(HS_AGENCY_DOCS_DIR),
+  fileFilter,
+  limits: { fileSize: MAX_SIZE },
+});
+
+export const placementDocUpload = multer({
+  storage: makeRoleStorage(HS_PLACEMENT_DOCS_DIR),
   fileFilter,
   limits: { fileSize: MAX_SIZE },
 });
