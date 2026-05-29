@@ -20,14 +20,14 @@ test.describe("Admin Console", () => {
 
 test.describe("Super Admin Console", () => {
   test("demo_superadmin sees Crown-branded console", async ({ page }) => {
-    await loginAs(page, "demo_superadmin", "test123");
+    await loginAs(page, "superadmin", "hpsedc@super2026");
 
     await expect(page.locator("text=Super Admin Console")).toBeVisible({ timeout: 5000 });
     await expect(page.locator("text=Restricted").first()).toBeVisible();
   });
 
   test("superadmin can navigate to User Management", async ({ page }) => {
-    await loginAs(page, "demo_superadmin", "test123");
+    await loginAs(page, "superadmin", "hpsedc@super2026");
 
     await page.locator("aside button:has-text('User Management')").click();
     await expect(page.locator("text=/User Management|users/i").first()).toBeVisible({ timeout: 3000 });
@@ -37,16 +37,16 @@ test.describe("Super Admin Console", () => {
   });
 
   test("superadmin sees Danger Zone with DB reset", async ({ page }) => {
-    await loginAs(page, "demo_superadmin", "test123");
+    await loginAs(page, "superadmin", "hpsedc@super2026");
 
     await page.locator("aside button:has-text('System Health')").click();
     await expect(page.getByRole("heading", { name: /Danger Zone/i })).toBeVisible({ timeout: 5000 });
-    await expect(page.locator("text=Reset Database").first()).toBeVisible();
-    await expect(page.locator("text=Reset + Reseed").first()).toBeVisible();
+    await expect(page.locator("text=Wipe + Reseed").first()).toBeVisible();
+    await expect(page.locator("text=Wipe to empty").first()).toBeVisible();
   });
 
   test("superadmin can open Create User dialog", async ({ page }) => {
-    await loginAs(page, "demo_superadmin", "test123");
+    await loginAs(page, "superadmin", "hpsedc@super2026");
 
     await page.locator("aside button:has-text('User Management')").click();
     await page.getByRole("button", { name: /create user/i }).click();

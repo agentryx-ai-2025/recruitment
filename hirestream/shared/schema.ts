@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, timestamp, boolean, jsonb, decimal, date } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, timestamp, boolean, jsonb, decimal, date, index } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -144,7 +144,11 @@ export const jobs = pgTable("jobs", {
   priority: text("priority").default("standard"),     // standard | urgent | critical
   employerNotes: text("employer_notes"),
   createdAt: timestamp("created_at").defaultNow(),
-});
+}, (table) => [
+  // Hot search path: candidates browse public jobs, agents see agents_only
+  // requisitions — both filter on (visibility, status).
+  index("idx_jobs_visibility_status").on(table.visibility, table.status),
+]);
 
 export const applications = pgTable("applications", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),

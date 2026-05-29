@@ -5,19 +5,18 @@ import { test, expect } from "@playwright/test";
  */
 
 test.describe("Auth flow", () => {
-  test("landing page renders with 5 stakeholder cards", async ({ page }) => {
+  test("landing page renders the 4 public stakeholder cards", async ({ page }) => {
     await page.goto("/");
 
     // Hero + CTAs visible
     await expect(page.locator("h1:has-text('HireStream')").first()).toBeVisible();
     await expect(page.getByRole("button", { name: /get started/i })).toBeVisible();
 
-    // All 5 role cards visible
+    // 4 public stakeholder cards (Super Admin is an internal role, not advertised)
     await expect(page.locator("text=Job Seekers").first()).toBeVisible();
     await expect(page.locator("text=Recruitment Agencies").first()).toBeVisible();
     await expect(page.locator("text=Employers").first()).toBeVisible();
     await expect(page.locator("text=Government Officers").first()).toBeVisible();
-    await expect(page.locator("text=Super Admin").first()).toBeVisible();
   });
 
   test("clicking Get Started navigates to auth page", async ({ page }) => {
