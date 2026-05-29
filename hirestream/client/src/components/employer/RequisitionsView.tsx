@@ -21,9 +21,10 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Briefcase, Users, Clock, AlertCircle, Loader2, Search, Tag, MapPin,
-  CheckCircle, Handshake, Flame, Zap, Target, Eye,
+  CheckCircle, Handshake, Flame, Zap, Target, Eye, Edit, ArrowRight,
 } from "lucide-react";
 import { jobCategoryLabel } from "@/lib/reference-data";
+import { JobCreationForm } from "@/components/employer/job-creation-form";
 
 interface RequisitionRow {
   id: string;
@@ -166,7 +167,9 @@ export function RequisitionsView() {
 function RequisitionCard({ r }: { r: RequisitionRow }) {
   const isCritical = r.priority === "critical";
   const isUrgent = r.priority === "urgent";
+  const isDraft = r.status === "draft";
   const target = r.targetHires ?? 1;
+  const [editOpen, setEditOpen] = useState(false);
   return (
     <div className={`rounded-xl border bg-white p-4 transition-all hover:shadow-md ${
       isCritical ? "border-red-200" : isUrgent ? "border-amber-200" : "border-slate-200"
@@ -228,12 +231,26 @@ function RequisitionCard({ r }: { r: RequisitionRow }) {
       </div>
 
       <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-end gap-2">
-        <Link href={`/employer/review/${r.id}`}>
-          <Button size="sm" variant="outline" className="text-xs h-8">
-            <Eye className="w-3.5 h-3.5 mr-1" /> Open requisition
+        {isDraft ? (
+          <Button size="sm" onClick={() => setEditOpen(true)}
+            className="text-xs h-8 bg-purple-600 hover:bg-purple-700 text-white">
+            <ArrowRight className="w-3.5 h-3.5 mr-1" /> Continue editing
           </Button>
-        </Link>
+        ) : (
+          <>
+            <Button size="sm" variant="outline" className="text-xs h-8" onClick={() => setEditOpen(true)}>
+              <Edit className="w-3.5 h-3.5 mr-1" /> Edit
+            </Button>
+            <Link href={`/employer/review/${r.id}`}>
+              <Button size="sm" variant="outline" className="text-xs h-8">
+                <Eye className="w-3.5 h-3.5 mr-1" /> Open requisition
+              </Button>
+            </Link>
+          </>
+        )}
       </div>
+      <JobCreationForm editJob={r} controlledOpen={editOpen} onOpenChange={setEditOpen}
+        trigger={<span style={{ display: "none" }} />} />
     </div>
   );
 }
