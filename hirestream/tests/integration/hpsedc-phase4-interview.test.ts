@@ -323,6 +323,32 @@ describe('Phase 4 — agent visa/passport status (placement)', () => {
     expect(placedApp.welfare.d30.notes).toBe('Settled in well');
     expect(placedApp.welfare.d60.status).toBeNull();
   });
+
+  it('agent sets start date + appointment letter, candidate-detail surfaces them', async () => {
+    const dateRes = await request(app).patch(`/api/v1/agent/placements/${placementId}`)
+      .set('Cookie', agentCookie).send({ startDate: '2027-01-15' });
+    expect(dateRes.status).toBe(200);
+    const letterRes = await request(app).patch(`/api/v1/agent/placements/${placementId}/appointment-letter`)
+      .set('Cookie', agentCookie).send({ appointmentLetterUrl: 'https://example.com/letter.pdf' });
+    expect(letterRes.status).toBe(200);
+
+    const r = await request(app).get(`/api/v1/agencies/candidates/${candidateId}`).set('Cookie', agentCookie);
+    const placedApp = (r.body.data.applications as any[]).find((a) => a.id === applicationId);
+    expect(placedApp.appointmentLetterUrl).toBe('https://example.com/letter.pdf');
+    expect(placedApp.startDate).toBeTruthy();
+  });
+
+  it('a different agent cannot set the appointment letter (IDOR guard)', async () => {
+    const otherReg = await request(app).post('/api/v1/auth/register').send({ email: 'other-letter@test.com', password: 'Test@123', role: 'agent' });
+    const otherCookie = otherReg.headers['set-cookie'] as unknown as string[];
+    const db = getDb();
+    await request(app).post('/api/v1/agencies/register').set('Cookie', otherCookie)
+      .send({ agencyName: 'Other Letter Agency', licenseNumber: 'LIC-LETTER-OTHER', specializations: ['IT'] });
+    await db.execute(sql`UPDATE recruitment_agents SET verified = true WHERE user_id = ${otherReg.body.data.id}`);
+    const r = await request(app).patch(`/api/v1/agent/placements/${placementId}/appointment-letter`)
+      .set('Cookie', otherCookie).send({ appointmentLetterUrl: 'https://evil.example.com/x.pdf' });
+    expect(r.status).toBe(403);
+  });
 });
 
 describe('Phase 2 — deployment phase (candidate tracker + HPSEDC oversight)', () => {

@@ -604,6 +604,24 @@ router.patch("/placements/:id/appointment-letter", async (req, res, next) => {
     }
     const { appointmentLetterUrl } = req.body ?? {};
     if (!appointmentLetterUrl) return res.status(400).json({ success: false, message: "appointmentLetterUrl required" });
+
+    // Ownership check — placement is owned via its application's job (same
+    // model as the placement-details PATCH above). Without this, any agent/
+    // employer could overwrite the letter on any placement.
+    const [owner] = await storage.db
+      .select({ job: jobs })
+      .from(placements)
+      .innerJoin(applications, eq(placements.applicationId, applications.id))
+      .innerJoin(jobs, eq(applications.jobId, jobs.id))
+      .where(eq(placements.id, req.params.id)).limit(1);
+    if (!owner) return res.status(404).json({ success: false, message: "Placement not found" });
+    const isAdmin = user.role === "admin" || user.role === "superadmin";
+    if (!isAdmin) {
+      const owns = (user.role === "agent" && owner.job.agentId === user.id)
+                 || (user.role === "employer" && owner.job.employerId === user.id);
+      if (!owns) return res.status(403).json({ success: false, message: "Not your placement" });
+    }
+
     const [row] = await storage.db.update(placements)
       .set({ appointmentLetterUrl })
       .where(eq(placements.id, req.params.id)).returning();

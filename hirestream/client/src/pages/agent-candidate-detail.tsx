@@ -387,6 +387,7 @@ function ComplianceAndWelfarePanel({ candidate, applications }: { candidate: any
       {activePlacement?.placementId && (
         <>
           <VisaStatusPanel placementId={activePlacement.placementId} current={activePlacement.visaStatus} history={activePlacement.visaHistory ?? []} />
+          <AppointmentTravelPanel placementId={activePlacement.placementId} startDate={activePlacement.startDate} appointmentLetterUrl={activePlacement.appointmentLetterUrl} />
           <WelfarePanel placementId={activePlacement.placementId} welfare={activePlacement.welfare} />
         </>
       )}
@@ -471,6 +472,71 @@ function VisaStatusPanel({ placementId, current, history }: { placementId: strin
           </ul>
         </div>
       )}
+    </div>
+  );
+}
+
+// ── Appointment letter + travel/start date (FRS 2.2 — agency issues these) ──
+function AppointmentTravelPanel({ placementId, startDate, appointmentLetterUrl }: { placementId: string; startDate?: string | null; appointmentLetterUrl?: string | null }) {
+  const { toast } = useToast();
+  const qc = useQueryClient();
+  const [date, setDate] = useState<string>(startDate ? String(startDate).slice(0, 10) : "");
+  const [url, setUrl] = useState<string>(appointmentLetterUrl || "");
+
+  const saveDate = useMutation({
+    mutationFn: async () => {
+      const r = await fetch(`/api/v1/agent/placements/${placementId}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ startDate: date || null }),
+      });
+      if (!r.ok) throw new Error((await r.json().catch(() => ({})))?.message || "Failed");
+      return r.json();
+    },
+    onSuccess: () => { toast({ title: "Start date saved" }); qc.invalidateQueries({}); },
+    onError: (e: any) => toast({ title: "Couldn't save start date", description: e.message, variant: "destructive" }),
+  });
+
+  const saveUrl = useMutation({
+    mutationFn: async () => {
+      const r = await fetch(`/api/v1/agent/placements/${placementId}/appointment-letter`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ appointmentLetterUrl: url.trim() }),
+      });
+      if (!r.ok) throw new Error((await r.json().catch(() => ({})))?.message || "Failed");
+      return r.json();
+    },
+    onSuccess: () => { toast({ title: "Appointment letter linked" }); qc.invalidateQueries({}); },
+    onError: (e: any) => toast({ title: "Couldn't save letter", description: e.message, variant: "destructive" }),
+  });
+
+  return (
+    <div className="border-t border-slate-100 p-5">
+      <h3 className="text-sm font-bold text-slate-900 mb-1 flex items-center gap-2">
+        <FileText className="w-4 h-4 text-emerald-600" /> Appointment &amp; travel
+      </h3>
+      <p className="text-xs text-slate-500 mb-3">Agency-issued. Both appear on the candidate's pre-departure tracker.</p>
+      <div className="grid sm:grid-cols-2 gap-4">
+        <div>
+          <label className="text-[11px] font-semibold text-slate-600">Travel / start date</label>
+          <div className="flex gap-2 mt-1">
+            <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="h-9 text-sm" />
+            <Button size="sm" disabled={saveDate.isPending || (date ? date : "") === (startDate ? String(startDate).slice(0, 10) : "")}
+              onClick={() => saveDate.mutate()} className="gap-1">
+              {saveDate.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+            </Button>
+          </div>
+        </div>
+        <div>
+          <label className="text-[11px] font-semibold text-slate-600">Appointment letter URL</label>
+          <div className="flex gap-2 mt-1">
+            <Input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://… signed PDF" className="h-9 text-sm" />
+            <Button size="sm" disabled={!url.trim() || saveUrl.isPending || url.trim() === (appointmentLetterUrl || "")}
+              onClick={() => saveUrl.mutate()} className="gap-1">
+              {saveUrl.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+            </Button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

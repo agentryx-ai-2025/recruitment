@@ -153,6 +153,8 @@ router.get("/candidates/:id", protect, async (req, res, next) => {
       placementId: r.placement?.id ?? null,
       visaStatus: r.placement?.visaStatus ?? null,
       placementStatus: r.placement?.status ?? null,
+      startDate: r.placement?.startDate ?? null,
+      appointmentLetterUrl: r.placement?.appointmentLetterUrl ?? null,
       // Welfare check-ins (already persisted on the placement) so the panel
       // can show what was recorded instead of looking like it vanished.
       welfare: r.placement ? {
