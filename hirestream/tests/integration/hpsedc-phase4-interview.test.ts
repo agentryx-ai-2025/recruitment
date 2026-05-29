@@ -299,4 +299,28 @@ describe('Phase 4 — agent visa/passport status (placement)', () => {
     expect(placedApp.placementId).toBe(placementId);
     expect(placedApp.visaStatus).toBe('approved');
   });
+
+  it('records a history entry per change and surfaces it newest-first with the note', async () => {
+    await request(app).patch(`/api/v1/agent/placements/${placementId}/visa-status`)
+      .set('Cookie', agentCookie).send({ visaStatus: 'applied', note: 'Lodged at VFS' });
+    await request(app).patch(`/api/v1/agent/placements/${placementId}/visa-status`)
+      .set('Cookie', agentCookie).send({ visaStatus: 'approved', note: 'Stamped' });
+    const r = await request(app).get(`/api/v1/agencies/candidates/${candidateId}`).set('Cookie', agentCookie);
+    const placedApp = (r.body.data.applications as any[]).find((a) => a.id === applicationId);
+    expect(placedApp.visaHistory.length).toBe(2);
+    // newest first
+    expect(placedApp.visaHistory[0].visaStatus).toBe('approved');
+    expect(placedApp.visaHistory[0].note).toBe('Stamped');
+    expect(placedApp.visaHistory[1].visaStatus).toBe('applied');
+  });
+
+  it('surfaces recorded welfare check-ins on the candidate-detail placement', async () => {
+    await request(app).patch(`/api/v1/agent/placements/${placementId}/welfare`)
+      .set('Cookie', agentCookie).send({ milestone: '30', status: 'ok', notes: 'Settled in well' });
+    const r = await request(app).get(`/api/v1/agencies/candidates/${candidateId}`).set('Cookie', agentCookie);
+    const placedApp = (r.body.data.applications as any[]).find((a) => a.id === applicationId);
+    expect(placedApp.welfare.d30.status).toBe('ok');
+    expect(placedApp.welfare.d30.notes).toBe('Settled in well');
+    expect(placedApp.welfare.d60.status).toBeNull();
+  });
 });

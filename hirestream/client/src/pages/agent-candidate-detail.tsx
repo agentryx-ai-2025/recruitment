@@ -386,8 +386,8 @@ function ComplianceAndWelfarePanel({ candidate, applications }: { candidate: any
       {/* Visa/passport assistance + welfare — only when a placement exists */}
       {activePlacement?.placementId && (
         <>
-          <VisaStatusPanel placementId={activePlacement.placementId} current={activePlacement.visaStatus} />
-          <WelfarePanel placementId={activePlacement.placementId} />
+          <VisaStatusPanel placementId={activePlacement.placementId} current={activePlacement.visaStatus} history={activePlacement.visaHistory ?? []} />
+          <WelfarePanel placementId={activePlacement.placementId} welfare={activePlacement.welfare} />
         </>
       )}
     </section>
@@ -403,11 +403,12 @@ const VISA_STEPS: { value: string; label: string; tone: string }[] = [
   { value: "approved",    label: "Approved", tone: "text-emerald-700" },
   { value: "rejected",    label: "Rejected", tone: "text-red-700" },
 ];
-function VisaStatusPanel({ placementId, current }: { placementId: string; current?: string | null }) {
+function VisaStatusPanel({ placementId, current, history }: { placementId: string; current?: string | null; history?: any[] }) {
   const { toast } = useToast();
   const qc = useQueryClient();
   const [value, setValue] = useState<string>(current || "not_applied");
   const [note, setNote] = useState("");
+  const labelFor = (v: string) => VISA_STEPS.find((s) => s.value === v)?.label || v;
   const save = useMutation({
     mutationFn: async () => {
       const r = await fetch(`/api/v1/agent/placements/${placementId}/visa-status`, {
@@ -451,14 +452,41 @@ function VisaStatusPanel({ placementId, current }: { placementId: string; curren
           {save.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />} Update & notify
         </Button>
       </div>
+
+      {/* History timeline — every change is logged (audit_log) and shown here */}
+      {history && history.length > 0 && (
+        <div className="mt-4 border-t border-slate-100 pt-3">
+          <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide mb-2">History</p>
+          <ul className="space-y-2">
+            {history.map((h, i) => (
+              <li key={i} className="flex gap-2 text-xs">
+                <span className="mt-1 w-1.5 h-1.5 rounded-full bg-indigo-400 shrink-0" />
+                <div>
+                  <span className="font-semibold text-slate-800">{labelFor(h.visaStatus)}</span>
+                  <span className="text-slate-400"> · {h.at ? new Date(h.at).toLocaleString("en-IN") : ""}{h.role ? ` · by ${h.role}` : ""}</span>
+                  {h.note && <p className="text-slate-600 mt-0.5">“{h.note}”</p>}
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   );
 }
 
-function WelfarePanel({ placementId }: { placementId: string }) {
-  // Minimal UI scaffolding — full 30/60/90 check-in cards; agent records status + notes
+const WELFARE_OPTS: { value: string; label: string; tone: string }[] = [
+  { value: "ok",             label: "OK",             tone: "text-emerald-700 bg-emerald-50 border-emerald-200" },
+  { value: "concerns",       label: "Concerns",       tone: "text-amber-700 bg-amber-50 border-amber-200" },
+  { value: "no_response",    label: "No response",    tone: "text-slate-600 bg-slate-50 border-slate-200" },
+  { value: "not_applicable", label: "Not applicable", tone: "text-slate-500 bg-slate-50 border-slate-200" },
+];
+function WelfarePanel({ placementId, welfare }: { placementId: string; welfare?: any }) {
   const { toast } = useToast();
   const qc = useQueryClient();
+  const [editing, setEditing] = useState<string | null>(null);
+  const [draftStatus, setDraftStatus] = useState("ok");
+  const [draftNotes, setDraftNotes] = useState("");
   const record = useMutation({
     mutationFn: async ({ milestone, status, notes }: { milestone: string; status: string; notes?: string }) => {
       const r = await fetch(`/api/v1/agent/placements/${placementId}/welfare`, {
@@ -468,27 +496,63 @@ function WelfarePanel({ placementId }: { placementId: string }) {
       if (!r.ok) throw new Error("Failed");
       return r.json();
     },
-    onSuccess: () => { toast({ title: "Welfare check-in recorded" }); qc.invalidateQueries({}); },
+    onSuccess: () => { toast({ title: "Welfare check-in recorded" }); setEditing(null); setDraftNotes(""); qc.invalidateQueries({}); },
+    onError: () => toast({ title: "Couldn't record check-in", variant: "destructive" }),
   });
-  const ask = (milestone: string) => {
-    const status = window.prompt("Status: ok / concerns / no_response / not_applicable");
-    if (!status || !["ok", "concerns", "no_response", "not_applicable"].includes(status)) return;
-    const notes = window.prompt("Any notes? (optional)") || undefined;
-    record.mutate({ milestone, status, notes });
+  const milestones = [{ m: "30", w: welfare?.d30 }, { m: "60", w: welfare?.d60 }, { m: "90", w: welfare?.d90 }];
+  const openEditor = (m: string, current?: any) => {
+    setEditing(m);
+    setDraftStatus(current?.status || "ok");
+    setDraftNotes(current?.notes || "");
   };
   return (
     <div className="border-t border-slate-100 p-5">
       <h3 className="text-sm font-bold text-slate-900 mb-3 flex items-center gap-2">
         <Heart className="w-4 h-4 text-rose-600" /> Post-placement welfare check-ins
       </h3>
-      <div className="grid grid-cols-3 gap-3">
-        {["30", "60", "90"].map(m => (
-          <button key={m} onClick={() => ask(m)}
-            className="bg-gradient-to-br from-rose-50 to-pink-50 border border-rose-200 rounded-lg p-4 text-left hover:border-rose-400 transition">
-            <p className="text-xs font-semibold text-rose-800">{m}-day check-in</p>
-            <p className="text-[10px] text-rose-600 mt-1">Click to record status</p>
-          </button>
-        ))}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        {milestones.map(({ m, w }) => {
+          const opt = WELFARE_OPTS.find((o) => o.value === w?.status);
+          const recorded = !!w?.status;
+          return (
+            <div key={m} className={`rounded-lg border p-4 ${recorded ? "bg-white border-slate-200" : "bg-gradient-to-br from-rose-50 to-pink-50 border-rose-200"}`}>
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-semibold text-slate-800">{m}-day check-in</p>
+                <button onClick={() => openEditor(m, w)} className="text-[11px] text-blue-600 font-semibold hover:underline">
+                  {recorded ? "Edit" : "Record"}
+                </button>
+              </div>
+              {recorded ? (
+                <div className="mt-2 space-y-1">
+                  <span className={`inline-block text-[11px] font-semibold px-2 py-0.5 rounded border ${opt?.tone}`}>{opt?.label || w.status}</span>
+                  {w.at && <p className="text-[10px] text-slate-400">{new Date(w.at).toLocaleDateString("en-IN")}</p>}
+                  {w.notes && <p className="text-[11px] text-slate-600">{w.notes}</p>}
+                </div>
+              ) : (
+                <p className="text-[10px] text-rose-600 mt-1">Not recorded yet</p>
+              )}
+
+              {editing === m && (
+                <div className="mt-3 space-y-2 border-t border-slate-100 pt-2">
+                  <Select value={draftStatus} onValueChange={setDraftStatus}>
+                    <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {WELFARE_OPTS.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  <Input value={draftNotes} onChange={(e) => setDraftNotes(e.target.value)} placeholder="Notes (optional)" className="h-8 text-xs" />
+                  <div className="flex gap-2">
+                    <Button size="sm" className="h-7 text-xs" disabled={record.isPending}
+                      onClick={() => record.mutate({ milestone: m, status: draftStatus, notes: draftNotes.trim() || undefined })}>
+                      {record.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : "Save"}
+                    </Button>
+                    <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setEditing(null)}>Cancel</Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );

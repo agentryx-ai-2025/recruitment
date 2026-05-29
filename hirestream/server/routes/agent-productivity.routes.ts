@@ -733,6 +733,15 @@ router.patch("/placements/:id/visa-status", async (req, res, next) => {
 
     const [updated] = await db.update(placements).set({ visaStatus }).where(eq(placements.id, row.placement.id)).returning();
 
+    // Record the change so agent + admin keep a history (note included).
+    // Reuses the generic audit_log — no separate table, admin-visible.
+    await db.insert(auditLog).values({
+      userId: user.id, action: "update", resourceType: "placement_visa",
+      resourceId: row.placement.id,
+      details: { visaStatus, note: note?.trim() || null, role: user.role } as any,
+      ipAddress: (req as any).ip,
+    }).catch(() => { /* history is best-effort, never block the update */ });
+
     // Notify the candidate.
     const candRows = await db.select().from(candidates).where(eq(candidates.id, row.application.candidateId!)).limit(1);
     if (candRows.length && candRows[0].userId) {

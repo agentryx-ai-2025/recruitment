@@ -6,8 +6,8 @@ import { storage } from "../storage";
 import { logger } from "../config/logger.config";
 import { insertRecruitmentAgentSchema, recruitmentAgents, candidates, agencyReviews,
   candidateEducation, candidateExperience, documents, applications, jobs,
-  agencyDocuments, placements } from "@shared/schema";
-import { eq } from "drizzle-orm";
+  agencyDocuments, placements, auditLog } from "@shared/schema";
+import { eq, and } from "drizzle-orm";
 import {
   agencyDocUpload, verifyUploadedFile, handleUploadErrors,
   HS_AGENCY_DOCS_DIR, UPLOAD_DIR,
@@ -153,7 +153,32 @@ router.get("/candidates/:id", protect, async (req, res, next) => {
       placementId: r.placement?.id ?? null,
       visaStatus: r.placement?.visaStatus ?? null,
       placementStatus: r.placement?.status ?? null,
+      // Welfare check-ins (already persisted on the placement) so the panel
+      // can show what was recorded instead of looking like it vanished.
+      welfare: r.placement ? {
+        d30: { status: r.placement.welfare30Day, at: r.placement.welfare30DayAt, notes: r.placement.welfare30DayNotes },
+        d60: { status: r.placement.welfare60Day, at: r.placement.welfare60DayAt, notes: r.placement.welfare60DayNotes },
+        d90: { status: r.placement.welfare90Day, at: r.placement.welfare90DayAt, notes: r.placement.welfare90DayNotes },
+      } : null,
+      visaHistory: [] as any[],
     }));
+
+    // Attach visa-status history (from the generic audit_log) to each placed app.
+    const placementIds = applicationsList.map((a: any) => a.placementId).filter(Boolean) as string[];
+    if (placementIds.length > 0) {
+      const { inArray, desc } = await import("drizzle-orm");
+      const events = await storage.db
+        .select({ resourceId: auditLog.resourceId, details: auditLog.details, createdAt: auditLog.createdAt })
+        .from(auditLog)
+        .where(and(eq(auditLog.resourceType, "placement_visa"), inArray(auditLog.resourceId, placementIds)))
+        .orderBy(desc(auditLog.createdAt));
+      for (const a of applicationsList) {
+        if (!a.placementId) continue;
+        a.visaHistory = events
+          .filter((e: any) => e.resourceId === a.placementId)
+          .map((e: any) => ({ visaStatus: e.details?.visaStatus, note: e.details?.note ?? null, role: e.details?.role ?? null, at: e.createdAt }));
+      }
+    }
 
     res.json({
       success: true,
