@@ -13,7 +13,7 @@ import {
   MapPin, Mail, User, GraduationCap, Building, Search, DollarSign,
   Clock, Shield, ChevronDown, ChevronUp, ArrowUpDown, Sparkles,
   LayoutDashboard, ClipboardList, XCircle, Calendar, ArrowRight,
-  Bookmark, BookmarkCheck, Heart, TrendingUp, Globe, Award, Eye, Route, Trash2, Flag, Zap, Upload, Tag
+  Bookmark, BookmarkCheck, Heart, TrendingUp, Globe, Award, Eye, Route, Trash2, Flag, Zap, Upload, Tag, Plane
 } from "lucide-react";
 import { ReportJobDialog } from "@/components/shared/report-job-dialog";
 import { PhotoAvatar } from "@/components/shared/PhotoAvatar";
@@ -1482,12 +1482,15 @@ function ApplicationsView({ applications, initialIntent }: { applications: any[]
                 </div>
               )}
 
-              {/* Accepted Offer */}
-              {selectedApp.placement && selectedApp.placement.status === "accepted" && (
-                <div className="mt-5 bg-emerald-50 border border-emerald-200 rounded-xl p-4 flex items-center gap-3">
-                  <CheckCircle className="w-5 h-5 text-emerald-600" />
-                  <p className="text-sm text-emerald-900 font-medium">Offer accepted. Visa status: <span className="font-bold capitalize">{selectedApp.placement.visaStatus?.replace(/_/g, " ") || "not applied"}</span></p>
-                </div>
+              {/* Accepted Offer → full pre-departure tracker */}
+              {selectedApp.placement && ["accepted", "active", "completed"].includes(selectedApp.placement.status) && (
+                <>
+                  <div className="mt-5 bg-emerald-50 border border-emerald-200 rounded-xl p-4 flex items-center gap-3">
+                    <CheckCircle className="w-5 h-5 text-emerald-600" />
+                    <p className="text-sm text-emerald-900 font-medium">Offer accepted. Your agency is preparing your departure.</p>
+                  </div>
+                  <CandidateDeploymentTracker placementId={selectedApp.placement.id} />
+                </>
               )}
 
               {/* Agency Review — shown for placed/selected applications */}
@@ -3134,5 +3137,102 @@ function WelfareReplyCard({ applications }: { applications: any[] }) {
         </Button>
       </div>
     </motion.div>
+  );
+}
+
+// ── Candidate Pre-Departure Tracker ──────────────────────────────────
+// The candidate's view of Phase 2 (deployment): the best-practice checklist
+// with who owns each step, visa status + the destination's typical timeline
+// + history, the appointment letter, and welfare check-ins the agency logged.
+function CandidateDeploymentTracker({ placementId }: { placementId: string }) {
+  const { data: res, isLoading } = useQuery({
+    queryKey: [`/api/v1/me/placements/${placementId}/deployment`],
+    queryFn: async () => (await fetch(`/api/v1/me/placements/${placementId}/deployment`)).json(),
+  });
+  const d = res?.data;
+  if (isLoading) return <div className="mt-4 flex items-center gap-2 text-sm text-slate-400"><Loader2 className="w-4 h-4 animate-spin" /> Loading your departure checklist…</div>;
+  if (!d) return null;
+
+  const statusMeta: Record<string, { icon: any; cls: string; label: string }> = {
+    done:          { icon: CheckCircle, cls: "text-emerald-600", label: "Done" },
+    in_progress:   { icon: Clock,       cls: "text-blue-600",    label: "In progress" },
+    action_needed: { icon: AlertCircle, cls: "text-amber-600",   label: "Needs your action" },
+    pending:       { icon: Clock,       cls: "text-slate-300",   label: "Pending" },
+  };
+
+  return (
+    <div className="mt-4 bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+          <Plane className="w-4 h-4 text-indigo-600" /> Pre-departure tracker
+        </h3>
+        <span className="text-xs font-semibold text-slate-500">{d.summary.done}/{d.summary.total} complete</span>
+      </div>
+      <div className="h-2 rounded-full bg-slate-100 overflow-hidden mb-4">
+        <div className="h-full bg-indigo-500 transition-all" style={{ width: `${d.summary.pct}%` }} />
+      </div>
+
+      <ul className="space-y-2">
+        {d.checklist.map((it: any) => {
+          const m = statusMeta[it.status] || statusMeta.pending;
+          const Icon = m.icon;
+          return (
+            <li key={it.key} className="flex items-start gap-2.5">
+              <Icon className={`w-4 h-4 mt-0.5 shrink-0 ${m.cls}`} />
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-sm text-slate-800">{it.label}</span>
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${it.owner === "you" ? "bg-amber-50 text-amber-700" : "bg-slate-100 text-slate-500"}`}>
+                    {it.owner === "you" ? "Your action" : "Agency"}
+                  </span>
+                </div>
+                {it.detail && <p className="text-xs text-slate-500">{it.detail}</p>}
+              </div>
+              <span className={`text-[11px] font-medium shrink-0 ${m.cls}`}>{m.label}</span>
+            </li>
+          );
+        })}
+      </ul>
+
+      <div className="mt-4 rounded-lg bg-indigo-50/50 border border-indigo-100 p-3">
+        <p className="text-xs font-semibold text-indigo-900 flex items-center gap-1.5"><Plane className="w-3.5 h-3.5" /> Visa / passport</p>
+        <p className="text-sm text-slate-700 mt-1 capitalize">
+          {(d.visa.status || "not_applied").replace(/_/g, " ")}
+          {d.visa.timelineDays ? <span className="text-slate-400 normal-case"> · {d.placement.country} typically takes ~{d.visa.timelineDays} days</span> : null}
+        </p>
+        {d.visa.history?.length > 0 && (
+          <ul className="mt-2 space-y-1">
+            {d.visa.history.map((h: any, i: number) => (
+              <li key={i} className="text-xs text-slate-500">
+                <span className="capitalize font-medium text-slate-700">{(h.visaStatus || "").replace(/_/g, " ")}</span>
+                {" · "}{h.at ? new Date(h.at).toLocaleDateString("en-IN") : ""}{h.note ? ` — “${h.note}”` : ""}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      {d.placement.appointmentLetterUrl && (
+        <a href={`/api/v1/me/placements/${placementId}/offer-letter.pdf`} target="_blank" rel="noopener noreferrer"
+          className="mt-3 inline-flex items-center gap-1.5 text-xs font-medium px-3 py-2 rounded-md border border-slate-200 hover:border-indigo-400 hover:text-indigo-700 transition">
+          <Download className="w-4 h-4" /> Appointment letter (PDF)
+        </a>
+      )}
+
+      {(d.welfare.d30.status || d.welfare.d60.status || d.welfare.d90.status) && (
+        <div className="mt-4 border-t border-slate-100 pt-3">
+          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2 flex items-center gap-1.5"><Heart className="w-3.5 h-3.5 text-rose-500" /> Welfare check-ins</p>
+          <div className="grid grid-cols-3 gap-2">
+            {[["30", d.welfare.d30], ["60", d.welfare.d60], ["90", d.welfare.d90]].map(([m, w]: any) => (
+              <div key={m} className="rounded-lg border border-slate-100 p-2">
+                <p className="text-[11px] font-semibold text-slate-700">{m}-day</p>
+                {w.status ? <p className="text-[11px] text-emerald-700 capitalize">{w.status.replace(/_/g, " ")}</p> : <p className="text-[11px] text-slate-300">—</p>}
+                {w.at && <p className="text-[10px] text-slate-400">{new Date(w.at).toLocaleDateString("en-IN")}</p>}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
   );
 }

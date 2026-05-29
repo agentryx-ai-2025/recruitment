@@ -6,6 +6,7 @@ import { storage } from '../server/storage';
 import authRouter from '../server/routes/auth.routes';
 import candidateRouter from '../server/routes/candidate.routes';
 import adminRouter from '../server/routes/admin.routes';
+import adminOversightRouter from '../server/routes/admin-oversight.routes';
 import agencyRouter from '../server/routes/agency.routes';
 import jobRouter from '../server/routes/job.routes';
 import notificationRouter from '../server/routes/notification.routes';
@@ -75,6 +76,7 @@ export function createTestApp(): express.Express {
   app.use('/api/v1/drives', driveRouter);
   app.use('/api/v1/admin/reports', reportsRouter);
   app.use('/api/v1/admin/audit', auditRouter);
+  app.use('/api/v1/admin/oversight', adminOversightRouter);
   app.use('/api/v1/grievances', grievanceRouter);
   app.use('/api/v1/content', contentRouter);
   app.use('/api/v1/resume', resumeParserRouter);

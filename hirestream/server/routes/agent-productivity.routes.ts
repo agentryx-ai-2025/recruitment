@@ -25,6 +25,7 @@ import PDFDocument from "pdfkit";
 import { logger } from "../config/logger.config";
 import { getSetting } from "../services/settings.service";
 import { notify } from "../services/notification.service";
+import { buildDeploymentChecklist, readinessSummary } from "../services/deployment.service";
 
 const router = Router();
 router.use(protect);
@@ -623,6 +624,13 @@ router.get("/placements", async (req, res, next) => {
       return res.status(403).json({ success: false, message: "Forbidden" });
     }
 
+    // Attach the shared deployment readiness (checklist + summary) so every
+    // role renders the same pre-departure truth from one source.
+    const withReadiness = (rows: any[]) => rows.map((r: any) => {
+      const checklist = buildDeploymentChecklist(r.candidate, r.placement);
+      return { ...r, deployment: { checklist, summary: readinessSummary(checklist) } };
+    });
+
     if (user.role === "admin" || user.role === "superadmin") {
       const rows = await storage.db
         .select({ placement: placements, application: applications, candidate: candidates, job: jobs })
@@ -630,7 +638,7 @@ router.get("/placements", async (req, res, next) => {
         .innerJoin(applications, eq(placements.applicationId, applications.id))
         .innerJoin(candidates, eq(applications.candidateId, candidates.id))
         .innerJoin(jobs, eq(applications.jobId, jobs.id));
-      return res.json({ success: true, data: rows });
+      return res.json({ success: true, data: withReadiness(rows) });
     }
 
     if (user.role === "agent") {
@@ -641,7 +649,7 @@ router.get("/placements", async (req, res, next) => {
         .innerJoin(candidates, eq(applications.candidateId, candidates.id))
         .innerJoin(jobs, eq(applications.jobId, jobs.id))
         .where(eq(jobs.agentId, user.id));
-      return res.json({ success: true, data: rows });
+      return res.json({ success: true, data: withReadiness(rows) });
     }
 
     // Employer: direct ownership OR derivative job whose parent requisition is theirs.
@@ -655,7 +663,7 @@ router.get("/placements", async (req, res, next) => {
       .innerJoin(jobs, eq(applications.jobId, jobs.id))
       .leftJoin(parentJobs, eq(jobs.parentRequisitionId, parentJobs.id))
       .where(or(eq(jobs.employerId, user.id), eq(parentJobs.employerId, user.id)));
-    res.json({ success: true, data: rows });
+    res.json({ success: true, data: withReadiness(rows) });
   } catch (err) { next(err); }
 });
 

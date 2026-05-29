@@ -52,10 +52,23 @@ router.get("/compliance", async (_req, res, next) => {
     });
 
     // Gaps in active placements (the concerning ones)
+    const candById = new Map<string, any>(allCandidates.map((c: any) => [c.id, c]));
     const activeCandidateIds = new Set<string>();
-    for (const p of activePlacements) {
+    // Visa pipeline across deployed placements + the per-placement risk list.
+    const visaCounts: Record<string, number> = { not_applied: 0, applied: 0, approved: 0, rejected: 0 };
+    const placedVisaNotApproved: any[] = [];
+    const visaRejected: any[] = [];
+    for (const p of activePlacements as any[]) {
       const [app] = await db.select().from(applications).where(eq(applications.id, p.applicationId)).limit(1);
-      if (app?.candidateId) activeCandidateIds.add(app.candidateId);
+      if (app?.candidateId) {
+        activeCandidateIds.add(app.candidateId);
+        const cand = candById.get(app.candidateId);
+        const v = p.visaStatus || "not_applied";
+        visaCounts[v] = (visaCounts[v] ?? 0) + 1;
+        const tag = { placementId: p.id, candidateId: app.candidateId, fullName: cand?.fullName, country: p.country, visaStatus: v };
+        if (v !== "approved") placedVisaNotApproved.push(tag);
+        if (v === "rejected") visaRejected.push(tag);
+      }
     }
     const activeCandidates = allCandidates.filter((c: any) => activeCandidateIds.has(c.id));
     const placedMissingPDO = activeCandidates.filter((c: any) => !c.pdoCompleted);
@@ -75,6 +88,11 @@ router.get("/compliance", async (_req, res, next) => {
           pbbyEnrolled: { count: pbbyEnrolled, pct: total > 0 ? Math.round((pbbyEnrolled / total) * 100) : 0 },
           ieltsRecorded: { count: ieltsRecorded, pct: total > 0 ? Math.round((ieltsRecorded / total) * 100) : 0 },
         },
+        // Visa pipeline across deployed placements (FRS §2.2 — agency-driven).
+        visa: {
+          counts: visaCounts,
+          deployed: activeCandidates.length,
+        },
         riskFlags: {
           passportExpiringSoon: expiringSoon.map((c: any) => ({
             id: c.id, fullName: c.fullName, email: c.email, passportExpiry: c.passportExpiry,
@@ -82,6 +100,8 @@ router.get("/compliance", async (_req, res, next) => {
           placedMissingPDO: placedMissingPDO.map((c: any) => ({ id: c.id, fullName: c.fullName, email: c.email })),
           placedMissingPBBY: placedMissingPBBY.map((c: any) => ({ id: c.id, fullName: c.fullName, email: c.email })),
           placedMissingPassport: placedMissingPassport.map((c: any) => ({ id: c.id, fullName: c.fullName, email: c.email })),
+          placedVisaNotApproved,
+          visaRejected,
         },
       },
     });
@@ -105,10 +125,22 @@ router.get("/welfare-sla", async (_req, res, next) => {
     const now = Date.now();
     const MS = 86_400_000;
     const overdue: any[] = [];
+    // Placements that escaped the monitor before: no start date was ever set,
+    // so the 30/60/90 clock could never start. Surface them as their own gap
+    // (falling back to created-at) instead of silently dropping them.
+    const missingStartDate: any[] = [];
     for (const r of rows) {
       const p: any = r.placement;
-      if (!p.startDate) continue;
-      const startMs = new Date(p.startDate).getTime();
+      const anchor = p.startDate ?? p.createdAt;
+      if (!anchor) continue;
+      const usingFallback = !p.startDate;
+      if (usingFallback) {
+        missingStartDate.push({
+          placementId: p.id, candidateId: r.candidate.id, candidateName: r.candidate.fullName,
+          jobTitle: r.job.title, company: r.job.company, country: p.country,
+        });
+      }
+      const startMs = new Date(anchor).getTime();
       const daysSinceStart = (now - startMs) / MS;
       const flag = (dueDays: number, milestone: "30" | "60" | "90", recordedValue: any) => {
         if (daysSinceStart >= dueDays && !recordedValue) {
@@ -116,7 +148,7 @@ router.get("/welfare-sla", async (_req, res, next) => {
             placementId: p.id, milestone, daysOverdue: Math.floor(daysSinceStart - dueDays),
             candidateId: r.candidate.id, candidateName: r.candidate.fullName,
             jobTitle: r.job.title, company: r.job.company, country: p.country,
-            startDate: p.startDate,
+            startDate: p.startDate, usingFallback,
           });
         }
       };
@@ -126,7 +158,7 @@ router.get("/welfare-sla", async (_req, res, next) => {
     }
 
     overdue.sort((a, b) => b.daysOverdue - a.daysOverdue);
-    res.json({ success: true, data: overdue });
+    res.json({ success: true, data: { overdue, missingStartDate } });
   } catch (err) { next(err); }
 });
 

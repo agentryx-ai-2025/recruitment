@@ -1632,9 +1632,11 @@ function CompliancePanel() {
     queryFn: () => fetchJson("/api/v1/admin/oversight/compliance"),
   });
   if (isLoading) return <div className="p-10 text-center"><Loader2 className="w-6 h-6 animate-spin text-blue-600 inline" /></div>;
-  const d = res?.data ?? { totals: { candidates: 0, activePlacements: 0 }, coverage: {}, riskFlags: {} };
+  const d = res?.data ?? { totals: { candidates: 0, activePlacements: 0 }, coverage: {}, riskFlags: {}, visa: { counts: {}, deployed: 0 } };
   const cov = d.coverage;
   const risk = d.riskFlags;
+  const visa = d.visa ?? { counts: {}, deployed: 0 };
+  const vc = visa.counts ?? {};
 
   const row = (key: string, label: string, target: number = 90) => {
     const c = cov[key] || { count: 0, pct: 0 };
@@ -1685,12 +1687,32 @@ function CompliancePanel() {
         </div>
       </div>
 
+      {/* Visa pipeline across deployed placements */}
+      <div>
+        <h3 className="text-sm font-bold text-slate-900 mb-3">Visa pipeline — {visa.deployed} deployed</h3>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {[
+            { key: "not_applied", label: "Not applied", cls: "text-slate-600" },
+            { key: "applied", label: "Applied", cls: "text-blue-700" },
+            { key: "approved", label: "Approved", cls: "text-emerald-700" },
+            { key: "rejected", label: "Rejected", cls: "text-red-700" },
+          ].map((s) => (
+            <div key={s.key} className="bg-white rounded-lg border border-slate-200 p-4">
+              <p className="text-xs font-semibold text-slate-700">{s.label}</p>
+              <p className={`text-2xl font-bold tabular-nums ${s.cls}`}>{vc[s.key] ?? 0}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
       {/* Risk flags */}
       <div className="grid md:grid-cols-2 gap-4">
         <RiskList title="Placed without PDO" icon="⚠️" severity="critical" rows={risk.placedMissingPDO ?? []} />
         <RiskList title="Placed without PBBY" icon="⚠️" severity="critical" rows={risk.placedMissingPBBY ?? []} />
         <RiskList title="Placed without passport on file" icon="🚨" severity="critical" rows={risk.placedMissingPassport ?? []} />
         <RiskList title="Passport expiring in < 6 months" icon="⏰" severity="warning" rows={risk.passportExpiringSoon ?? []} />
+        <RiskList title="Placed, visa not yet approved" icon="✈️" severity="warning" rows={risk.placedVisaNotApproved ?? []} />
+        <RiskList title="Visa rejected" icon="🚨" severity="critical" rows={risk.visaRejected ?? []} />
       </div>
     </div>
   );
@@ -1710,10 +1732,12 @@ function RiskList({ title, icon, severity, rows }: { title: string; icon: string
         <p className="text-xs text-emerald-700">✓ None flagged</p>
       ) : (
         <div className="space-y-1 max-h-48 overflow-y-auto">
-          {rows.slice(0, 20).map((r: any) => (
-            <div key={r.id} className="text-xs bg-white rounded px-2 py-1 border border-slate-100 flex justify-between">
+          {rows.slice(0, 20).map((r: any, i: number) => (
+            <div key={r.id || r.placementId || r.candidateId || i} className="text-xs bg-white rounded px-2 py-1 border border-slate-100 flex justify-between gap-2">
               <span className="font-medium text-slate-800 truncate">{r.fullName}</span>
-              {r.passportExpiry && <span className="text-slate-500 shrink-0">{new Date(r.passportExpiry).toLocaleDateString("en-IN")}</span>}
+              {r.passportExpiry
+                ? <span className="text-slate-500 shrink-0">{new Date(r.passportExpiry).toLocaleDateString("en-IN")}</span>
+                : r.country ? <span className="text-slate-500 shrink-0">{r.country}</span> : null}
             </div>
           ))}
           {rows.length > 20 && <p className="text-[10px] text-slate-500 italic mt-1">+{rows.length - 20} more</p>}
@@ -1730,7 +1754,10 @@ function WelfareSlaPanel() {
     queryFn: () => fetchJson("/api/v1/admin/oversight/welfare-sla"),
   });
   if (isLoading) return <div className="p-10 text-center"><Loader2 className="w-6 h-6 animate-spin text-blue-600 inline" /></div>;
-  const overdue: any[] = res?.data ?? [];
+  // v0.4.40: endpoint now returns { overdue, missingStartDate } (was a bare
+  // array). Tolerate both shapes so a stale cache can't crash the panel.
+  const overdue: any[] = Array.isArray(res?.data) ? res.data : (res?.data?.overdue ?? []);
+  const missingStartDate: any[] = Array.isArray(res?.data) ? [] : (res?.data?.missingStartDate ?? []);
 
   return (
     <div className="space-y-4">
@@ -1749,6 +1776,23 @@ function WelfareSlaPanel() {
           </div>
         </div>
       </div>
+
+      {/* Data-quality flag: placements with no start date set — the welfare
+          clock is estimated from the created date so they still get tracked. */}
+      {missingStartDate.length > 0 && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50/50 p-4">
+          <div className="flex items-center justify-between mb-2">
+            <h4 className="text-sm font-bold text-slate-900">⏱️ Placed, no start date set</h4>
+            <span className="text-[11px] font-bold px-2 py-0.5 rounded bg-amber-500 text-white">{missingStartDate.length}</span>
+          </div>
+          <p className="text-[11px] text-slate-500 mb-2">Welfare due-dates estimated from the placement creation date. Set a real start date to make the SLA exact.</p>
+          <div className="flex flex-wrap gap-1.5">
+            {missingStartDate.slice(0, 30).map((r: any, i: number) => (
+              <span key={r.placementId || i} className="text-xs bg-white rounded px-2 py-1 border border-amber-100 text-slate-700">{r.candidateName} · {r.country}</span>
+            ))}
+          </div>
+        </div>
+      )}
 
       {overdue.length === 0 ? (
         <div className="bg-white rounded-xl border border-slate-200 p-12 text-center">

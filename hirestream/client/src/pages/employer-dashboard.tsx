@@ -768,6 +768,9 @@ function EmployerPlacements() {
   const [letterUrl, setLetterUrl] = useState("");
   // v0.4.14: edit details (country/salary/startDate) dialog state
   const [editDetailsFor, setEditDetailsFor] = useState<any | null>(null);
+  // Employer observer welfare note (FRS — employer-observable welfare).
+  const [noteFor, setNoteFor] = useState<string | null>(null);
+  const [noteText, setNoteText] = useState("");
 
   const { data: res, isLoading } = useQuery({
     queryKey: ["/api/v1/agent/placements"],
@@ -788,6 +791,22 @@ function EmployerPlacements() {
       setEditing(null); setLetterUrl("");
       qc.invalidateQueries({ queryKey: ["/api/v1/agent/placements"] });
     },
+  });
+
+  const saveNote = useMutation({
+    mutationFn: async ({ id, note }: { id: string; note: string }) => {
+      const r = await fetch(`/api/v1/employer/placements/${id}/welfare-note`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ note }),
+      });
+      if (!r.ok) throw new Error("Failed");
+      return r.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Observation saved" });
+      setNoteFor(null); setNoteText("");
+      qc.invalidateQueries({ queryKey: ["/api/v1/agent/placements"] });
+    },
+    onError: () => toast({ title: "Couldn't save note", variant: "destructive" }),
   });
 
   if (isLoading) return <div className="p-10 text-center"><Loader2 className="w-6 h-6 animate-spin text-blue-600 inline" /></div>;
@@ -898,10 +917,37 @@ function EmployerPlacements() {
                 )}
               </div>
 
+              {/* Deployment readiness (read-only — agency drives, employer observes) */}
+              {r.deployment && (
+                <div className="mt-3 p-3 bg-indigo-50/40 border border-indigo-200 rounded-lg">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-xs font-semibold text-indigo-900 flex items-center gap-1.5"><Globe className="w-3.5 h-3.5" /> Deployment readiness</p>
+                    <span className="text-[11px] font-semibold text-indigo-700">{r.deployment.summary.done}/{r.deployment.summary.total} done</span>
+                  </div>
+                  <div className="h-1.5 rounded-full bg-indigo-100 overflow-hidden mb-2">
+                    <div className="h-full bg-indigo-500" style={{ width: `${r.deployment.summary.pct}%` }} />
+                  </div>
+                  <div className="grid sm:grid-cols-3 gap-1.5 text-[11px]">
+                    {r.deployment.checklist.map((it: any) => (
+                      <div key={it.key} className="flex items-center gap-1.5">
+                        <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${it.status === "done" ? "bg-emerald-500" : it.status === "in_progress" ? "bg-blue-500" : it.status === "action_needed" ? "bg-amber-500" : "bg-slate-300"}`} />
+                        <span className="text-slate-600 truncate">{it.label}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Welfare check-ins visibility (read-mostly for employer) */}
-              {(r.placement.welfare30Day || r.placement.welfare60Day || r.placement.welfare90Day || r.placement.candidateWelfareNote) && (
+              {(r.placement.welfare30Day || r.placement.welfare60Day || r.placement.welfare90Day || r.placement.candidateWelfareNote || r.placement.employerWelfareNote || noteFor === r.placement.id) && (
                 <div className="mt-3 p-3 bg-rose-50/60 border border-rose-200 rounded-lg">
-                  <p className="text-xs font-semibold text-rose-800 flex items-center gap-1.5"><Heart className="w-3.5 h-3.5" /> Post-placement welfare</p>
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-semibold text-rose-800 flex items-center gap-1.5"><Heart className="w-3.5 h-3.5" /> Post-placement welfare</p>
+                    <button onClick={() => { setNoteFor(r.placement.id); setNoteText(r.placement.employerWelfareNote || ""); }}
+                      className="text-[11px] font-semibold text-rose-700 hover:underline">
+                      {r.placement.employerWelfareNote ? "Edit observation" : "Add observation"}
+                    </button>
+                  </div>
                   <div className="grid sm:grid-cols-3 gap-2 mt-2 text-[11px]">
                     {["30", "60", "90"].map((m) => {
                       const st = r.placement[`welfare${m}Day`];
@@ -919,6 +965,22 @@ function EmployerPlacements() {
                     <div className="mt-2 bg-white rounded border border-rose-100 p-2">
                       <p className="text-[10px] uppercase text-rose-700 font-semibold">Candidate update</p>
                       <p className="text-xs text-slate-700 mt-0.5">{r.placement.candidateWelfareNote}</p>
+                    </div>
+                  )}
+                  {r.placement.employerWelfareNote && noteFor !== r.placement.id && (
+                    <div className="mt-2 bg-white rounded border border-indigo-100 p-2">
+                      <p className="text-[10px] uppercase text-indigo-700 font-semibold">Your observation</p>
+                      <p className="text-xs text-slate-700 mt-0.5">{r.placement.employerWelfareNote}</p>
+                    </div>
+                  )}
+                  {noteFor === r.placement.id && (
+                    <div className="mt-2 flex gap-2">
+                      <Input value={noteText} onChange={(e) => setNoteText(e.target.value)}
+                        placeholder="How is the hire performing at destination?" className="h-9 text-sm" />
+                      <Button size="sm" disabled={saveNote.isPending} onClick={() => saveNote.mutate({ id: r.placement.id, note: noteText.trim() })}>
+                        {saveNote.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "Save"}
+                      </Button>
+                      <Button size="sm" variant="ghost" onClick={() => { setNoteFor(null); setNoteText(""); }}>Cancel</Button>
                     </div>
                   )}
                 </div>

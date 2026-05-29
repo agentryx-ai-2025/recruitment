@@ -15,7 +15,7 @@ import request from 'supertest';
 import type { Express } from 'express';
 import { sql } from 'drizzle-orm';
 import { createTestApp, truncateAllTables, getDb } from '../helpers';
-import { interviews, applications, jobs as jobsTable, candidates, recruitmentAgents, placements } from '../../shared/schema';
+import { interviews, applications, jobs as jobsTable, candidates, recruitmentAgents, placements, users } from '../../shared/schema';
 import { eq } from 'drizzle-orm';
 
 let app: Express;
@@ -322,5 +322,73 @@ describe('Phase 4 — agent visa/passport status (placement)', () => {
     expect(placedApp.welfare.d30.status).toBe('ok');
     expect(placedApp.welfare.d30.notes).toBe('Settled in well');
     expect(placedApp.welfare.d60.status).toBeNull();
+  });
+});
+
+describe('Phase 2 — deployment phase (candidate tracker + HPSEDC oversight)', () => {
+  let placementId: string;
+
+  beforeEach(async () => {
+    const db = getDb();
+    await db.update(applications).set({ status: 'placed' }).where(eq(applications.id, applicationId));
+    // status accepted = "deployed" → counted by compliance + welfare SLA. No
+    // startDate on purpose, to exercise the welfare-SLA fallback.
+    const pIns = await db.insert(placements).values({ applicationId, country: 'Canada', status: 'accepted' }).returning();
+    placementId = pIns[0].id;
+  });
+
+  it('candidate gets their pre-departure dossier (checklist + visa + welfare)', async () => {
+    const r = await request(app).get(`/api/v1/me/placements/${placementId}/deployment`).set('Cookie', candidateCookie);
+    expect(r.status).toBe(200);
+    expect(Array.isArray(r.body.data.checklist)).toBe(true);
+    expect(r.body.data.checklist.length).toBeGreaterThanOrEqual(8);
+    expect(r.body.data.summary).toHaveProperty('done');
+    expect(r.body.data.summary).toHaveProperty('total');
+    expect(r.body.data.visa).toHaveProperty('status');
+    expect(r.body.data.welfare).toHaveProperty('d30');
+  });
+
+  it("another candidate cannot read someone else's deployment dossier", async () => {
+    const otherReg = await request(app).post('/api/v1/auth/register').send({ email: 'other-cand@test.com', password: 'Test@123', role: 'candidate' });
+    const otherCookie = otherReg.headers['set-cookie'] as unknown as string[];
+    const r = await request(app).get(`/api/v1/me/placements/${placementId}/deployment`).set('Cookie', otherCookie);
+    expect(r.status).toBe(404);
+  });
+
+  it('the checklist reflects an approved visa', async () => {
+    await request(app).patch(`/api/v1/agent/placements/${placementId}/visa-status`)
+      .set('Cookie', agentCookie).send({ visaStatus: 'approved' });
+    const r = await request(app).get(`/api/v1/me/placements/${placementId}/deployment`).set('Cookie', candidateCookie);
+    const visaItem = (r.body.data.checklist as any[]).find((i) => i.key === 'visa');
+    expect(visaItem.status).toBe('done');
+  });
+
+  it('HPSEDC compliance shows the visa pipeline + flags placed-without-approved-visa', async () => {
+    const db = getDb();
+    const admReg = await request(app).post('/api/v1/auth/register').send({ email: 'adm-dep@test.com', password: 'Test@123', role: 'candidate' });
+    const admCookie = admReg.headers['set-cookie'] as unknown as string[];
+    await db.update(users).set({ role: 'admin' }).where(eq(users.id, admReg.body.data.id));
+
+    await request(app).patch(`/api/v1/agent/placements/${placementId}/visa-status`)
+      .set('Cookie', agentCookie).send({ visaStatus: 'applied' });
+
+    const r = await request(app).get('/api/v1/admin/oversight/compliance').set('Cookie', admCookie);
+    expect(r.status).toBe(200);
+    expect(r.body.data.visa.counts.applied).toBeGreaterThanOrEqual(1);
+    // visa is "applied", not "approved" → flagged
+    const flagged = (r.body.data.riskFlags.placedVisaNotApproved as any[]).some((x) => x.placementId === placementId);
+    expect(flagged).toBe(true);
+  });
+
+  it('welfare SLA no longer drops placements with no start date', async () => {
+    const db = getDb();
+    const admReg = await request(app).post('/api/v1/auth/register').send({ email: 'adm-sla@test.com', password: 'Test@123', role: 'candidate' });
+    const admCookie = admReg.headers['set-cookie'] as unknown as string[];
+    await db.update(users).set({ role: 'admin' }).where(eq(users.id, admReg.body.data.id));
+
+    const r = await request(app).get('/api/v1/admin/oversight/welfare-sla').set('Cookie', admCookie);
+    expect(r.status).toBe(200);
+    const listed = (r.body.data.missingStartDate as any[]).some((x) => x.placementId === placementId);
+    expect(listed).toBe(true);
   });
 });

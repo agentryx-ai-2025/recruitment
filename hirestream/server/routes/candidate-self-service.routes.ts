@@ -14,7 +14,9 @@ import { storage } from "../storage";
 import {
   candidates, candidateEducation, candidateExperience, documents,
   candidateReferences, placements, applications, interviews, jobs,
+  countryInfo, auditLog,
 } from "@shared/schema";
+import { buildDeploymentChecklist, readinessSummary } from "../services/deployment.service";
 import { eq, and, desc } from "drizzle-orm";
 import PDFDocument from "pdfkit";
 import { logger } from "../config/logger.config";
@@ -194,6 +196,67 @@ router.post("/placements/:id/welfare-reply", async (req, res, next) => {
       .set({ candidateWelfareNote: note, candidateWelfareNoteAt: new Date() })
       .where(eq(placements.id, req.params.id));
     res.json({ success: true });
+  } catch (err) { next(err); }
+});
+
+// ── Candidate pre-departure / deployment dossier ─────────────────────
+// Everything the candidate needs to see between offer-accept and travel:
+// the best-practice checklist (who owns each step), visa status + history
+// + the destination's typical visa timeline, and the welfare check-ins.
+router.get("/placements/:id/deployment", async (req, res, next) => {
+  try {
+    if (!storage.db) return res.status(500).json({ success: false });
+    const user = (req as any).user;
+    const candId = await getMyCandidateId(user.id);
+    if (!candId) return res.status(404).json({ success: false });
+
+    const [row] = await storage.db
+      .select({ p: placements, a: applications, j: jobs })
+      .from(placements)
+      .innerJoin(applications, eq(placements.applicationId, applications.id))
+      .innerJoin(jobs, eq(applications.jobId, jobs.id))
+      .where(and(eq(placements.id, req.params.id), eq(applications.candidateId, candId)))
+      .limit(1);
+    if (!row) return res.status(404).json({ success: false });
+
+    const [cand] = await storage.db.select().from(candidates).where(eq(candidates.id, candId)).limit(1);
+    const p: any = row.p;
+
+    // Destination visa timeline (matched by country name; null if unknown).
+    const [ci] = await storage.db.select().from(countryInfo).where(eq(countryInfo.name, p.country)).limit(1);
+
+    // Visa history (audit_log, newest-first).
+    const events = await storage.db
+      .select({ details: auditLog.details, createdAt: auditLog.createdAt })
+      .from(auditLog)
+      .where(and(eq(auditLog.resourceType, "placement_visa"), eq(auditLog.resourceId, p.id)))
+      .orderBy(desc(auditLog.createdAt));
+
+    const checklist = buildDeploymentChecklist(cand, p);
+
+    res.json({
+      success: true,
+      data: {
+        placement: {
+          id: p.id, status: p.status, country: p.country, salary: p.salary,
+          startDate: p.startDate, appointmentLetterUrl: p.appointmentLetterUrl,
+        },
+        jobTitle: row.j.title, company: row.j.company,
+        checklist,
+        summary: readinessSummary(checklist),
+        visa: {
+          status: p.visaStatus ?? "not_applied",
+          timelineDays: ci?.visaTimelineDays ?? null,
+          history: events.map((e: any) => ({ visaStatus: e.details?.visaStatus, note: e.details?.note ?? null, at: e.createdAt })),
+        },
+        welfare: {
+          d30: { status: p.welfare30Day, at: p.welfare30DayAt, notes: p.welfare30DayNotes },
+          d60: { status: p.welfare60Day, at: p.welfare60DayAt, notes: p.welfare60DayNotes },
+          d90: { status: p.welfare90Day, at: p.welfare90DayAt, notes: p.welfare90DayNotes },
+          candidateNote: p.candidateWelfareNote, candidateNoteAt: p.candidateWelfareNoteAt,
+        },
+      },
+    });
   } catch (err) { next(err); }
 });
 
