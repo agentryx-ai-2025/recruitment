@@ -308,11 +308,11 @@ export default function CandidateDashboard() {
             <motion.div key={activeView} variants={scaleIn} initial="initial" animate="animate" exit="exit">
               {activeView === "overview" && <OverviewView appCount={appCount} shortlisted={shortlistedCount} docs={docs.length} savedCount={savedJobsList.length} completion={completion} applications={applications} recommendations={recommendations} setActiveView={setActiveView} profile={profile} education={education} experience={experience} />}
               {activeView === "jobs" && <JobsView allJobs={allJobs} appliedJobIds={appliedJobIds} savedJobIds={savedJobIds} recommendations={recommendations} completion={completion} />}
-              {activeView === "applications" && <ApplicationsView applications={applications} initialIntent={intent} />}
+              {activeView === "applications" && <ApplicationsView applications={applications} initialIntent={intent} setActiveView={setActiveView} />}
               {activeView === "journey" && <JourneyView profile={profile} applications={applications} completion={completion} docs={docs} education={education} experience={experience} />}
               {activeView === "recommended" && <RecommendedView recommendations={recommendations} savedJobIds={savedJobIds} setActiveView={setActiveView} />}
               {activeView === "saved" && <SavedJobsView savedJobs={savedJobsList} appliedJobIds={appliedJobIds} setActiveView={setActiveView} />}
-              {activeView === "documents" && <DocumentsView docs={docs} profile={profile} />}
+              {activeView === "documents" && <DocumentsView docs={docs} profile={profile} intent={intent} />}
             </motion.div>
           </AnimatePresence>
         </main>
@@ -1130,7 +1130,7 @@ function renderAppCard(app: any, selectedApp: any, setSelectedApp: (a: any) => v
   );
 }
 
-function ApplicationsView({ applications, initialIntent }: { applications: any[]; initialIntent?: string | null }) {
+function ApplicationsView({ applications, initialIntent, setActiveView }: { applications: any[]; initialIntent?: string | null; setActiveView?: (v: string, intent?: string) => void }) {
   // v0.4.20: initial filter state honors the `intent` hint passed from
   // the Overview stat cards so each card lands the user on the rows the
   // card was about — instead of always dumping them on the same list.
@@ -1489,7 +1489,8 @@ function ApplicationsView({ applications, initialIntent }: { applications: any[]
                     <CheckCircle className="w-5 h-5 text-emerald-600" />
                     <p className="text-sm text-emerald-900 font-medium">Offer accepted. Your agency is preparing your departure.</p>
                   </div>
-                  <CandidateDeploymentTracker placementId={selectedApp.placement.id} />
+                  <CandidateDeploymentTracker placementId={selectedApp.placement.id}
+                    onAction={() => setActiveView?.("documents", "compliance")} />
                 </>
               )}
 
@@ -1643,11 +1644,20 @@ function RecommendedView({ recommendations, savedJobIds, setActiveView }: { reco
 
 // ── DOCUMENTS VIEW ──────────────────────────────────────────────────
 
-function DocumentsView({ docs, profile }: { docs: any[]; profile: any }) {
+function DocumentsView({ docs, profile, intent }: { docs: any[]; profile: any; intent?: string | null }) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [docType, setDocType] = useState<string>("cv");
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const complianceRef = React.useRef<HTMLDivElement>(null);
+
+  // When the candidate arrives here from the Pre-Departure Tracker's
+  // "Update →" link, jump straight to the compliance self-service panel.
+  React.useEffect(() => {
+    if (intent === "compliance" && complianceRef.current) {
+      complianceRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, [intent]);
 
   const uploadMutation = useMutation({
     mutationFn: async ({ file, type }: { file: File; type: string }) => {
@@ -1786,7 +1796,9 @@ function DocumentsView({ docs, profile }: { docs: any[]; profile: any }) {
       )}
 
       {/* ── Pre-Departure Compliance self-service ──────────────────── */}
-      <CandidateCompliancePanel profile={profile} />
+      <div ref={complianceRef}>
+        <CandidateCompliancePanel profile={profile} />
+      </div>
 
       {/* ── Profile PDF export ──────────────────────────────────────── */}
       <motion.div variants={fadeUp} className="mt-4 bg-gradient-to-r from-slate-50 to-white rounded-2xl border border-slate-200 p-5 flex items-center justify-between gap-4">
@@ -3144,7 +3156,7 @@ function WelfareReplyCard({ applications }: { applications: any[] }) {
 // The candidate's view of Phase 2 (deployment): the best-practice checklist
 // with who owns each step, visa status + the destination's typical timeline
 // + history, the appointment letter, and welfare check-ins the agency logged.
-function CandidateDeploymentTracker({ placementId }: { placementId: string }) {
+function CandidateDeploymentTracker({ placementId, onAction }: { placementId: string; onAction?: () => void }) {
   const { data: res, isLoading } = useQuery({
     queryKey: [`/api/v1/me/placements/${placementId}/deployment`],
     queryFn: async () => (await fetch(`/api/v1/me/placements/${placementId}/deployment`)).json(),
@@ -3188,7 +3200,11 @@ function CandidateDeploymentTracker({ placementId }: { placementId: string }) {
                 </div>
                 {it.detail && <p className="text-xs text-slate-500">{it.detail}</p>}
               </div>
-              <span className={`text-[11px] font-medium shrink-0 ${m.cls}`}>{m.label}</span>
+              {it.owner === "you" && it.status !== "done" ? (
+                <button onClick={onAction} className="text-[11px] font-semibold text-indigo-600 hover:underline shrink-0">Update →</button>
+              ) : (
+                <span className={`text-[11px] font-medium shrink-0 ${m.cls}`}>{m.label}</span>
+              )}
             </li>
           );
         })}
