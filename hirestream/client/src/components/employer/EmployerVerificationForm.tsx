@@ -2,8 +2,9 @@
  * v0.4.32 (HPSEDC Item 1): Employer company-verification form.
  *
  * Renders inside a sheet/dialog. Sections:
- *  1. Company info (legal name, industry, CIN, GST, PAN)
- *  2. Registered address (line 1/2, city, state, pin, country)
+ *  1. Company info (legal name, industry, business registration no., tax id)
+ *     — the employer is an OVERSEAS company (FRS); Indian KYC lives on the agency.
+ *  2. Registered address (line 1/2, city, state, pin, country of operation)
  *  3. Contact (email, phone) + authorised signatory (name, designation,
  *     ID type, ID number)
  *  4. KYB documents (via shared KYBDocSlots)
@@ -27,14 +28,16 @@ import {
 } from "lucide-react";
 import { KYBDocSlots, type KYBSlotDef } from "@/components/shared/KYBDocSlots";
 
+// Overseas employer document set (FRS: employers are foreign companies; the
+// Indian KYC — incorporation/PAN/GST — belongs to the recruiting AGENCY).
+// These mirror the MEA eMigrate model for a foreign principal employer.
 const EMPLOYER_DOC_SLOTS: KYBSlotDef[] = [
-  { value: "cin_certificate",  label: "CIN / Registration Certificate", description: "Certificate of Incorporation issued by MCA", icon: FileText,      color: "text-blue-600 bg-blue-100",     required: true },
-  { value: "gst_certificate",  label: "GST Registration",               description: "GSTIN registration certificate",            icon: Award,         color: "text-amber-600 bg-amber-100" },
-  { value: "pan_card",         label: "PAN Card",                        description: "Company PAN card",                          icon: IdCard,        color: "text-emerald-600 bg-emerald-100", required: true },
-  { value: "address_proof",    label: "Registered Office Address Proof", description: "Utility bill / lease deed / municipal cert", icon: MapPin,        color: "text-violet-600 bg-violet-100" },
-  { value: "signatory_id",     label: "Authorised Signatory ID",         description: "Aadhaar / passport / driving licence",       icon: FileSignature, color: "text-cyan-600 bg-cyan-100",    required: true },
-  { value: "labour_permission",label: "Labour / Recruitment Permission", description: "If your business requires one",              icon: Briefcase,     color: "text-indigo-600 bg-indigo-100" },
-  { value: "agreement",        label: "Agreement / Undertaking",         description: "Recruitment/placement undertaking with HPSEDC", icon: ShieldCheck, color: "text-teal-600 bg-teal-100" },
+  { value: "demand_letter",        label: "Demand Letter",                description: "Manpower request — roles, headcount, salary & terms (attested by the Indian Mission)", icon: FileText,      color: "text-blue-600 bg-blue-100",      required: true },
+  { value: "power_of_attorney",    label: "Power of Attorney",            description: "Authorising the Indian recruiting agent to act on your behalf (Mission-attested)",      icon: FileSignature, color: "text-violet-600 bg-violet-100",  required: true },
+  { value: "company_registration", label: "Business Registration / Trade Licence", description: "Company registration or trade licence in your country of operation",            icon: Award,         color: "text-amber-600 bg-amber-100",    required: true },
+  { value: "employment_contract",  label: "Employment Contract / Offer",  description: "Standard worker contract / offer template for the deployment",                          icon: Briefcase,     color: "text-emerald-600 bg-emerald-100" },
+  { value: "signatory_id",         label: "Authorised Signatory Passport / ID", description: "Passport or national ID of the signing representative",                            icon: IdCard,        color: "text-cyan-600 bg-cyan-100",      required: true },
+  { value: "agreement",            label: "Agreement / Undertaking",      description: "Recruitment undertaking with HPSEDC",                                                   icon: ShieldCheck,   color: "text-teal-600 bg-teal-100" },
 ];
 
 interface ProfileShape {
@@ -92,7 +95,7 @@ export function EmployerVerificationForm({ onDone }: { onDone?: () => void }) {
         registeredCity: profile.registeredCity ?? "",
         registeredState: profile.registeredState ?? "",
         registeredPinCode: profile.registeredPinCode ?? "",
-        registeredCountry: profile.registeredCountry ?? "India",
+        registeredCountry: profile.registeredCountry ?? "",
         contactEmail: profile.contactEmail ?? "",
         contactPhone: profile.contactPhone ?? "",
         authorisedSignatoryName: profile.authorisedSignatoryName ?? "",
@@ -191,21 +194,17 @@ export function EmployerVerificationForm({ onDone }: { onDone?: () => void }) {
             <Input value={form.industry ?? ""} onChange={(e) => setForm({ ...form, industry: e.target.value })}
               placeholder="e.g. Healthcare / Construction" maxLength={120} />
           </Field>
-          <Field label="CIN (Corporate Identification Number)" required>
+          <Field label="Business Registration / Trade Licence No." required>
             <Input value={form.cin ?? ""} onChange={(e) => setForm({ ...form, cin: e.target.value })}
-              placeholder="e.g. U72200KA2010PTC056789" maxLength={30} />
+              placeholder="Company registration no. in your country" maxLength={40} />
           </Field>
-          <Field label="GSTIN">
+          <Field label="Tax ID / VAT (optional)">
             <Input value={form.gst ?? ""} onChange={(e) => setForm({ ...form, gst: e.target.value })}
-              placeholder="e.g. 29ABCDE1234F1Z5" maxLength={20} />
-          </Field>
-          <Field label="PAN" required>
-            <Input value={form.pan ?? ""} onChange={(e) => setForm({ ...form, pan: e.target.value })}
-              placeholder="e.g. ABCDE1234F" maxLength={20} />
+              placeholder="Tax registration no. (if applicable)" maxLength={30} />
           </Field>
           <Field label="Primary operating location">
             <Input value={form.location ?? ""} onChange={(e) => setForm({ ...form, location: e.target.value })}
-              placeholder="e.g. Mumbai, India" maxLength={120} />
+              placeholder="e.g. Dubai, UAE" maxLength={120} />
           </Field>
         </Grid>
       </Section>
@@ -225,7 +224,7 @@ export function EmployerVerificationForm({ onDone }: { onDone?: () => void }) {
           <Field label="State"><Input value={form.registeredState ?? ""} onChange={(e) => setForm({ ...form, registeredState: e.target.value })} maxLength={80} /></Field>
           <Field label="PIN code"><Input value={form.registeredPinCode ?? ""} onChange={(e) => setForm({ ...form, registeredPinCode: e.target.value })} maxLength={10} /></Field>
           <Field label="Country">
-            <Input value={form.registeredCountry ?? "India"} onChange={(e) => setForm({ ...form, registeredCountry: e.target.value })} maxLength={60} />
+            <Input value={form.registeredCountry ?? ""} onChange={(e) => setForm({ ...form, registeredCountry: e.target.value })} placeholder="Country of operation (e.g. UAE)" maxLength={60} />
           </Field>
         </Grid>
       </Section>
@@ -239,7 +238,7 @@ export function EmployerVerificationForm({ onDone }: { onDone?: () => void }) {
           </Field>
           <Field label="Contact phone">
             <Input value={form.contactPhone ?? ""} onChange={(e) => setForm({ ...form, contactPhone: e.target.value })}
-              placeholder="+91 9876543210" maxLength={20} />
+              placeholder="+971 50 123 4567" maxLength={20} />
           </Field>
           <Field label="Signatory name" required>
             <Input value={form.authorisedSignatoryName ?? ""} onChange={(e) => setForm({ ...form, authorisedSignatoryName: e.target.value })}
@@ -253,9 +252,8 @@ export function EmployerVerificationForm({ onDone }: { onDone?: () => void }) {
             <Select value={form.authorisedSignatoryIdType ?? ""} onValueChange={(v) => setForm({ ...form, authorisedSignatoryIdType: v })}>
               <SelectTrigger><SelectValue placeholder="Select ID type" /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="aadhaar">Aadhaar</SelectItem>
-                <SelectItem value="pan">PAN</SelectItem>
                 <SelectItem value="passport">Passport</SelectItem>
+                <SelectItem value="national_id">National ID</SelectItem>
                 <SelectItem value="driving_licence">Driving Licence</SelectItem>
               </SelectContent>
             </Select>

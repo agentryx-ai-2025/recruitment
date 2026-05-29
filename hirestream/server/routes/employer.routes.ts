@@ -34,8 +34,11 @@ router.use((req, res, next) => {
 // v0.4.32 (HPSEDC Item 1): allowed employer doc types — kept inline so the
 // route file is self-contained. Pair with the schema comment in shared/schema.
 const EMPLOYER_DOC_TYPES = [
-  "cin_certificate", "gst_certificate", "pan_card", "address_proof",
-  "signatory_id", "labour_permission", "agreement", "other",
+  // Overseas-employer document set (FRS: employers are foreign companies).
+  "demand_letter", "power_of_attorney", "company_registration",
+  "employment_contract", "signatory_id", "agreement", "other",
+  // Legacy Indian-doc values kept valid so any pre-existing rows still load.
+  "cin_certificate", "gst_certificate", "pan_card", "address_proof", "labour_permission",
 ];
 
 // Helper: load the caller's employer row, or null. Auto-creates a stub row
@@ -554,8 +557,8 @@ router.post("/submit-for-review", async (req, res, next) => {
     // Require core KYB fields + at least one doc before allowing submit.
     const missing: string[] = [];
     if (!row.companyName || row.companyName === "(pending)") missing.push("Company name");
-    if (!row.cin) missing.push("CIN");
-    if (!row.pan) missing.push("PAN");
+    if (!row.cin) missing.push("Business registration / trade licence no.");
+    if (!row.registeredCountry) missing.push("Country of operation");
     if (!row.contactEmail) missing.push("Contact email");
     if (!row.authorisedSignatoryName) missing.push("Authorised signatory name");
     if (missing.length) {
