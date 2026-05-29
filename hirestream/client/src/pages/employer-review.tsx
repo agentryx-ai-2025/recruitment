@@ -12,9 +12,10 @@ import { PhotoAvatar } from "@/components/shared/PhotoAvatar";
 import {
   ArrowLeft, Loader2, CheckCircle, XCircle, Star, Users, MessageSquare,
   ArrowRight, Briefcase, MapPin, Calendar, AlertCircle, Eye, Award,
-  Layers, ChevronRight, Send,
+  Layers, ChevronRight, Send, Edit, FileText,
 } from "lucide-react";
 import { RecordOutcomeModal } from "@/components/shared/RecordOutcomeModal";
+import { JobCreationForm } from "@/components/employer/job-creation-form";
 
 async function fetchJson(url: string) {
   const res = await fetch(url);
@@ -46,6 +47,7 @@ export default function EmployerReviewPage() {
   // terminal state. Composes with the bucket filter so employers can, e.g., see
   // "approved-for-interview candidates who've been waiting > 7 days".
   const [onlyStale, setOnlyStale] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
 
   const { data: jobRes, isLoading: jobLoading } = useQuery({
     queryKey: [`/api/v1/jobs/${id}`],
@@ -126,6 +128,37 @@ export default function EmployerReviewPage() {
 
   if (jobLoading || appsLoading) return <div className="flex items-center justify-center min-h-[60vh]"><Loader2 className="w-8 h-8 animate-spin text-purple-600" /></div>;
   if (!job) return <div className="p-10 text-center"><p>Requisition not found.</p></div>;
+
+  // A draft has no review queue — route the employer straight to completing it
+  // instead of an empty "awaiting your decision" page (this is where every
+  // draft link lands).
+  if (job.status === "draft") {
+    return (
+      <div className="max-w-3xl mx-auto px-4 md:px-6 py-8">
+        <button onClick={() => history.length > 1 ? history.back() : setLocation("/")}
+          className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-900 mb-4">
+          <ArrowLeft className="w-4 h-4" /> Back
+        </button>
+        <div className="bg-gradient-to-br from-amber-500 to-orange-600 text-white rounded-2xl p-6 shadow-lg">
+          <Badge className="bg-white/20 text-white border-0">Draft</Badge>
+          <h1 className="text-2xl font-bold mt-2">{job.title || "Untitled requisition"}</h1>
+          <p className="text-amber-50 text-sm mt-1 max-w-xl">
+            This requisition is still a draft. Complete the details and publish it so verified agencies can start sourcing candidates.
+          </p>
+          <Button onClick={() => setEditOpen(true)} className="mt-4 bg-white text-orange-700 hover:bg-orange-50">
+            <Edit className="w-4 h-4 mr-1.5" /> Continue editing
+          </Button>
+        </div>
+        <div className="mt-4 rounded-xl border border-slate-200 bg-white p-5 text-sm text-slate-600 flex items-start gap-3">
+          <FileText className="w-5 h-5 text-slate-400 mt-0.5" />
+          <p>Your saved details are preserved. Pick up where you left off, then either save again as a draft or publish the requisition.</p>
+        </div>
+        <JobCreationForm editJob={job} controlledOpen={editOpen}
+          onOpenChange={(o) => { setEditOpen(o); if (!o) qc.invalidateQueries({ queryKey: [`/api/v1/jobs/${id}`] }); }}
+          trigger={<span style={{ display: "none" }} />} />
+      </div>
+    );
+  }
 
   const awaitingDecision = reviewable.filter((a) => a.status === "shortlisted" && !a.employerDecision).length;
   const approvedForInterview = reviewable.filter((a) => a.employerDecision === "approved_for_interview").length;
