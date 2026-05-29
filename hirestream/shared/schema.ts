@@ -260,7 +260,7 @@ export const employers = pgTable("employers", {
   registeredCity: text("registered_city"),
   registeredState: text("registered_state"),
   registeredPinCode: text("registered_pin_code"),
-  registeredCountry: text("registered_country").default("India"),
+  registeredCountry: text("registered_country"),
   contactEmail: text("contact_email"),
   contactPhone: text("contact_phone"),
   authorisedSignatoryName: text("authorised_signatory_name"),

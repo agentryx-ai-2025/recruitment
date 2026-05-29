@@ -27,6 +27,7 @@ import {
   Mail, Phone, AlertTriangle, FileText, Award, Briefcase, Send, CheckCircle,
 } from "lucide-react";
 import { KYBDocSlots, type KYBSlotDef } from "@/components/shared/KYBDocSlots";
+import { DESTINATION_COUNTRIES } from "@/lib/reference-data";
 
 // Overseas employer document set (FRS: employers are foreign companies; the
 // Indian KYC — incorporation/PAN/GST — belongs to the recruiting AGENCY).
@@ -223,8 +224,13 @@ export function EmployerVerificationForm({ onDone }: { onDone?: () => void }) {
           <Field label="City"><Input value={form.registeredCity ?? ""} onChange={(e) => setForm({ ...form, registeredCity: e.target.value })} maxLength={80} /></Field>
           <Field label="State"><Input value={form.registeredState ?? ""} onChange={(e) => setForm({ ...form, registeredState: e.target.value })} maxLength={80} /></Field>
           <Field label="PIN code"><Input value={form.registeredPinCode ?? ""} onChange={(e) => setForm({ ...form, registeredPinCode: e.target.value })} maxLength={10} /></Field>
-          <Field label="Country">
-            <Input value={form.registeredCountry ?? ""} onChange={(e) => setForm({ ...form, registeredCountry: e.target.value })} placeholder="Country of operation (e.g. UAE)" maxLength={60} />
+          <Field label="Country of operation" required>
+            <Select value={form.registeredCountry ?? ""} onValueChange={(v) => setForm({ ...form, registeredCountry: v })}>
+              <SelectTrigger><SelectValue placeholder="Select country" /></SelectTrigger>
+              <SelectContent className="max-h-72">
+                {DESTINATION_COUNTRIES.map((c) => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
+              </SelectContent>
+            </Select>
           </Field>
         </Grid>
       </Section>
