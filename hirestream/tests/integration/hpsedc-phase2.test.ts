@@ -123,6 +123,7 @@ describe('HPSEDC Item 1 — Employer KYB', () => {
     await request(app).patch('/api/v1/employer/profile').set('Cookie', employerCookie).send({
       companyName: 'Phase2 Corp', cin: 'CIN1', pan: 'PAN1',
       contactEmail: 'hr@p2.test', authorisedSignatoryName: 'Sig',
+      registeredCountry: 'Saudi Arabia',
     });
     r = await request(app).post('/api/v1/employer/submit-for-review').set('Cookie', employerCookie);
     expect(r.status).toBe(400);
@@ -145,6 +146,7 @@ describe('HPSEDC Item 1 — Employer KYB', () => {
     await request(app).patch('/api/v1/employer/profile').set('Cookie', employerCookie).send({
       companyName: 'Phase2 Corp', cin: 'CIN1', pan: 'PAN1',
       contactEmail: 'hr@p2.test', authorisedSignatoryName: 'Sig',
+      registeredCountry: 'Saudi Arabia',
     });
     await request(app).post('/api/v1/employer/documents').set('Cookie', employerCookie)
       .field('type', 'pan_card').attach('file', TEST_FILE_PATH);
@@ -177,6 +179,7 @@ describe('HPSEDC Item 1 — Employer KYB', () => {
     await request(app).patch('/api/v1/employer/profile').set('Cookie', employerCookie).send({
       companyName: 'Phase2 Corp', cin: 'CIN1', pan: 'PAN1',
       contactEmail: 'hr@p2.test', authorisedSignatoryName: 'Sig',
+      registeredCountry: 'Saudi Arabia',
     });
     await request(app).post('/api/v1/employer/documents').set('Cookie', employerCookie)
       .field('type', 'pan_card').attach('file', TEST_FILE_PATH);

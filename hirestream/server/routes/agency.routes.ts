@@ -267,6 +267,25 @@ router.get("/", async (req, res, next) => {
   }
 });
 
+// GET /api/v1/agencies/documents — the calling agent's own KYB documents.
+// MUST be declared before the public "/:id" route below: "documents" is a
+// single path segment, so "/:id" would otherwise capture it as an agency id
+// and 404 (this broke the HPSEDC Item 3 agency document list).
+router.get("/documents", protect, async (req, res, next) => {
+  try {
+    const userId = (req.user as any)?.id;
+    if (!userId) return res.status(401).json({ success: false });
+    if ((req.user as any)?.role !== "agent") return res.status(403).json({ success: false });
+    if (!storage.db) return res.status(500).json({ success: false });
+    const agentRows = await storage.db.select().from(recruitmentAgents).where(eq(recruitmentAgents.userId, userId)).limit(1);
+    if (!agentRows.length) return res.json({ success: true, data: [] });
+    const docs = await storage.db.select().from(agencyDocuments)
+      .where(eq(agencyDocuments.agencyId, agentRows[0].id))
+      .orderBy(agencyDocuments.uploadedAt);
+    res.json({ success: true, data: docs });
+  } catch (err) { next(err); }
+});
+
 // GET /api/v1/agencies/:id — public agency profile (candidate-facing).
 // Includes reviews, recent active jobs, and the set of countries this agency
 // has posted jobs in — the three signals candidates weigh when deciding
@@ -466,21 +485,6 @@ router.post("/documents",
     } catch (err) { next(err); }
   },
 );
-
-router.get("/documents", protect, async (req, res, next) => {
-  try {
-    const userId = (req.user as any)?.id;
-    if (!userId) return res.status(401).json({ success: false });
-    if ((req.user as any)?.role !== "agent") return res.status(403).json({ success: false });
-    if (!storage.db) return res.status(500).json({ success: false });
-    const agentRows = await storage.db.select().from(recruitmentAgents).where(eq(recruitmentAgents.userId, userId)).limit(1);
-    if (!agentRows.length) return res.json({ success: true, data: [] });
-    const docs = await storage.db.select().from(agencyDocuments)
-      .where(eq(agencyDocuments.agencyId, agentRows[0].id))
-      .orderBy(agencyDocuments.uploadedAt);
-    res.json({ success: true, data: docs });
-  } catch (err) { next(err); }
-});
 
 router.delete("/documents/:id", protect, async (req, res, next) => {
   try {

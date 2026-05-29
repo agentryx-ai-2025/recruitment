@@ -294,7 +294,7 @@ async function seed() {
   // ── APPLICATIONS (Arjun applied to several, with varied statuses) ───
   const arjunApps = [
     { jobTitle: "Senior Software Engineer",   status: "shortlisted", matchScore: 92 },
-    { jobTitle: "Full Stack Developer",       status: "interview",   matchScore: 88 },
+    { jobTitle: "Full Stack Developer",       status: "interview_scheduled", matchScore: 88 },
     { jobTitle: "DevOps Engineer",            status: "reviewed",    matchScore: 76 },
     { jobTitle: "Front-End Developer",        status: "submitted",   matchScore: 84 },
     { jobTitle: "Cloud Architect",            status: "submitted",   matchScore: 71 },
