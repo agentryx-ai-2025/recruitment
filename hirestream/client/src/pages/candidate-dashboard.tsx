@@ -2860,6 +2860,10 @@ function CandidateCompliancePanel({ profile }: { profile: any }) {
     onSuccess: () => {
       toast({ title: "Compliance record saved" });
       qc.invalidateQueries({ queryKey: ["/api/v1/candidates/profile"] });
+      // staleTime is Infinity globally, so the Pre-Departure Tracker's
+      // deployment query won't refetch on its own — invalidate it explicitly
+      // so the checklist reflects the just-saved passport/PCC/medical/etc.
+      qc.invalidateQueries({ predicate: (q) => typeof q.queryKey[0] === "string" && (q.queryKey[0] as string).startsWith("/api/v1/me/placements") });
     },
     onError: () => toast({ title: "Couldn't save", variant: "destructive" }),
   });
