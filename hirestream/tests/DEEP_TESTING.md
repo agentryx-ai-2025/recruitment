@@ -46,3 +46,24 @@ The current harness is read-only (GET). Not yet covered, in rough priority order
   against the test DB, to avoid mutating shared state).
 - **Data-isolation** — employer A cannot see employer B's placements (needs 2 fixture accounts).
 - **Input-boundary** — empty/oversized/malformed payloads, error-path responses.
+
+## CI gating
+
+The `.github/workflows/pr-check.yml` workflow enforces deep testing on PRs to `main`.
+It runs both `npm test` (Jest) and `npm run smoke` against a local dev server spun up in CI.
+A red status check means your branch introduced a regression; you must fix it to unblock merging.
+View the workflow execution logs in the Actions tab of the GitHub repository to debug failures.
+
+## Deploy gate
+
+`scripts/deploy-gate.sh <target-url>` wraps `pm2 restart hirestream` with a pre-flight smoke probe. A red smoke harness aborts the restart.
+
+Usage:
+
+    # Standard deploy
+    ./scripts/deploy-gate.sh https://hirestream-stg.agentryx.dev
+
+    # Emergency bypass (rarely correct; logs a loud warning):
+    ./scripts/deploy-gate.sh https://hirestream-stg.agentryx.dev --force
+
+This is the standard deploy path. Bare `pm2 restart hirestream` should not be invoked.

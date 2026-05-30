@@ -1,5 +1,7 @@
 # HireStream
 
+![PR Check](https://github.com/agentryx-ai-2025/recruitment/actions/workflows/pr-check.yml/badge.svg)
+
 **HPSEDC Overseas Placement Portal** — a Government of Himachal Pradesh initiative for safe, regulated overseas employment placement.
 
 Built by [Agentryx](https://agentryx.dev) · Production: https://hirestream.agentryx.dev
