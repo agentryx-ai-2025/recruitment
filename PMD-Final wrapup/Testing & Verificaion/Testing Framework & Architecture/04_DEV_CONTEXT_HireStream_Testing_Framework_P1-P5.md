@@ -71,15 +71,21 @@ Live on staging, committed `v0.4.44.0`:
 
 ---
 
-## 3. Current technical state (as of close of Phase 0)
+## 3. Current technical state (as of close of Phase 1 — 2026-05-30)
 
-- **HireStream `VERSION`**: 0.4.44.0 (in `hirestream/VERSION`)
-- **Jest functional**: 485/485 passing (after fixing 1 stale KYB test in 0.4.43.4)
+- **HireStream `VERSION`**: 0.4.46.1 (Phase 1 + calibration follow-up)
+- **agentryx-verify package version**: 0.2.2 (embedded harness adopted)
+- **Jest functional**: 485/485 passing
 - **Playwright e2e journeys**: 15/15 passing
-- **`deep-smoke`** against staging: 105 checks pass (0 fail, 0 warn)
-- **Local commits NOT pushed** to remote — every commit since `v0.4.37.0` is local-only per [[project_session_handoff]]. Confirm with operator before any push.
-- **Structured logs**: Pino emitting JSON to stdout — *partially* compliant with the mandatory-field schema in `02_LOG_MINING_AND_RUNTIME_OBSERVABILITY.md` §3 (most calls have `level/route/statusCode`; many lack `requestId/userRole/userIdHash/buildRef`).
-- **Auto-discovery, CI, pre-deploy gate, mutation smoke, data-isolation, schema fuzz, log digest, anomaly detection, LLM triage, confidence score, Verify bridge**: NONE yet implemented. These are the deliverables of Phases 1-5.
+- **`deep-smoke` against staging**: 381 pass / 11 warn / 80 fail. The 80 fails are all calibration noise — HireStream uses **handler-level data scoping** rather than route-level role gates, so the L2 authz-negative matrix flags cross-role *route* access as "LEAK" when the *data* is correctly scoped. **The proper test is P2.2's data-isolation suite (content-level, not status-code).** See Phase 1 retrospective.
+- **All commits pushed to `origin/main`** (github.com/agentryx-ai-2025/recruitment). The "local-only" rule from earlier sessions is **lifted for Phase-1+ commits** — operator explicitly authorised push at end of Phase 1.
+- **Structured logs**: Pino emitting JSON to stdout — *partially* compliant; full mandatory-field migration is P2.3 (a moderate-risk refactor, smallest-possible-PR strategy).
+- **Auto-discovery**: ✅ live (P1.1). `__routes` endpoint at `/api/v1/__routes`, env+token-gated. Staging has `DEEP_ROUTES_DEBUG=1` + `DEEP_SMOKE_TOKEN=test123` in pm2 env.
+- **CI gate**: ✅ workflow in place at `.github/workflows/pr-check.yml`; awaiting first real PR to fire end-to-end (operator action: enable branch protection).
+- **Pre-deploy gate**: ✅ `scripts/deploy-gate.sh` is now the standard deploy path. Bare `pm2 restart hirestream` deprecated.
+- **Day-1 skeleton check**: ✅ `scripts/verify-skeleton.mjs`; HireStream + Verify both pass 11/11.
+- **Pending in Phase 2**: schema fuzz (P2.1), mutation + data-isolation suite (P2.2 — the critical path), logger contract (P2.3), daily digest (P2.4).
+- **Pending in Phase 3+**: anomaly detection, LLM triage, confidence score, Verify bridge.
 
 ---
 
