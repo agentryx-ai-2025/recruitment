@@ -71,21 +71,27 @@ Live on staging, committed `v0.4.44.0`:
 
 ---
 
-## 3. Current technical state (as of close of Phase 1 — 2026-05-30)
+## 3. Current technical state (as of close of Phase 2 — 2026-05-30)
 
-- **HireStream `VERSION`**: 0.4.46.1 (Phase 1 + calibration follow-up)
+- **HireStream `VERSION`**: 0.6.0.0 (this commit; Phase 2 milestone bump)
 - **agentryx-verify package version**: 0.2.2 (embedded harness adopted)
-- **Jest functional**: 485/485 passing
+- **Jest functional**: **503/503** passing (was 485 + 15 data-isolation + 2 logger.redact + 1 cleaned-up dummy)
 - **Playwright e2e journeys**: 15/15 passing
-- **`deep-smoke` against staging**: 381 pass / 11 warn / 80 fail. The 80 fails are all calibration noise — HireStream uses **handler-level data scoping** rather than route-level role gates, so the L2 authz-negative matrix flags cross-role *route* access as "LEAK" when the *data* is correctly scoped. **The proper test is P2.2's data-isolation suite (content-level, not status-code).** See Phase 1 retrospective.
-- **All commits pushed to `origin/main`** (github.com/agentryx-ai-2025/recruitment). The "local-only" rule from earlier sessions is **lifted for Phase-1+ commits** — operator explicitly authorised push at end of Phase 1.
-- **Structured logs**: Pino emitting JSON to stdout — *partially* compliant; full mandatory-field migration is P2.3 (a moderate-risk refactor, smallest-possible-PR strategy).
-- **Auto-discovery**: ✅ live (P1.1). `__routes` endpoint at `/api/v1/__routes`, env+token-gated. Staging has `DEEP_ROUTES_DEBUG=1` + `DEEP_SMOKE_TOKEN=test123` in pm2 env.
-- **CI gate**: ✅ workflow in place at `.github/workflows/pr-check.yml`; awaiting first real PR to fire end-to-end (operator action: enable branch protection).
-- **Pre-deploy gate**: ✅ `scripts/deploy-gate.sh` is now the standard deploy path. Bare `pm2 restart hirestream` deprecated.
+- **`deep-smoke` against staging**: 381 pass / 11 warn / 80 fail. Unchanged from Phase 1 baseline — the 80 fails are the same calibration noise. **The content-level coverage is now provided by P2.2b's `tests/integration/data-isolation.test.ts` (15/15 green); the L2 surface harness's authz-negative-matrix limitation is documented and accepted.**
+- **`schema-fuzz` against staging**: 98 pass / 0 warn / 80 fail. The 80 fails are mostly 404-on-dummy-UUID calibration (no real fixture IDs in fuzz payloads). One real bug surfaced: **`POST /auth/register` is missing `validateRequest(registerSchema)` middleware** — pending separate product fix.
+- **`log:digest` against staging**: works end-to-end. Already surfaced 8 p95-latency regressions vs 7d baseline + 119× UnknownError on the intentional `/sso/himaccess` stub.
+- **All commits pushed to `origin/main`** (github.com/agentryx-ai-2025/recruitment).
+- **Structured logs**: **Winston** (not Pino — corrected in Phase 2). `lib/logger.ts` typed wrapper enforces the §3.1 mandatory-field schema; ESLint rule blocks raw `console.log` outside `tests/scripts/lib`. Redact unit-tested (2 tests pass).
+- **Auto-discovery**: ✅ live (P1.1). `__routes` endpoint at `/api/v1/__routes`, env+token-gated. Staging has `DEEP_ROUTES_DEBUG=1` + `DEEP_SMOKE_TOKEN=test123` in pm2 env (note: pm2 daemon restart drops env — pin via ecosystem file as a small operator follow-up).
+- **CI gate**: ✅ workflow in place at `.github/workflows/pr-check.yml`; awaiting first real PR to fire end-to-end (operator action: enable branch protection on `main`).
+- **Pre-deploy gate**: ✅ `scripts/deploy-gate.sh` is the standard deploy path.
 - **Day-1 skeleton check**: ✅ `scripts/verify-skeleton.mjs`; HireStream + Verify both pass 11/11.
-- **Pending in Phase 2**: schema fuzz (P2.1), mutation + data-isolation suite (P2.2 — the critical path), logger contract (P2.3), daily digest (P2.4).
-- **Pending in Phase 3+**: anomaly detection, LLM triage, confidence score, Verify bridge.
+- **L3 schema fuzz**: ✅ live (P2.1). `scripts/schema-fuzz.mjs` runnable via `npm run schema-fuzz`.
+- **Data-isolation suite**: ✅ live (P2.2b). 15 Jest tests across A-vs-B for all 4 roles; deliberately-broken-handler experiment verified suite catches real leaks.
+- **L4 Tier 2 daily digest**: ✅ live (P2.4). `tools/log-analyzer/digest.mjs` reads `logs/app.log` (Winston NDJSON); pm2 cron registration is operator action.
+- **Pending in Phase 3**: anomaly detection (L4 Tier 1 — Loki + Promtail + alertmanager); LLM-assisted triage (L4 Tier 3 via Claude API); confidence-score reporter (L5); pre-merge gate based on score; synthetic monitoring on prod.
+- **Pending in Phase 4+**: OpenAPI/Schemathesis, mutation testing (Stryker), visual regression, Verify-portal bridge.
+- **Confidence**: ~92-93% (Phase 2 target met). Phase 3 target: ~95%.
 
 ---
 
