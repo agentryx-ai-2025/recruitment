@@ -56,3 +56,8 @@ id_ed25519
 # ── tmp ─────────────────────────────────────────────────────────────
 .tmp/
 tmp/
+
+# ── PMD-DevFactory — reference methodology template, not a project artefact ──
+# Carries .venv directories + walkthrough videos (~622MB total). Living
+# reference; templates are copied INTO this repo's PMD-Final wrapup/ when used.
+PMD-DevFactory/
