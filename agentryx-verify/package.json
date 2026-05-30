@@ -1,6 +1,6 @@
 {
   "name": "agentryx-verify",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "private": true,
   "type": "module",
   "scripts": {
@@ -10,7 +10,11 @@
     "start": "NODE_ENV=production node dist/index.js",
     "db:push": "drizzle-kit push",
     "db:seed": "tsx scripts/seed.ts",
-    "typecheck": "tsc --noEmit"
+    "smoke": "node scripts/deep-smoke.mjs",
+    "smoke:local": "DEEP_URL=http://localhost:5000 node scripts/deep-smoke.mjs",
+    "test:deep": "npm test && npm run smoke",
+    "typecheck": "tsc --noEmit",
+    "verify:skeleton": "node scripts/verify-skeleton.mjs"
   },
   "dependencies": {
     "@neondatabase/serverless": "^0.9.5",
