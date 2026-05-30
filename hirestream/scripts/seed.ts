@@ -323,7 +323,7 @@ async function seed() {
     { title: "Welder – Offshore",                company: "Saudi Aramco",               location: "Ras Tanura, Saudi Arabia", country: "Saudi Arabia", skills: ["MIG","TIG","Offshore","HSE"],                    salary: "USD 3,500 – 5,000/mo tax-free", experience: 4, agentId: userIds.gulf_jobs_direct, employerId: userIds.aramco_hr,    description: "Offshore welding on petroleum platforms. Rotation schedule." },
     { title: "Civil Draftsperson",               company: "BuildRight International",   location: "Christchurch, New Zealand", country: "New Zealand", skills: ["AutoCAD","Revit","Civil 3D"],                   salary: "NZD 65,000 – 78,000",  experience: 2, agentId: userIds.demo_agent,       employerId: userIds.demo_employer, description: "Detailed drawings for bridge and road projects." },
   ];
-  const jobRows = await db.insert(jobs).values(jobSeed.map((j) => ({ ...j, status: "active", employmentType: "full-time" as any }))).returning();
+  const jobRows = await db.insert(jobs).values(jobSeed.map((j) => ({ ...j, status: "active", employmentType: "full-time" as any, visibility: j.employerId && !j.agentId ? "agents_only" : "public" as any }))).returning();
   console.log(`Jobs: ${jobRows.length + 3}`);
   const jobByTitle: Record<string, string> = {};
   for (const j of jobRows) jobByTitle[j.title] = j.id;
@@ -335,7 +335,7 @@ async function seed() {
   ];
   for (const j of isolationJobs) {
     const existingJob = await db.select().from(jobs).where(sql`${jobs.title} = ${j.title} AND (${jobs.employerId} = ${j.employerId} OR ${jobs.agentId} = ${j.agentId})`).limit(1);
-    const jobPayload = { ...j, status: "active" as any, employmentType: "full-time" as any };
+    const jobPayload = { ...j, status: "active" as any, employmentType: "full-time" as any, visibility: j.employerId && !j.agentId ? "agents_only" : "public" as any };
     if (existingJob.length > 0) {
       await db.update(jobs).set(jobPayload).where(eq(jobs.id, existingJob[0].id));
       jobByTitle[j.title] = existingJob[0].id;
@@ -387,6 +387,8 @@ async function seed() {
     { cand: "priya_verma",   job: "Full Stack Developer",            status: "rejected",            score: 38 },
     { cand: "ananya_bhatt",  job: "QA Automation Engineer",          status: "submitted",           score: 57 },
     { cand: "vikram_negi",   job: "Senior Software Engineer",        status: "submitted",           score: 31 },
+    // Isolation applications
+    { cand: "meera_iyer",    job: "Senior Drilling Engineer",        status: "shortlisted",         score: 85 },
   ];
   const otherAppIds: Record<string, string> = {};
   for (const a of otherApps) {
