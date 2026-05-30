@@ -84,6 +84,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const { maintenanceMode } = await import("./middleware/maintenance.middleware");
   app.use(maintenanceMode);
 
+  // Diagnostic route autodiscovery for deep-smoke
+  if (env.NODE_ENV !== "production" || process.env.DEEP_ROUTES_DEBUG === "1") {
+    app.get("/api/v1/__routes", (req, res) => {
+      const token = req.header("X-Deep-Smoke-Token");
+      if (!token || token !== process.env.DEEP_SMOKE_TOKEN) {
+        return res.status(401).json({ success: false, error: "Unauthorized" });
+      }
+
+      function getRoutes(router: any, basePath = ''): Array<{method: string, path: string}> {
+        let endpoints: Array<{method: string, path: string}> = [];
+        if (router && router.stack) {
+          router.stack.forEach((layer: any) => {
+            if (layer.route) {
+              const path = layer.route.path;
+              const methods = Object.keys(layer.route.methods).filter(m => layer.route.methods[m]).map(m => m.toUpperCase());
+              methods.forEach(method => {
+                let fullPath = basePath + (path === '/' ? '' : path);
+                fullPath = fullPath.replace(/\/+/g, '/');
+                if (fullPath === '') fullPath = '/';
+                endpoints.push({ method, path: fullPath });
+              });
+            } else if (layer.name === 'router' && layer.handle && layer.handle.stack) {
+              let prefix = '';
+              if (layer.regexp && !layer.regexp.fast_slash) {
+                let str = layer.regexp.toString();
+                str = str.replace(/^\/\^/, '').replace(/\\\/\?\(\?\=\\\/\|\$\)\/i$/, '').replace(/\\\/\?\(\?\=\/\|\$\)\/i$/, '');
+                prefix = str.replace(/\\\//g, '/');
+                if (!prefix.startsWith('/')) prefix = '/' + prefix;
+              }
+              endpoints = endpoints.concat(getRoutes(layer.handle, basePath + prefix));
+            }
+          });
+        }
+        return endpoints;
+      }
+
+      const allRoutes = getRoutes((app as any)._router);
+      const getRoutesList = allRoutes.filter(r => r.method === 'GET');
+
+      return res.json({ success: true, data: getRoutesList });
+    });
+  }
+
   // Register API routes
   app.use("/api/v1/auth", authLimiter, authRouter);
   app.use("/api/v1/candidates", candidateRouter);

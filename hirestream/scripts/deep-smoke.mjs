@@ -30,38 +30,53 @@ const ROLES = {
   superadmin: { u: process.env.DEEP_U_SUPERADMIN || "superadmin",     p: process.env.DEEP_PW_SUPERADMIN || "hpsedc@super2026" },
 };
 
-// GET endpoints each role should be able to read (2xx + {success:true}).
-const COMMON = ["/content/faq", "/content/countries", "/matching/version", "/notifications/", "/notifications/preferences"];
-const ROUTES = {
-  candidate: [...COMMON, "/candidates/profile", "/candidates/profile/completion", "/candidates/applications",
-    "/candidates/education", "/candidates/experience", "/candidates/documents", "/me/references",
-    "/jobs/", "/jobs/saved/my", "/drives/my", "/drives/interviews/my", "/me/saved-searches/",
-    "/applications/recommendations/for-me"],
-  agent: [...COMMON, "/agencies/me", "/agencies/candidates", "/agencies/documents", "/agencies/leaderboard/top",
-    "/agent/segments", "/agent/placements", "/agent/reports", "/agent/requisitions", "/agent/applicants",
-    "/drives/", "/jobs/", "/grievances/assigned-to-me"],
-  employer: [...COMMON, "/employer/requisitions", "/employer/review-queue", "/employer/agency-scorecard",
-    "/employer/profile", "/employer/documents", "/jobs/"],
-  admin: [...COMMON, "/admin/health", "/admin/logs", "/admin/config", "/admin/agencies", "/admin/employers",
-    "/admin/settings", "/admin/notification-templates", "/admin/integrations",
-    "/admin/oversight/compliance", "/admin/oversight/welfare-sla", "/admin/oversight/audit-log",
-    "/admin/oversight/users", "/admin/oversight/funnel", "/grievances/"],
-  superadmin: [...COMMON, "/superadmin/users", "/superadmin/stats", "/superadmin/flags", "/superadmin/logs",
-    "/superadmin/integrations", "/superadmin/settings", "/superadmin/audit",
-    "/superadmin/ops/overview", "/superadmin/ops/signals", "/superadmin/ops/pipeline", "/superadmin/ops/reports"],
-};
-
-// Negative authorization matrix: { role -> endpoints it MUST be denied (401/403) }.
-// Each endpoint belongs to a higher-privilege or different role.
-const FORBIDDEN = {
-  // NOTE: /agent/placements is intentionally cross-role (agent+employer+admin),
-  // each scoped to their own rows in the handler — so it is NOT in the employer
-  // forbidden list. Candidates have no placement-monitoring role, so it IS denied to them.
-  candidate: ["/admin/employers", "/admin/config", "/superadmin/users", "/superadmin/stats",
-    "/employer/requisitions", "/agencies/me", "/agent/placements"],
-  agent:     ["/admin/employers", "/admin/config", "/superadmin/users", "/superadmin/stats"],
-  employer:  ["/admin/employers", "/admin/config", "/superadmin/users", "/superadmin/stats"],
-  admin:     ["/superadmin/users", "/superadmin/settings"],
+// A route is allowed for a role if the path (without /api/v1) matches any of their allowlist regexes.
+// The allowlist must cover ALL endpoints that role is allowed to access.
+const ROLE_ALLOWLIST = {
+  common: [
+    /^\/content\/.*/, 
+    /^\/matching\/version/, 
+    /^\/notifications\/.*/,
+    /^\/public\/.*/,
+    /^\/mobile\/.*/,
+    /^\/2fa\/.*/,
+    /^\/__routes/,
+    /^\/resume\/.*/
+  ],
+  candidate: [
+    /^\/candidates\/.*/, 
+    /^\/jobs\/.*/,
+    /^\/drives\/.*/,
+    /^\/me\/.*/,
+    /^\/applications\/.*/,
+    /^\/auth\/.*/
+  ],
+  agent: [
+    /^\/agencies\/.*/,
+    /^\/agent\/.*/,
+    /^\/drives\/.*/,
+    /^\/jobs\/.*/,
+    /^\/grievances\/.*/,
+    /^\/auth\/.*/
+  ],
+  employer: [
+    /^\/employer\/.*/,
+    /^\/jobs\/.*/,
+    // NOTE: /agent/placements is intentionally cross-role (agent+employer+admin),
+    // each scoped to their own rows in the handler — so it is explicitly allowed here.
+    /^\/agent\/placements/,
+    /^\/auth\/.*/
+  ],
+  admin: [
+    /^\/admin\/.*/,
+    /^\/grievances\/.*/,
+    /^\/agent\/placements/,
+    /^\/auth\/.*/
+  ],
+  superadmin: [
+    /^\/superadmin\/.*/,
+    /^\/auth\/.*/
+  ]
 };
 
 const pass = [], warn = [], fail = [];
@@ -103,31 +118,60 @@ async function run() {
   if (unauth.status === 401) { pass.push("auth reject unauthenticated"); console.log("  ok    unauthenticated /candidates/profile -> 401"); }
   else { fail.push(`unauthenticated /candidates/profile -> ${unauth.status} (expected 401)`); console.log(`  FAIL  unauthenticated -> ${unauth.status}`); }
 
-  // ---- Layer 2: ROUTE HEALTH ----
-  console.log("\n[2] ROUTE HEALTH (per role)");
-  for (const [role, eps] of Object.entries(ROUTES)) {
-    if (!cookies[role]) { console.log(`  -- skip ${role} (no session)`); continue; }
-    for (const ep of eps) {
-      const r = await get(ep, cookies[role]);
-      if (r.status >= 500 || r.status === -1) { fail.push(`${role} GET ${ep} -> ${r.status}`); console.log(`  FAIL  ${role} ${ep} -> ${r.status}`); }
-      else if (r.status >= 400) { warn.push(`${role} GET ${ep} -> ${r.status}`); console.log(`  warn  ${role} ${ep} -> ${r.status}`); }
-      else if (r.body && r.body.success === false) { fail.push(`${role} GET ${ep} -> 200 but success:false`); console.log(`  FAIL  ${role} ${ep} -> 200 success:false`); }
-      else pass.push(`${role} GET ${ep}`);
+  // Fetch routes from the diagnostic endpoint
+  let discoveredRoutes = [];
+  try {
+    const adminToken = process.env.DEEP_SMOKE_TOKEN || "test123";
+    const res = await fetch(`${BASE}/api/v1/__routes`, { headers: { "X-Deep-Smoke-Token": adminToken } });
+    const json = await res.json();
+    if (json.success && Array.isArray(json.data)) {
+      discoveredRoutes = json.data.map(r => r.path.replace(/^\/api\/v1/, ""));
+    } else {
+      fail.push(`Route autodiscovery failed: ${res.status}`);
+      console.log(`\nFAIL  __routes -> ${res.status} ${JSON.stringify(json)}`);
     }
-    console.log(`  ... ${role}: ${eps.length} endpoints checked`);
+  } catch (e) {
+    fail.push(`Route autodiscovery error: ${e.message}`);
+    console.log(`\nFAIL  __routes -> ${e.message}`);
   }
 
-  // ---- Layer 3: AUTHZ NEGATIVE MATRIX ----
-  console.log("\n[3] AUTHZ NEGATIVE (role must be DENIED on others' endpoints)");
-  for (const [role, eps] of Object.entries(FORBIDDEN)) {
-    if (!cookies[role]) { console.log(`  -- skip ${role} (no session)`); continue; }
-    for (const ep of eps) {
-      const r = await get(ep, cookies[role]);
-      if (r.status === 401 || r.status === 403) { pass.push(`authz ${role} denied ${ep}`); console.log(`  ok    ${role} denied ${ep} (${r.status})`); }
-      else if (r.status >= 500) { fail.push(`authz ${role} ${ep} -> ${r.status} (server error)`); console.log(`  FAIL  ${role} ${ep} -> ${r.status}`); }
-      else { fail.push(`authz LEAK: ${role} reached ${ep} -> ${r.status} (expected 401/403)`); console.log(`  FAIL  LEAK ${role} reached ${ep} -> ${r.status}`); }
+  // Pre-fetch all routes for all roles to separate the logs
+  const layer2Logs = [];
+  const layer3Logs = [];
+  
+  for (const role of Object.keys(ROLES)) {
+    if (!cookies[role]) { 
+      layer2Logs.push(`  -- skip ${role} (no session)`); 
+      layer3Logs.push(`  -- skip ${role} (no session)`); 
+      continue; 
     }
+    const allowlist = (ROLE_ALLOWLIST[role] || []).concat(ROLE_ALLOWLIST.common || []);
+    let matchCount = 0;
+    
+    for (const ep of discoveredRoutes) {
+      const isMatch = allowlist.some(re => re.test(ep));
+      const r = await get(ep, cookies[role]);
+
+      if (isMatch) {
+        matchCount++;
+        if (r.status >= 500 || r.status === -1) { fail.push(`${role} GET ${ep} -> ${r.status}`); layer2Logs.push(`  FAIL  ${role} ${ep} -> ${r.status}`); }
+        else if (r.status >= 400) { warn.push(`${role} GET ${ep} -> ${r.status}`); layer2Logs.push(`  warn  ${role} ${ep} -> ${r.status}`); }
+        else if (r.body && r.body.success === false) { fail.push(`${role} GET ${ep} -> 200 but success:false`); layer2Logs.push(`  FAIL  ${role} ${ep} -> 200 success:false`); }
+        else { pass.push(`${role} GET ${ep}`); layer2Logs.push(`  ok    ${role} GET ${ep}`); }
+      } else {
+        if (r.status === 401 || r.status === 403) { pass.push(`authz ${role} denied ${ep}`); layer3Logs.push(`  ok    ${role} denied ${ep} (${r.status})`); }
+        else if (r.status >= 500) { fail.push(`authz ${role} ${ep} -> ${r.status} (server error)`); layer3Logs.push(`  FAIL  ${role} ${ep} -> ${r.status}`); }
+        else { fail.push(`authz LEAK: ${role} reached ${ep} -> ${r.status} (expected 401/403)`); layer3Logs.push(`  FAIL  LEAK ${role} reached ${ep} -> ${r.status}`); }
+      }
+    }
+    layer2Logs.push(`  ... ${role}: ${matchCount} endpoints checked`);
   }
+
+  console.log("\n[2] ROUTE HEALTH (per role)");
+  layer2Logs.forEach(l => { if (!l.startsWith("  ok")) console.log(l); });
+
+  console.log("\n[3] AUTHZ NEGATIVE (role must be DENIED on others' endpoints)");
+  layer3Logs.forEach(l => { if (!l.startsWith("  --")) console.log(l); });
 
   // ---- SUMMARY ----
   console.log(`\n${"=".repeat(60)}\nSUMMARY  pass=${pass.length}  warn=${warn.length}  FAIL=${fail.length}`);
