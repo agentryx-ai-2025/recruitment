@@ -16,6 +16,7 @@
     "test:watch": "NODE_ENV=test node --experimental-vm-modules node_modules/jest/bin/jest.js --watch --forceExit",
     "test:coverage": "NODE_ENV=test node --experimental-vm-modules node_modules/jest/bin/jest.js --runInBand --forceExit --coverage",
     "test:e2e": "playwright test",
+    "schema-fuzz": "node scripts/schema-fuzz.mjs",
     "smoke": "node scripts/deep-smoke.mjs",
     "smoke:local": "DEEP_URL=http://localhost:5001 node scripts/deep-smoke.mjs",
     "test:deep": "npm test && npm run smoke",
