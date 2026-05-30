@@ -45,6 +45,9 @@ async function seed() {
     // walk through the full register → upload → submit → admin-review flow.
     { username: "demo_agent_unverified",    email: "demo_agent_unverified@hirestream.dev",    role: "agent",    password: "test123" },
     { username: "demo_employer_unverified", email: "demo_employer_unverified@hirestream.dev", role: "employer", password: "test123" },
+    { username: "demo_employer_b", email: "demo_employer_b@hirestream.dev", role: "employer",  password: "test123" },
+    { username: "demo_agent_b",    email: "demo_agent_b@hirestream.dev",    role: "agent",     password: "test123" },
+    { username: "demo_admin_b",    email: "demo_admin_b@hirestream.dev",    role: "admin",     password: "test123" },
   ];
   const userIds: Record<string, string> = {};
 
@@ -219,7 +222,24 @@ async function seed() {
     specializations: [],
     verified: false, rating: 0, placements: 0,
   });
-  console.log("Agencies: 5");
+
+  const existingAgentB = await db.select().from(recruitmentAgents).where(eq(recruitmentAgents.userId, userIds.demo_agent_b)).limit(1);
+  const agentBPayload = {
+    userId: userIds.demo_agent_b,
+    agencyName: "Gulf Bridge Recruiting Pvt Ltd",
+    licenseNumber: "HP-OPA-2022-0588",
+    specializations: ["Oil & Gas", "Engineering"],
+    verified: true,
+    rating: 4,
+    placements: 28
+  };
+  if (existingAgentB.length > 0) {
+    await db.update(recruitmentAgents).set(agentBPayload).where(eq(recruitmentAgents.id, existingAgentB[0].id));
+  } else {
+    await db.insert(recruitmentAgents).values(agentBPayload);
+  }
+
+  console.log("Agencies: 6");
 
   // ── EMPLOYERS ───────────────────────────────────────────────────────
   await db.delete(employers);
@@ -246,7 +266,24 @@ async function seed() {
     companyName: "(pending verification)",
     verified: false, activeJobs: 0,
   });
-  console.log("Employers: 5");
+
+  const existingEmployerB = await db.select().from(employers).where(eq(employers.userId, userIds.demo_employer_b)).limit(1);
+  const employerBPayload = {
+    userId: userIds.demo_employer_b,
+    companyName: "Aramco Petroleum (Saudi Arabia)",
+    industry: "Oil & Gas",
+    location: "Riyadh, Saudi Arabia",
+    registeredCountry: "Saudi Arabia",
+    verified: true,
+    activeJobs: 1
+  };
+  if (existingEmployerB.length > 0) {
+    await db.update(employers).set(employerBPayload).where(eq(employers.id, existingEmployerB[0].id));
+  } else {
+    await db.insert(employers).values(employerBPayload);
+  }
+
+  console.log("Employers: 6");
 
   // Delete in FK-safe order before re-inserting jobs
   await db.delete(placements);
@@ -287,9 +324,26 @@ async function seed() {
     { title: "Civil Draftsperson",               company: "BuildRight International",   location: "Christchurch, New Zealand", country: "New Zealand", skills: ["AutoCAD","Revit","Civil 3D"],                   salary: "NZD 65,000 – 78,000",  experience: 2, agentId: userIds.demo_agent,       employerId: userIds.demo_employer, description: "Detailed drawings for bridge and road projects." },
   ];
   const jobRows = await db.insert(jobs).values(jobSeed.map((j) => ({ ...j, status: "active", employmentType: "full-time" as any }))).returning();
-  console.log(`Jobs: ${jobRows.length}`);
+  console.log(`Jobs: ${jobRows.length + 3}`);
   const jobByTitle: Record<string, string> = {};
   for (const j of jobRows) jobByTitle[j.title] = j.id;
+
+  const isolationJobs = [
+    { title: "Senior Drilling Engineer", company: "Aramco Petroleum (Saudi Arabia)", location: "Riyadh, Saudi Arabia", country: "Saudi Arabia", skills: ["Drilling", "Engineering"], salary: "USD 8,000/mo", experience: 5, agentId: null, employerId: userIds.demo_employer_b, description: "Drilling operations in Saudi Arabia." },
+    { title: "Production Supervisor", company: "Aramco Petroleum (Saudi Arabia)", location: "Riyadh, Saudi Arabia", country: "Saudi Arabia", skills: ["Supervision", "Operations"], salary: "USD 6,000/mo", experience: 4, agentId: null, employerId: userIds.demo_employer_b, description: "Supervisor for production lines." },
+    { title: "Petrochemical Operator", company: "Gulf Bridge Recruiting Pvt Ltd", location: "Dubai, UAE", country: "UAE", skills: ["Operations", "Safety"], salary: "AED 12,000/mo", experience: 3, agentId: userIds.demo_agent_b, employerId: null, description: "Operator role." }
+  ];
+  for (const j of isolationJobs) {
+    const existingJob = await db.select().from(jobs).where(sql`${jobs.title} = ${j.title} AND (${jobs.employerId} = ${j.employerId} OR ${jobs.agentId} = ${j.agentId})`).limit(1);
+    const jobPayload = { ...j, status: "active" as any, employmentType: "full-time" as any };
+    if (existingJob.length > 0) {
+      await db.update(jobs).set(jobPayload).where(eq(jobs.id, existingJob[0].id));
+      jobByTitle[j.title] = existingJob[0].id;
+    } else {
+      const [newJob] = await db.insert(jobs).values(jobPayload).returning();
+      jobByTitle[j.title] = newJob.id;
+    }
+  }
 
   // ── APPLICATIONS (Arjun applied to several, with varied statuses) ───
   const arjunApps = [
@@ -444,6 +498,7 @@ async function seed() {
   console.log("Announcements: 2");
 
   // ── SUMMARY ─────────────────────────────────────────────────────────
+  console.log("Isolation pairs: demo_employer_b (Aramco), demo_agent_b (Gulf Bridge), demo_admin_b — ready for P2.2b data-isolation tests");
   console.log("\n✅ Seeding complete.\n");
   console.log("Demo credentials (password: test123 for all):");
   console.log("  demo_candidate / demo_agent / demo_employer / demo_admin (all test123)");
