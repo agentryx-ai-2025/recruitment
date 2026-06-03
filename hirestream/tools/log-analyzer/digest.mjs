@@ -106,6 +106,20 @@ async function run() {
   if (totalEvents === 0) {
     const noEventsMsg = `HireStream · digest · ${new Date().toISOString().split('T')[0]}\n─────────────────────────────────────────────\nNo events in last ${WINDOW_HOURS}h.`;
     console.log(noEventsMsg);
+    const idlePath = resolve(process.cwd(), 'logs', 'digest-latest.json');
+    try {
+      fs.writeFileSync(idlePath, JSON.stringify({
+        kind: "log-digest",
+        version: "1",
+        generatedAt: new Date().toISOString(),
+        windowHours: WINDOW_HOURS,
+        baselineDays: BASELINE_DAYS,
+        totals: { currentWindowErrors: 0, baselineAvgErrorsPerWindow: 0, pctChangeVsBaseline: 0 },
+        topErrors: [], slowestRoute: { route: "none", p95: 0 },
+        novelClasses: [], regressions: [], errorClasses: [], routeCount: 0,
+        idle: true,
+      }, null, 2) + "\n");
+    } catch (e) { console.warn(`Failed to write ${idlePath}: ${e.message}`); }
     process.exit(0);
   }
 
@@ -171,6 +185,53 @@ async function run() {
   }
 
   console.log(output);
+
+  // Structured artefact for downstream consumers (P3.2 LLM triage, Phase 4
+  // Operator Console). Always written; logs/ is gitignored. Schema is kept
+  // stable across digest runs so consumers can pin to fields.
+  const digestRecord = {
+    kind: "log-digest",
+    version: "1",
+    generatedAt: new Date().toISOString(),
+    windowHours: WINDOW_HOURS,
+    baselineDays: BASELINE_DAYS,
+    totals: {
+      currentWindowErrors: current.totalErrors,
+      baselineAvgErrorsPerWindow: Math.round(baselineAvgErrors * 10) / 10,
+      pctChangeVsBaseline: errDiff,
+    },
+    topErrors,
+    slowestRoute,
+    novelClasses: novelClasses.map(nc => ({
+      errorClass: nc.eClass,
+      count: nc.count,
+      sampleRoute: nc.sampleRoute,
+      sampleMsg: nc.sampleMsg,
+    })),
+    regressions: regressions.map(r => ({
+      route: r.route,
+      p95Ms: Math.round(r.p95),
+      baselineMedianMs: Math.round(r.baseMedian),
+      pctIncrease: Math.round(((r.p95 - r.baseMedian) / r.baseMedian) * 100),
+    })),
+    errorClasses: Object.entries(current.errorClasses)
+      .sort((a, b) => b[1].count - a[1].count)
+      .slice(0, 10)
+      .map(([errorClass, data]) => ({
+        errorClass,
+        count: data.count,
+        sampleRoute: data.sampleRoute,
+        sampleMsg: data.sampleMsg,
+      })),
+    routeCount: Object.keys(current.routes).length,
+  };
+
+  const digestJsonPath = resolve(process.cwd(), 'logs', 'digest-latest.json');
+  try {
+    fs.writeFileSync(digestJsonPath, JSON.stringify(digestRecord, null, 2) + "\n");
+  } catch (e) {
+    console.warn(`Failed to write ${digestJsonPath}: ${e.message}`);
+  }
 
   if (SLACK_WEBHOOK_URL) {
     try {
