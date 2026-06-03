@@ -14,10 +14,8 @@
 # tool.
 #
 # Mount: this compose file is meant to live in the deployment host (NOT in
-# CI). Adjust the bind-mount path on the `promtail` service to point at the
-# HireStream logs/ directory on that host.
-
-version: "3.8"
+# CI). The Promtail bind-mount uses a relative path (../../logs) so it works
+# regardless of install location.
 
 services:
   loki:
