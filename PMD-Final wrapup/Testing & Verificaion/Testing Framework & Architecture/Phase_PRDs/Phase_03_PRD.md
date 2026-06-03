@@ -9,11 +9,39 @@ AUDIENCE: Sub-agents working in Phase 3 (mandatory reading); architect
           during reviews.
 -->
 
-# Phase 3 — Full L4 + L5 confidence score · Phase PRD
+# Phase 3 — L4 observability + optional LLM triage · Phase PRD
+
+**Phase**: 03
+**Status**: **CLOSED 2026-06-03 at v0.6.0.3** — see §0 close-out below
+**Maps to**: `03_ROADMAP_AND_INTEGRATION.md` §3 Phase 3 (re-scoped); `01_EMBEDDED_TESTING_ARCHITECTURE.md` §3 L4-L5; `02_LOG_MINING_AND_RUNTIME_OBSERVABILITY.md` §4 Tier 1 + Tier 3
+**Duration**: ~6 hours architect-direct (vs original ~12 dispatchable agent-hours estimate)
+**Owner**: Architect (Claude Opus 4.7)
+
+---
+
+## 0. Phase close-out — what actually shipped
+
+The phase was re-scoped mid-execution after a 13-agent adversarial readiness review (2026-06-03) caught load-bearing factual errors in 4 of the 5 original briefs against the actual codebase. Combined with customer-side guidance (air-gapped PROD, no notification channels approved yet, DocuMind LLM forthcoming, UI-driven config preferred over env-var management), the trim was:
+
+| Original deliverable | Shipped? | Commit | Notes |
+|---|---|---|---|
+| **P3.1** Loki + Promtail + Alertmanager + Slack | **Shipped (trimmed)** as v0.6.0.3 / 11c4f39 | Loki + Promtail base; Grafana behind `--profile grafana`; Alertmanager behind `--profile alerts` (PARKED until customer approves a channel) |
+| **P3.2** LLM triage (Anthropic API) | **Shipped (reshaped)** as v0.6.0.2 / f6b67af | OpenAI-compatible client targeting HPSEDC self-hosted Mistral 7B (Nexus). Disabled by default (`TRIAGE_ENABLED=false`). Live-validated against `https://nexus.osipl.dev/v1` |
+| **P3.3** Confidence score | **Deferred indefinitely** | Reporter-only value is marginal for a 6-person team. Adversarial review found 3 of 4 penalty multipliers structurally inert from CI. Revisit only if PR velocity changes |
+| **P3.4** Pre-merge gate | **Deferred indefinitely** | Needs ≥10 PRs with P3.3 scores to calibrate threshold. Bypass-label persistence + fork-PR cliff also need brief rewrites |
+| **P3.5** Synthetic monitor | **Shipped (trimmed)** as v0.6.0.1 / 4efb8da | Writes JSON status file (dashboard input). Optional env-gated Slack on FAIL/TIMEOUT. Default OFF for PROD |
+| (NEW) digest.mjs JSON output | **Shipped** as part of v0.6.0.2 | Additive — `logs/digest-latest.json` for downstream triage + Phase 4 dashboard |
+
+**Net shipped**: 3 deliverables (P3.1 trimmed + P3.2 reshaped + P3.5 trimmed) + 1 additive (digest JSON output). All configurable, all disable-able in seconds, all written to JSON files for the Phase 4 Operator Console to surface.
+
+**What carries forward to Phase 4**: a fully-defined Operator Console (status dashboard + system_config UI matching the DMS Admin Console pattern). See `Phase_04_PRD.md`.
+
+---
+
+## Original PRD (preserved for historical record)
 
 **Phase**: 03
 **Status**: Locked — ready to dispatch
-**Maps to**: `03_ROADMAP_AND_INTEGRATION.md` §3 Phase 3; `01_EMBEDDED_TESTING_ARCHITECTURE.md` §3 L4-L5; `02_LOG_MINING_AND_RUNTIME_OBSERVABILITY.md` §4 Tier 1 + Tier 3
 **Duration estimate**: ~2 weeks (~10-12 dispatchable agent-hours)
 **Owner**: Architect (Claude Opus 4.7 in planning; operator-of-record during execution)
 
@@ -167,3 +195,5 @@ Files shared across Phase 3 tasks:
 | Date | Status | Note | Author |
 |---|---|---|---|
 | 2026-05-30 | Locked — ready to dispatch | Initial draft at close of Phase 2. 6 tasks in 3 waves, 4 model picks. P3.3 flagship at Opus tier. P3.1 has operator handoff for Loki/Promtail deploy on staging. | Architect (Claude Opus 4.7) |
+| 2026-06-03 | Trimmed mid-execution | 13-agent adversarial readiness review caught factual errors in 4 of 5 briefs (cluster schema mismatch, errorClass label that doesn't exist in NDJSON, path-as-label cardinality bomb, LogQL-vs-Prometheus syntax error, deep-smoke double-post hidden coupling). Combined with customer guidance (air-gap PROD, no notification channel approved, DocuMind LLM forthcoming, UI-driven config preferred): re-scoped to 3 deliverables. Architect implements directly — bypasses brief-correctness bottleneck. | Architect (Claude Opus 4.7) |
+| 2026-06-03 | **CLOSED at v0.6.0.3** | 3 deliverables shipped: P3.5 synthetic (4efb8da), P3.2 LLM triage + digest JSON (f6b67af), P3.1 Loki + Promtail (11c4f39). All Jest 502/502, all configurable, all disable-able. P3.3 + P3.4 deferred indefinitely (not blocking; can revisit if PR velocity ever justifies). Phase 4 PRD drafted — unified Operator Console. | Architect (Claude Opus 4.7) |
