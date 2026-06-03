@@ -950,3 +950,30 @@ export const insertMobilePushTokenSchema = createInsertSchema(mobilePushTokens).
 
 export type MobileRefreshToken = typeof mobileRefreshTokens.$inferSelect;
 export type MobilePushToken = typeof mobilePushTokens.$inferSelect;
+
+// ── Operator Console: System Configuration ──────────────────────────
+// One row per toggleable feature (synthetic monitor, LLM triage, daily
+// digest, Loki, DocuMind, notifications). The Operator Console UI reads
+// and writes these rows; tool scripts consult them at startup with env-var
+// fallback. See Phase_04_PRD.md and /PMD-Final wrapup/Testing & Verificaion/
+// Testing Framework & Architecture/01_EMBEDDED_TESTING_ARCHITECTURE.md.
+//
+// `feature` is the primary key (one canonical row per feature). `config` is
+// feature-shaped JSONB validated by per-feature Zod schemas at the API layer.
+// Secrets (API keys, webhook URLs) are stored plaintext in v1 — masked in
+// API responses; column-level encryption is a Phase 5 follow-up if HPSEDC
+// compliance flags it.
+export const systemConfig = pgTable("system_config", {
+  feature: text("feature").primaryKey(),
+  enabled: boolean("enabled").notNull().default(false),
+  config: jsonb("config").notNull().default(sql`'{}'::jsonb`),
+  updatedBy: varchar("updated_by").references(() => users.id),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const insertSystemConfigSchema = createInsertSchema(systemConfig).omit({
+  updatedAt: true,
+});
+
+export type SystemConfig = typeof systemConfig.$inferSelect;
+export type InsertSystemConfig = z.infer<typeof insertSystemConfigSchema>;
