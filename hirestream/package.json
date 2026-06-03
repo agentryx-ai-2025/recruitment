@@ -19,6 +19,7 @@
     "schema-fuzz": "node scripts/schema-fuzz.mjs",
     "smoke": "node scripts/deep-smoke.mjs",
     "smoke:local": "DEEP_URL=http://localhost:5001 node scripts/deep-smoke.mjs",
+    "smoke:prod": "node tools/synthetic/run-prod-smoke.mjs",
     "test:deep": "npm test && npm run smoke",
     "verify:skeleton": "node scripts/verify-skeleton.mjs",
     "log:digest": "node tools/log-analyzer/digest.mjs",
