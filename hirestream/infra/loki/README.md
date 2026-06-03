@@ -14,11 +14,11 @@ Self-hosted log search and (optionally) alerting infrastructure for HireStream. 
 On the deployment host:
 
 ```bash
-cd infra/loki
+cd hirestream/infra/loki
 
-# Adjust the bind-mount path in docker-compose.yml line ~50 to point at the
-# host's HireStream logs directory. Default is /opt/hirestream/logs which
-# matches a typical pm2 deployment under /opt/.
+# The promtail bind-mount is a relative path (../../logs) that resolves to
+# the hirestream/logs/ directory from the compose file's location — works
+# regardless of where HireStream is installed (no env override needed).
 docker compose up -d loki promtail
 
 # Verify
