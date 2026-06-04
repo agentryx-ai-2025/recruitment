@@ -198,8 +198,6 @@ async function runConnectivityTest(
     }
     case "daily_digest":
       return { ok: true, details: "no remote service; runs locally via cron. Use /api/v1/admin/operator-console/digest for the latest digest record." };
-    case "documind":
-      return { ok: false, details: "DocuMind connectivity test not yet implemented — placeholder for Phase 5+" };
     default: {
       const _exhaustive: never = feature;
       return { ok: false, details: `unknown feature: ${_exhaustive}` };

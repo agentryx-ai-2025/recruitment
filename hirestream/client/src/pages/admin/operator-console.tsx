@@ -69,7 +69,6 @@ const FEATURE_LABEL: Record<string, string> = {
   llm_triage: "LLM Triage",
   daily_digest: "Daily Log Digest",
   loki: "Loki (Log Search)",
-  documind: "DocuMind (Phase 5+)",
   notifications: "Notifications",
 };
 
@@ -78,7 +77,6 @@ const FEATURE_ICON: Record<string, JSX.Element> = {
   llm_triage: <Brain className="h-5 w-5 text-purple-600" />,
   daily_digest: <FileText className="h-5 w-5 text-amber-600" />,
   loki: <Database className="h-5 w-5 text-emerald-600" />,
-  documind: <Brain className="h-5 w-5 text-gray-400" />,
   notifications: <Bell className="h-5 w-5 text-rose-600" />,
 };
 

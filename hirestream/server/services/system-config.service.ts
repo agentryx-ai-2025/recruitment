@@ -31,7 +31,6 @@ export type FeatureName =
   | "llm_triage"
   | "daily_digest"
   | "loki"
-  | "documind"
   | "notifications";
 
 export const FEATURES: readonly FeatureName[] = [
@@ -39,7 +38,6 @@ export const FEATURES: readonly FeatureName[] = [
   "llm_triage",
   "daily_digest",
   "loki",
-  "documind",
   "notifications",
 ] as const;
 
@@ -86,13 +84,6 @@ export const FEATURE_DEFAULTS: Record<FeatureName, { enabled: boolean; config: R
       lokiUrl: "http://localhost:3100",
       defaultQueryLimit: 50,
       defaultLookbackMinutes: 60,
-    },
-  },
-  documind: {
-    enabled: false,                          // placeholder for future integration
-    config: {
-      documindAnswerUrl: "",
-      apiKey: "",
     },
   },
   notifications: {

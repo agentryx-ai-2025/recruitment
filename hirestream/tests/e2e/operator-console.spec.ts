@@ -18,7 +18,6 @@ const FEATURES = [
   "llm_triage",
   "daily_digest",
   "loki",
-  "documind",
   "notifications",
 ];
 
@@ -87,7 +86,7 @@ test.describe("Operator Console — API smoke (superadmin)", () => {
     expect(r.ok()).toBeTruthy();
     const body = await r.json();
     expect(body.success).toBe(true);
-    expect(body.data).toHaveLength(6);
+    expect(body.data).toHaveLength(5);
     const features = body.data.map((d: any) => d.feature).sort();
     expect(features).toEqual([...FEATURES].sort());
   });
@@ -97,23 +96,25 @@ test.describe("Operator Console — API smoke (superadmin)", () => {
       data: { username: "superadmin", password: "hpsedc@super2026" },
     });
 
-    // Read current state for documind (safe — placeholder, no side-effects)
-    const before = await (await request.get("/api/v1/admin/system-config/documind")).json();
+    // Read current state for notifications (safe target — toggling enabled is
+    // harmless; the /test endpoint has side effects only if slackWebhookUrl
+    // is set, which it isn't by default)
+    const before = await (await request.get("/api/v1/admin/system-config/notifications")).json();
     const original = before.data.enabled;
 
     // Flip it
-    const flip = await request.put("/api/v1/admin/system-config/documind", {
+    const flip = await request.put("/api/v1/admin/system-config/notifications", {
       data: { enabled: !original },
     });
     expect(flip.ok()).toBeTruthy();
     expect((await flip.json()).data.enabled).toBe(!original);
 
     // Confirm via GET
-    const after = await (await request.get("/api/v1/admin/system-config/documind")).json();
+    const after = await (await request.get("/api/v1/admin/system-config/notifications")).json();
     expect(after.data.enabled).toBe(!original);
 
     // Restore
-    await request.put("/api/v1/admin/system-config/documind", { data: { enabled: original } });
+    await request.put("/api/v1/admin/system-config/notifications", { data: { enabled: original } });
   });
 
   test("POST /api/v1/admin/system-config/llm_triage/test returns ok=true from live Nexus", async ({ request }) => {

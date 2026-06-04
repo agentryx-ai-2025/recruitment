@@ -13,7 +13,7 @@ URL: `https://hirestream-stg.agentryx.dev/admin/operator-console` (superadmin lo
 - **Log Search (Loki)** — type a LogQL query, see matching log lines. Available labels: `job`, `level`, `service`, `method`, `status_code`. Use `| json` to parse JSON fields (e.g. `{job="hirestream"} | json | path=~"/auth.*"`).
 
 **System Config tab:**
-- One card per feature: `synthetic_monitor`, `llm_triage`, `daily_digest`, `loki`, `documind`, `notifications`.
+- One card per feature: `synthetic_monitor`, `llm_triage`, `daily_digest`, `loki`, `notifications`.
 - Per card: enable/disable switch, current config (secrets shown as `***`), Edit Config button, Test Connection button.
 - Connection test returns `ok / latency / details` (e.g. for LLM Triage: HTTP 200 + 2s latency + first 80 chars of model reply).
 
@@ -25,7 +25,6 @@ URL: `https://hirestream-stg.agentryx.dev/admin/operator-console` (superadmin lo
 | `llm_triage` | `system_config.llm_triage` | disabled | `tools/triage/triage.mjs` (cron or manual) writes `logs/triage-latest.json`. Hits `LLM_BASE_URL` (default `https://nexus.osipl.dev/v1`) |
 | `daily_digest` | `system_config.daily_digest` | enabled | `tools/log-analyzer/digest.mjs` (daily cron) writes `logs/digest-latest.json` |
 | `loki` | `system_config.loki` | disabled | Docker stack at `infra/loki/`; turn on the feature flag once stack is up |
-| `documind` | `system_config.documind` | disabled | Placeholder for Phase 5+ DocuMind integration |
 | `notifications` | `system_config.notifications` | disabled | Currently env-gated `SLACK_WEBHOOK_URL` in synthetic monitor + digest |
 
 ## Editing a feature's config
@@ -71,7 +70,6 @@ The UI's toggle currently only updates the DB row — wiring scripts to read DB-
 | `loki` | GET `${lokiUrl}/ready`. Expects "ready". |
 | `notifications` | POST a test message to `slackWebhookUrl`. |
 | `daily_digest` | No remote service; returns a placeholder. |
-| `documind` | Not implemented (Phase 5+). |
 
 ## API endpoints (for scripting / curl)
 
