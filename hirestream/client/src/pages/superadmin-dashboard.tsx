@@ -85,6 +85,7 @@ export default function SuperAdminDashboard() {
   const navItems = [
     { key: "overview", label: "Ops Overview", icon: Activity, count: null },
     { key: "system-controls", label: "System Controls", icon: ShieldAlert, count: null, external: "/admin/system-controls" },
+    { key: "operator-console", label: "Operator Console", icon: LayoutDashboard, count: null, external: "/admin/operator-console" },
     { key: "signals", label: "Signals", icon: AlertTriangle, count: null },
     { key: "pipeline", label: "Pipeline", icon: TrendingUp, count: null },
     { key: "trends", label: "Trends", icon: Activity, count: null },
