@@ -40,23 +40,36 @@
 import { promises as fs } from "fs";
 import { resolve, dirname } from "path";
 import { fileURLToPath } from "url";
+import { getFeatureConfig } from "../../lib/config.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(__dirname, "..", "..");
 
-const TRIAGE_ENABLED = (process.env.TRIAGE_ENABLED || "false").toLowerCase() === "true";
-const LLM_BASE_URL = (process.env.LLM_BASE_URL || "https://nexus.osipl.dev/v1").replace(/\/$/, "");
-const LLM_MODEL = process.env.LLM_MODEL || "mistral-7b-instruct-v0.2.Q4_K_M";
-const LLM_API_KEY = process.env.LLM_API_KEY || "";
-// Mistral 7B Q4 on CPU runs ~3-4 tokens/sec. 90s comfortably covers a
-// 250-token response with headroom. GPU-backed endpoints will be far faster
-// and the same default works.
-const LLM_TIMEOUT_MS = parseInt(process.env.LLM_TIMEOUT_MS || "90000", 10);
-const TRIAGE_MAX_TOKENS = parseInt(process.env.TRIAGE_MAX_TOKENS || "200", 10);
-const TRIAGE_TEMPERATURE = parseFloat(process.env.TRIAGE_TEMPERATURE || "0.2");
+// Config resolution: system_config DB row → env vars → hardcoded defaults.
+// Mistral 7B Q4 on CPU runs ~3-4 tokens/sec; 90s timeout covers a 250-token
+// response with headroom. GPU-backed endpoints are far faster on same defaults.
+const cfg = await getFeatureConfig("llm_triage", {
+  enabled: (process.env.TRIAGE_ENABLED || "false").toLowerCase() === "true",
+  llmBaseUrl: process.env.LLM_BASE_URL || "https://nexus.osipl.dev/v1",
+  llmModel: process.env.LLM_MODEL || "mistral-7b-instruct-v0.2.Q4_K_M",
+  llmApiKey: process.env.LLM_API_KEY || "",
+  llmTimeoutMs: parseInt(process.env.LLM_TIMEOUT_MS || "90000", 10),
+  maxTokens: parseInt(process.env.TRIAGE_MAX_TOKENS || "200", 10),
+  temperature: parseFloat(process.env.TRIAGE_TEMPERATURE || "0.2"),
+  maxClustersPerRun: parseInt(process.env.TRIAGE_MAX_CLUSTERS || "10", 10),
+});
+
+const TRIAGE_ENABLED = !!cfg.enabled;
+const LLM_BASE_URL = String(cfg.llmBaseUrl).replace(/\/$/, "");
+const LLM_MODEL = String(cfg.llmModel);
+const LLM_API_KEY = String(cfg.llmApiKey || "");
+const LLM_TIMEOUT_MS = Number(cfg.llmTimeoutMs) || 90000;
+const TRIAGE_MAX_TOKENS = Number(cfg.maxTokens) || 200;
+const TRIAGE_TEMPERATURE = Number.isFinite(cfg.temperature) ? Number(cfg.temperature) : 0.2;
 const TRIAGE_INPUT = resolve(REPO_ROOT, process.env.TRIAGE_INPUT || "logs/digest-latest.json");
 const TRIAGE_OUTPUT = resolve(REPO_ROOT, process.env.TRIAGE_OUTPUT || "logs/triage-latest.json");
-const TRIAGE_MAX_CLUSTERS = parseInt(process.env.TRIAGE_MAX_CLUSTERS || "10", 10);
+const TRIAGE_MAX_CLUSTERS = Number(cfg.maxClustersPerRun) || 10;
+const CONFIG_SOURCE = cfg.source;
 
 const args = new Set(process.argv.slice(2));
 const isDryRun = args.has("--dry-run");
@@ -198,7 +211,7 @@ async function readDigest() {
 
 async function runTriage() {
   if (!TRIAGE_ENABLED && !isDryRun) {
-    console.log(`[triage] TRIAGE_ENABLED=false — skipping. Set TRIAGE_ENABLED=true to run.`);
+    console.log(`[triage] disabled (source=${CONFIG_SOURCE}) — toggle Enabled on the LLM Triage card in the Operator Console (or set TRIAGE_ENABLED=true in env if no DB).`);
     process.exit(0);
   }
 

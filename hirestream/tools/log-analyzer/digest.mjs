@@ -1,11 +1,26 @@
 import fs from 'fs';
 import readline from 'readline';
 import { resolve } from 'path';
+import { getFeatureConfig } from '../../lib/config.mjs';
 
-const LOG_PATH = process.env.LOG_PATH || resolve(process.cwd(), 'logs', 'app.log');
-const SLACK_WEBHOOK_URL = process.env.SLACK_WEBHOOK_URL || "";
-const WINDOW_HOURS = parseInt(process.env.WINDOW_HOURS || "24", 10);
-const BASELINE_DAYS = parseInt(process.env.BASELINE_DAYS || "7", 10);
+// Config resolution: system_config DB row → env vars → hardcoded defaults.
+const cfg = await getFeatureConfig('daily_digest', {
+  enabled: (process.env.DIGEST_ENABLED || "true").toLowerCase() === "true",
+  logPath: process.env.LOG_PATH || resolve(process.cwd(), 'logs', 'app.log'),
+  windowHours: parseInt(process.env.WINDOW_HOURS || "24", 10),
+  baselineDays: parseInt(process.env.BASELINE_DAYS || "7", 10),
+  slackWebhookUrl: process.env.SLACK_WEBHOOK_URL || "",
+});
+
+if (!cfg.enabled) {
+  console.log(`[digest] disabled in system_config (source=${cfg.source}); exiting cleanly.`);
+  process.exit(0);
+}
+
+const LOG_PATH = String(cfg.logPath);
+const SLACK_WEBHOOK_URL = String(cfg.slackWebhookUrl || "");
+const WINDOW_HOURS = Number(cfg.windowHours) || 24;
+const BASELINE_DAYS = Number(cfg.baselineDays) || 7;
 
 function parseLine(line) {
   try {

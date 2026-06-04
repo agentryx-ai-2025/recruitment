@@ -29,23 +29,34 @@ import { spawn } from "child_process";
 import { promises as fs } from "fs";
 import { resolve, dirname } from "path";
 import { fileURLToPath } from "url";
+import { getFeatureConfig } from "../../lib/config.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(__dirname, "..", "..");
 
-const TARGET_URL = (process.env.DEEP_URL || "https://hirestream-stg.agentryx.dev").replace(/\/$/, "");
+// Config resolution: system_config DB row → env vars → hardcoded defaults.
+// See lib/config.mjs for the priority order.
+const cfg = await getFeatureConfig("synthetic_monitor", {
+  enabled: (process.env.SYNTHETIC_ENABLED || "true").toLowerCase() === "true",
+  targetUrl: process.env.DEEP_URL || "https://hirestream-stg.agentryx.dev",
+  minIntervalSeconds: parseInt(process.env.MIN_INTERVAL_SECONDS || "480", 10),
+  smokeTimeoutMs: parseInt(process.env.SMOKE_TIMEOUT_MS || "240000", 10),
+  slackWebhookUrl: process.env.SLACK_WEBHOOK_URL || "",
+});
+
+if (!cfg.enabled) {
+  console.log(`[synthetic ${new Date().toISOString()}] disabled in system_config (source=${cfg.source}); exiting cleanly.`);
+  process.exit(0);
+}
+
+const TARGET_URL = String(cfg.targetUrl).replace(/\/$/, "");
 const STATE_FILE = process.env.SYNTHETIC_STATE_FILE || "/tmp/hirestream-synthetic-state.json";
 const STATUS_FILE = resolve(REPO_ROOT, "logs", "synthetic-latest.json");
 const STATUS_PREV = resolve(REPO_ROOT, "logs", "synthetic-previous.json");
-const MIN_INTERVAL_SECONDS = parseInt(process.env.MIN_INTERVAL_SECONDS || "480", 10);
-const SMOKE_TIMEOUT_MS = parseInt(process.env.SMOKE_TIMEOUT_MS || "240000", 10);
+const MIN_INTERVAL_SECONDS = Number(cfg.minIntervalSeconds) || 480;
+const SMOKE_TIMEOUT_MS = Number(cfg.smokeTimeoutMs) || 240000;
 const SMOKE_SCRIPT = resolve(REPO_ROOT, "scripts", "deep-smoke.mjs");
-
-// Notifications are opt-in via env. Set SLACK_WEBHOOK_URL on the DEV monitor
-// host to get FAIL alerts; leave unset on the PROD host (the dashboard surfaces
-// status from the JSON file). Future Phase 4 Operator Console will move this
-// config into the DB-backed system_config table.
-const SLACK_WEBHOOK_URL = process.env.SLACK_WEBHOOK_URL || "";
+const SLACK_WEBHOOK_URL = String(cfg.slackWebhookUrl || "");
 
 const nowIso = () => new Date().toISOString();
 
