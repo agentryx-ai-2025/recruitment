@@ -15,13 +15,15 @@ import { resolve } from "path";
 import { protect } from "../../middleware/auth.middleware";
 import { requireRole } from "../../middleware/rbac.middleware";
 import { getFeature } from "../../services/system-config.service";
-import { logger } from "../../config/logger.config";
 
 const router = Router();
 router.use(protect);
 router.use(requireRole(["superadmin"]));
 
-const REPO_ROOT = resolve(__dirname, "..", "..", "..");
+// Server is always launched with cwd = hirestream/ (npm run dev / npm start /
+// pm2 start dist/index.js). process.cwd() is reliable here and avoids
+// ESM __dirname dance.
+const REPO_ROOT = process.cwd();
 const SYNTHETIC_PATH = resolve(REPO_ROOT, "logs", "synthetic-latest.json");
 const DIGEST_PATH = resolve(REPO_ROOT, "logs", "digest-latest.json");
 const TRIAGE_PATH = resolve(REPO_ROOT, "logs", "triage-latest.json");
