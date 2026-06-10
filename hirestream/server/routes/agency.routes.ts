@@ -77,6 +77,19 @@ router.get("/me", protect, async (req, res, next) => {
 });
 
 // Search candidates (for agents/employers)
+// Gate candidate-PII browse for unverified agencies (FRS §2.5). Setting-controlled
+// (agency.require_verification_to_view_candidates, default ON) — mirrors the
+// job-posting gate. Employers/admins are unaffected. Returns true if the caller
+// is an unverified agency that should be blocked.
+async function unverifiedAgencyBlocked(req: any): Promise<boolean> {
+  if ((req.user as any)?.role !== "agent") return false;
+  const { getSetting } = await import("../services/settings.service");
+  const requireVerified: boolean = await getSetting("agency.require_verification_to_view_candidates");
+  if (!requireVerified) return false;
+  const [agent] = await storage.db!.select().from(recruitmentAgents).where(eq(recruitmentAgents.userId, (req.user as any).id)).limit(1);
+  return !agent || !agent.verified;
+}
+
 router.get("/candidates", protect, async (req, res, next) => {
   try {
     const userRole = (req.user as any)?.role;
@@ -85,6 +98,10 @@ router.get("/candidates", protect, async (req, res, next) => {
     }
 
     if (!storage.db) return res.status(500).json({ success: false, message: "No db available" });
+
+    if (await unverifiedAgencyBlocked(req)) {
+      return res.status(403).json({ success: false, error: { code: 403, message: "Your agency must be verified by HPSEDC before viewing candidate profiles." } });
+    }
 
     const allCandidates = await storage.db.select().from(candidates);
 
@@ -121,6 +138,10 @@ router.get("/candidates/:id", protect, async (req, res, next) => {
       return res.status(403).json({ success: false, message: "Forbidden" });
     }
     if (!storage.db) return res.status(500).json({ success: false, message: "No db available" });
+
+    if (await unverifiedAgencyBlocked(req)) {
+      return res.status(403).json({ success: false, error: { code: 403, message: "Your agency must be verified by HPSEDC before viewing candidate profiles." } });
+    }
 
     const [candidate] = await storage.db.select().from(candidates).where(eq(candidates.id, req.params.id)).limit(1);
     if (!candidate) return res.status(404).json({ success: false, message: "Candidate not found" });

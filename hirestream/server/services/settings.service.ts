@@ -102,6 +102,18 @@ export const SETTING_SPECS: SettingSpec[] = [
     default: true,
   },
   {
+    // HPSEDC tester report (2026-06-10): unverified agencies could browse and
+    // open candidate profiles (PII) before HPSEDC approval — an FRS §2.5 /
+    // privacy gap. Gate the candidate-browse endpoints behind verification,
+    // mirroring agency.require_verification_to_post. Default ON.
+    key: "agency.require_verification_to_view_candidates",
+    category: "access",
+    label: "Require agency verification to view candidate profiles",
+    description: "Unverified agencies cannot search or open candidate profiles until HPSEDC approves their license.",
+    type: "boolean",
+    default: true,
+  },
+  {
     key: "drive.require_admin_approval",
     category: "access",
     label: "Require admin approval for drives",

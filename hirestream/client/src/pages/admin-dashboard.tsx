@@ -83,6 +83,9 @@ export default function AdminDashboard() {
   const grievanceList = grievancesRes?.data || [];
   const pendingDrives = pendingDrivesRes?.data || [];
 
+  // Controlled tab state so cross-card shortcuts (e.g. "Review now →") can switch panes.
+  const [tab, setTab] = useState("overview");
+
   if (isLoading) {
     return (
       <div className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 xl:px-8 2xl:px-12 py-8 space-y-6">
@@ -120,7 +123,7 @@ export default function AdminDashboard() {
         </div>
       </div>
 
-      <Tabs defaultValue="overview" className="space-y-6">
+      <Tabs value={tab} onValueChange={setTab} className="space-y-6">
         <TabsList className="bg-white border shadow-sm flex-wrap h-auto">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="agencies">Agencies</TabsTrigger>
@@ -148,10 +151,10 @@ export default function AdminDashboard() {
         <TabsContent value="overview">
           {/* Key Metrics — ALL REAL */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
-            <MetricCard icon={<Users />} color="bg-blue-600" label="Candidates" value={stats.users?.candidates || 0} />
-            <MetricCard icon={<Briefcase />} color="bg-emerald-600" label="Open Job Vacancies" value={stats.jobs?.active || 0} />
-            <MetricCard icon={<Handshake />} color="bg-orange-500" label="Placements" value={stats.placements?.total || 0} />
-            <MetricCard icon={<Building />} color="bg-purple-600" label="Agencies" value={`${stats.agencies?.verified || 0} / ${stats.agencies?.total || 0}`} sub="verified" />
+            <MetricCard icon={<Users />} color="bg-blue-600" label="Candidates" value={stats.users?.candidates || 0} onClick={() => setTab("users")} />
+            <MetricCard icon={<Briefcase />} color="bg-emerald-600" label="Open Job Vacancies" value={stats.jobs?.active || 0} onClick={() => setTab("funnel")} />
+            <MetricCard icon={<Handshake />} color="bg-orange-500" label="Placements" value={stats.placements?.total || 0} onClick={() => setTab("lifecycle")} />
+            <MetricCard icon={<Building />} color="bg-purple-600" label="Agencies" value={`${stats.agencies?.verified || 0} / ${stats.agencies?.total || 0}`} sub="verified" onClick={() => setTab("agencies")} />
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
@@ -163,15 +166,21 @@ export default function AdminDashboard() {
                   <TrendingUp className="text-blue-600 mr-2 w-5 h-5" /> Application Pipeline
                 </h3>
                 <div className="grid grid-cols-3 gap-4 mb-4 text-center">
-                  <div className="bg-blue-50 p-4 rounded-lg">
+                  <div onClick={() => setTab("users")} role="button" tabIndex={0}
+                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setTab("users"); } }}
+                    className="bg-blue-50 p-4 rounded-lg cursor-pointer hover:ring-2 hover:ring-blue-200 transition">
                     <p className="text-2xl font-bold text-blue-600">{funnel.summary?.registered || 0}</p>
                     <p className="text-xs text-gray-500">Registered</p>
                   </div>
-                  <div className="bg-emerald-50 p-4 rounded-lg">
+                  <div onClick={() => setTab("funnel")} role="button" tabIndex={0}
+                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setTab("funnel"); } }}
+                    className="bg-emerald-50 p-4 rounded-lg cursor-pointer hover:ring-2 hover:ring-emerald-200 transition">
                     <p className="text-2xl font-bold text-emerald-600">{funnel.summary?.applied || 0}</p>
                     <p className="text-xs text-gray-500">Applied</p>
                   </div>
-                  <div className="bg-orange-50 p-4 rounded-lg">
+                  <div onClick={() => setTab("lifecycle")} role="button" tabIndex={0}
+                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setTab("lifecycle"); } }}
+                    className="bg-orange-50 p-4 rounded-lg cursor-pointer hover:ring-2 hover:ring-orange-200 transition">
                     <p className="text-2xl font-bold text-orange-600">{funnel.summary?.placed || 0}</p>
                     <p className="text-xs text-gray-500">Placed</p>
                   </div>
@@ -249,16 +258,12 @@ export default function AdminDashboard() {
               <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">Pending Verifications</h3>
                 <div className="space-y-3">
-                  <PendingItem icon={<UserCheck />} label="Agency Verifications" count={stats.agencies?.pendingVerification || 0} color="bg-yellow-50 border-yellow-200" />
-                  <PendingItem icon={<Clock />} label="Drive Approvals" count={stats.drives?.pendingApproval || 0} color="bg-blue-50 border-blue-200" />
-                  <PendingItem icon={<MessageSquare />} label="Open Grievances" count={stats.grievances?.open || 0} color="bg-red-50 border-red-200" />
+                  <PendingItem icon={<UserCheck />} label="Agency Verifications" count={stats.agencies?.pendingVerification || 0} color="bg-yellow-50 border-yellow-200" onClick={() => setTab("agencies")} />
+                  <PendingItem icon={<Clock />} label="Drive Approvals" count={stats.drives?.pendingApproval || 0} color="bg-blue-50 border-blue-200" onClick={() => setTab("drives")} />
+                  <PendingItem icon={<MessageSquare />} label="Open Grievances" count={stats.grievances?.open || 0} color="bg-red-50 border-red-200" onClick={() => setTab("grievances")} />
                 </div>
                 <button
-                  onClick={() => {
-                    // Switch the adjacent Tabs to the Agencies pane — queries the Tabs trigger by data-state.
-                    const btn = document.querySelector<HTMLButtonElement>('[role="tab"][value="agencies"], [data-value="agencies"]');
-                    btn?.click();
-                  }}
+                  onClick={() => setTab("agencies")}
                   className="mt-3 w-full text-xs font-semibold px-3 py-2 rounded bg-slate-900 text-white hover:bg-slate-800">
                   Review now →
                 </button>
@@ -1410,7 +1415,7 @@ function SettingRow({ spec, onChange, saving }: { spec: any; onChange: (v: any) 
   );
 }
 
-function MetricCard({ icon, color, label, value, sub }: { icon: React.ReactNode; color: string; label: string; value: string | number; sub?: string }) {
+function MetricCard({ icon, color, label, value, sub, onClick }: { icon: React.ReactNode; color: string; label: string; value: string | number; sub?: string; onClick?: () => void }) {
   const lightMap: Record<string, string> = {
     "bg-blue-600": "bg-blue-50 text-blue-600",
     "bg-emerald-600": "bg-emerald-50 text-emerald-600",
@@ -1419,7 +1424,12 @@ function MetricCard({ icon, color, label, value, sub }: { icon: React.ReactNode;
   };
   const light = lightMap[color] || "bg-slate-50 text-slate-600";
   return (
-    <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 hover:shadow-md transition-all">
+    <div
+      onClick={onClick}
+      role={onClick ? "button" : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onKeyDown={onClick ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onClick(); } } : undefined}
+      className={`bg-white p-4 rounded-xl shadow-sm border border-slate-200 hover:shadow-md transition-all ${onClick ? "cursor-pointer hover:border-blue-300" : ""}`}>
       <div className="flex items-center gap-3">
         <div className={`${light} p-2 rounded-lg flex-shrink-0`}>
           {icon}
@@ -1613,9 +1623,14 @@ function GrievanceCard({ grievance: g }: { grievance: any }) {
   );
 }
 
-function PendingItem({ icon, label, count, color }: { icon: React.ReactNode; label: string; count: number; color: string }) {
+function PendingItem({ icon, label, count, color, onClick }: { icon: React.ReactNode; label: string; count: number; color: string; onClick?: () => void }) {
   return (
-    <div className={`flex items-center justify-between p-3 ${color} border rounded-lg`}>
+    <div
+      onClick={onClick}
+      role={onClick ? "button" : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onKeyDown={onClick ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onClick(); } } : undefined}
+      className={`flex items-center justify-between p-3 ${color} border rounded-lg ${onClick ? "cursor-pointer hover:brightness-95 transition" : ""}`}>
       <div className="flex items-center gap-2">
         <span className="text-gray-600 w-5 h-5">{icon}</span>
         <span className="text-sm font-medium text-gray-900">{label}</span>
