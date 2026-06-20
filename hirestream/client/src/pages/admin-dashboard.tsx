@@ -10,7 +10,7 @@ import {
   UserCheck, BarChart3, Shield, TrendingUp, Activity, AlertTriangle,
   CheckCircle, Clock, FileText, MessageSquare, GraduationCap,
   Loader2, Mail, Phone, Fingerprint, KeyRound, FolderLock, PlugZap, XCircle, Globe,
-  Printer,
+  Printer, Cpu,
 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -90,6 +90,45 @@ export default function AdminDashboard() {
   // Controlled tab state so cross-card shortcuts (e.g. "Review now →") can switch panes.
   const [tab, setTab] = useState("overview");
 
+  // Sidebar navigation — grouped semantically, replaces the 20-tab horizontal
+  // overflow that was wrapping to 2 lines. New tabs land in any group without
+  // a layout change. Pattern mirrors the superadmin Ops Console sidebar.
+  const navGroups: { label: string; items: { key: string; label: string; icon: any; count?: number }[] }[] = [
+    { label: "OVERVIEW & ANALYTICS", items: [
+      { key: "overview", label: "Overview", icon: BarChart3 },
+      { key: "reports", label: "Reports", icon: FileText },
+      { key: "funnel", label: "Funnel", icon: TrendingUp },
+      { key: "leaderboard", label: "Leaderboard", icon: Activity },
+    ]},
+    { label: "PEOPLE & ORGS", items: [
+      { key: "users", label: "Users", icon: Users },
+      { key: "agencies", label: "Agencies", icon: Building },
+      { key: "employers", label: "Employers", icon: Briefcase },
+    ]},
+    { label: "OPERATIONS", items: [
+      { key: "lifecycle", label: "Lifecycle", icon: Clock },
+      { key: "drives", label: "Drives", icon: Handshake, count: pendingDrives.length },
+      { key: "matching", label: "Matching Engine", icon: Cpu },
+      { key: "welfare", label: "Welfare SLA", icon: GraduationCap },
+    ]},
+    { label: "RISK & COMPLIANCE", items: [
+      { key: "compliance", label: "Compliance", icon: Shield },
+      { key: "audit", label: "Audit Log", icon: FolderLock },
+      { key: "fraud", label: "Fraud Watch", icon: AlertTriangle },
+      { key: "duplicates", label: "Duplicates", icon: Fingerprint },
+    ]},
+    { label: "COMMUNICATION", items: [
+      { key: "grievances", label: "Grievances", icon: MessageSquare, count: openGrievances.length },
+      { key: "templates", label: "Notifications", icon: Mail },
+    ]},
+    { label: "SYSTEM", items: [
+      { key: "integrations", label: "Integrations", icon: PlugZap },
+      { key: "countries", label: "Countries", icon: Globe },
+      { key: "settings", label: "System Config", icon: Settings },
+    ]},
+  ];
+  const flatNavItems = navGroups.flatMap(g => g.items);
+
   if (isLoading) {
     return (
       <div className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 xl:px-8 2xl:px-12 py-8 space-y-6">
@@ -127,29 +166,64 @@ export default function AdminDashboard() {
         </div>
       </div>
 
-      <Tabs value={tab} onValueChange={setTab} className="space-y-6">
-        <TabsList className="bg-white border shadow-sm flex-wrap h-auto">
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="agencies">Agencies</TabsTrigger>
-          <TabsTrigger value="employers">Employers</TabsTrigger>
-          <TabsTrigger value="matching">Matching Engine</TabsTrigger>
-          <TabsTrigger value="compliance">Compliance</TabsTrigger>
-          <TabsTrigger value="welfare">Welfare SLA</TabsTrigger>
-          <TabsTrigger value="reports">Reports</TabsTrigger>
-          <TabsTrigger value="drives">Drives ({pendingDrives.length} pending)</TabsTrigger>
-          <TabsTrigger value="grievances">Grievances ({openGrievances.length})</TabsTrigger>
-          <TabsTrigger value="users">Users</TabsTrigger>
-          <TabsTrigger value="audit">Audit Log</TabsTrigger>
-          <TabsTrigger value="lifecycle">Lifecycle</TabsTrigger>
-          <TabsTrigger value="leaderboard">Leaderboard</TabsTrigger>
-          <TabsTrigger value="funnel">Funnel</TabsTrigger>
-          <TabsTrigger value="fraud">Fraud watch</TabsTrigger>
-          <TabsTrigger value="duplicates">Duplicates</TabsTrigger>
-          <TabsTrigger value="countries">Countries</TabsTrigger>
-          <TabsTrigger value="templates">Notifications</TabsTrigger>
-          <TabsTrigger value="integrations">Integrations</TabsTrigger>
-          <TabsTrigger value="settings">System Config</TabsTrigger>
-        </TabsList>
+      {/* Mobile chip nav (lg:hidden) — horizontal scroll of all 20 items */}
+      <div className="lg:hidden mb-2">
+        <div className="flex gap-1 overflow-x-auto bg-white rounded-xl border border-slate-200 p-1">
+          {flatNavItems.map(item => (
+            <button key={item.key} onClick={() => setTab(item.key)}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs whitespace-nowrap font-medium transition-all ${
+                tab === item.key ? "bg-blue-50 text-blue-700" : "text-slate-500 hover:text-slate-700"
+              }`}>
+              <item.icon className="w-3.5 h-3.5" />
+              {item.label}
+              {typeof item.count === "number" && item.count > 0 && (
+                <span className="ml-1 text-[10px] font-semibold text-red-600 tabular-nums">({item.count})</span>
+              )}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/*
+        Desktop layout (lg+): sidebar on left, TabsContent panels in right
+        column. Below lg: chip nav above handles navigation; TabsContent
+        panels stack full-width.
+
+        The <Tabs> wrapper preserves Radix routing — each TabsContent reads
+        `value={tab}` from context and renders only when active.
+      */}
+      <Tabs value={tab} onValueChange={setTab} className="space-y-6 lg:grid lg:grid-cols-[minmax(220px,260px)_1fr] lg:gap-6 lg:space-y-0">
+        <aside className="hidden lg:flex lg:flex-col gap-3 sticky top-20 self-start max-h-[calc(100vh-6rem)] overflow-y-auto pb-4">
+          <nav className="bg-white rounded-xl border border-slate-200 p-2 shadow-sm">
+            {navGroups.map((group, gi) => (
+              <div key={group.label} className={gi > 0 ? "mt-3 pt-3 border-t border-slate-100" : ""}>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-2 mb-1">
+                  {group.label}
+                </p>
+                {group.items.map(item => (
+                  <button
+                    key={item.key}
+                    onClick={() => setTab(item.key)}
+                    className={`w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-sm transition-all ${
+                      tab === item.key
+                        ? "bg-blue-50 text-blue-700 font-semibold"
+                        : "text-slate-600 hover:bg-slate-50"
+                    }`}
+                  >
+                    <item.icon className="w-4 h-4 flex-shrink-0" />
+                    <span className="flex-1 text-left truncate">{item.label}</span>
+                    {typeof item.count === "number" && item.count > 0 && (
+                      <span className={`text-[11px] font-semibold tabular-nums ${
+                        tab === item.key ? "text-blue-600" : "text-red-500"
+                      }`}>{item.count}</span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            ))}
+          </nav>
+        </aside>
+        <div className="min-w-0 lg:col-start-2 space-y-6">
 
         {/* ── Overview Tab ──────────────────────────────── */}
         <TabsContent value="overview">
@@ -442,6 +516,7 @@ export default function AdminDashboard() {
         <TabsContent value="settings">
           <SystemConfigPanel />
         </TabsContent>
+        </div>{/* /main column wrapper */}
       </Tabs>
     </div>
   );
