@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -417,7 +418,7 @@ function QuickLink({ icon: Icon, title, desc, onClick }: { icon: React.ElementTy
 // ── Users View ──
 function UsersView() {
   const [search, setSearch] = useState("");
-  const [roleFilter, setRoleFilter] = useState("all");
+  const [roleFilter, setRoleFilter] = useState("candidate");  // default to the largest category
   const [showCreate, setShowCreate] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -432,9 +433,21 @@ function UsersView() {
     const matchesSearch = !search ||
       u.username?.toLowerCase().includes(search.toLowerCase()) ||
       u.email?.toLowerCase().includes(search.toLowerCase());
-    const matchesRole = roleFilter === "all" || u.role === roleFilter;
+    let matchesRole = false;
+    if (roleFilter === "all") matchesRole = true;
+    else if (roleFilter === "staff") matchesRole = u.role === "admin" || u.role === "superadmin";
+    else matchesRole = u.role === roleFilter;
     return matchesSearch && matchesRole;
   });
+
+  // Counts per category (against the unsearched list — tabs show absolute totals)
+  const counts = {
+    all: users.length,
+    candidate: users.filter((u: any) => u.role === "candidate").length,
+    agent: users.filter((u: any) => u.role === "agent").length,
+    employer: users.filter((u: any) => u.role === "employer").length,
+    staff: users.filter((u: any) => u.role === "admin" || u.role === "superadmin").length,
+  };
 
   const roleMutation = useMutation({
     mutationFn: async ({ id, role }: { id: string; role: string }) => {
@@ -483,20 +496,24 @@ function UsersView() {
         </Button>
       </div>
 
-      {/* Filters */}
+      {/* Role tabs — replaces the single dropdown filter */}
+      <Tabs value={roleFilter} onValueChange={setRoleFilter} className="mb-4">
+        <TabsList className="grid grid-cols-5 w-full max-w-2xl">
+          <TabsTrigger value="candidate">Candidates ({counts.candidate})</TabsTrigger>
+          <TabsTrigger value="agent">Agencies ({counts.agent})</TabsTrigger>
+          <TabsTrigger value="employer">Employers ({counts.employer})</TabsTrigger>
+          <TabsTrigger value="staff">Staff ({counts.staff})</TabsTrigger>
+          <TabsTrigger value="all">All ({counts.all})</TabsTrigger>
+        </TabsList>
+      </Tabs>
+
+      {/* Search (within the selected category) */}
       <div className="flex gap-2 mb-4">
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <Input placeholder="Search by username or email..." value={search}
             onChange={e => setSearch(e.target.value)} className="pl-10 rounded-lg" />
         </div>
-        <Select value={roleFilter} onValueChange={setRoleFilter}>
-          <SelectTrigger className="w-[160px] rounded-lg"><SelectValue placeholder="All Roles" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Roles</SelectItem>
-            {ROLES.map(r => <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>)}
-          </SelectContent>
-        </Select>
       </div>
 
       {isLoading ? (

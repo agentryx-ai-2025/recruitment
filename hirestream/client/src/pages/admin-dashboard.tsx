@@ -1873,44 +1873,71 @@ function UserManagementPanel() {
     employer: "bg-purple-100 text-purple-700", admin: "bg-red-100 text-red-700", superadmin: "bg-amber-100 text-amber-700",
   };
 
+  // Group by role category for separated tabs.
+  const candidates = rows.filter((u) => u.role === "candidate");
+  const agencies = rows.filter((u) => u.role === "agent");
+  const employers = rows.filter((u) => u.role === "employer");
+  const staff = rows.filter((u) => u.role === "admin" || u.role === "superadmin");
+
+  const renderTable = (data: any[]) => (
+    <div className="overflow-x-auto">
+      {data.length === 0 ? (
+        <div className="text-center py-8 text-slate-400 text-sm">No users in this category.</div>
+      ) : (
+        <table className="w-full text-sm">
+          <thead className="text-xs uppercase text-slate-500 border-b border-slate-200">
+            <tr>
+              <th className="text-left py-2 px-2">Username</th>
+              <th className="text-left py-2 px-2">Email</th>
+              <th className="text-left py-2 px-2">Role</th>
+              <th className="text-center py-2 px-2">Active</th>
+              <th className="text-left py-2 px-2">Last login</th>
+              <th className="text-right py-2 px-2">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {data.map((u) => (
+              <tr key={u.id} className="border-b border-slate-100">
+                <td className="py-2 px-2 font-medium text-slate-900">{u.username}</td>
+                <td className="py-2 px-2 text-slate-600">{u.email}</td>
+                <td className="py-2 px-2"><Badge className={`text-[10px] ${roleColor[u.role] || "bg-slate-100 text-slate-700"}`}>{u.role}</Badge></td>
+                <td className="py-2 px-2 text-center">
+                  {u.isActive ? <CheckCircle className="w-4 h-4 text-emerald-500 inline" /> : <span className="text-red-500">Disabled</span>}
+                </td>
+                <td className="py-2 px-2 text-xs text-slate-500">{u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleDateString("en-IN") : "Never"}</td>
+                <td className="py-2 px-2 text-right">
+                  <Button size="sm" variant="outline" onClick={() => toggle.mutate(u.id)}>
+                    {u.isActive ? "Disable" : "Enable"}
+                  </Button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
+
   return (
     <div className="space-y-3">
       <div className="bg-white rounded-xl border border-slate-200 p-5">
         <h3 className="text-sm font-bold text-slate-900 mb-3 flex items-center gap-2">
           <Users className="w-4 h-4 text-blue-600" /> Users ({rows.length})
         </h3>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="text-xs uppercase text-slate-500 border-b border-slate-200">
-              <tr>
-                <th className="text-left py-2 px-2">Username</th>
-                <th className="text-left py-2 px-2">Email</th>
-                <th className="text-left py-2 px-2">Role</th>
-                <th className="text-center py-2 px-2">Active</th>
-                <th className="text-left py-2 px-2">Last login</th>
-                <th className="text-right py-2 px-2">Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((u) => (
-                <tr key={u.id} className="border-b border-slate-100">
-                  <td className="py-2 px-2 font-medium text-slate-900">{u.username}</td>
-                  <td className="py-2 px-2 text-slate-600">{u.email}</td>
-                  <td className="py-2 px-2"><Badge className={`text-[10px] ${roleColor[u.role] || "bg-slate-100 text-slate-700"}`}>{u.role}</Badge></td>
-                  <td className="py-2 px-2 text-center">
-                    {u.isActive ? <CheckCircle className="w-4 h-4 text-emerald-500 inline" /> : <span className="text-red-500">Disabled</span>}
-                  </td>
-                  <td className="py-2 px-2 text-xs text-slate-500">{u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleDateString("en-IN") : "Never"}</td>
-                  <td className="py-2 px-2 text-right">
-                    <Button size="sm" variant="outline" onClick={() => toggle.mutate(u.id)}>
-                      {u.isActive ? "Disable" : "Enable"}
-                    </Button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <Tabs defaultValue="candidates">
+          <TabsList className="grid grid-cols-5 w-full max-w-2xl">
+            <TabsTrigger value="candidates">Candidates ({candidates.length})</TabsTrigger>
+            <TabsTrigger value="agencies">Agencies ({agencies.length})</TabsTrigger>
+            <TabsTrigger value="employers">Employers ({employers.length})</TabsTrigger>
+            <TabsTrigger value="staff">Staff ({staff.length})</TabsTrigger>
+            <TabsTrigger value="all">All ({rows.length})</TabsTrigger>
+          </TabsList>
+          <TabsContent value="candidates" className="mt-4">{renderTable(candidates)}</TabsContent>
+          <TabsContent value="agencies" className="mt-4">{renderTable(agencies)}</TabsContent>
+          <TabsContent value="employers" className="mt-4">{renderTable(employers)}</TabsContent>
+          <TabsContent value="staff" className="mt-4">{renderTable(staff)}</TabsContent>
+          <TabsContent value="all" className="mt-4">{renderTable(rows)}</TabsContent>
+        </Tabs>
       </div>
     </div>
   );
