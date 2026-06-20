@@ -20,8 +20,9 @@ import { SalaryRangePicker, EXPERIENCE_OPTIONS } from "@/components/shared/salar
 import { HiringCriteriaSection } from "@/components/shared/HiringCriteriaSection";
 
 // Keys MUST match country_info.name exactly — see country-validator.service.ts.
-// Netherlands removed (not in country_info; add via admin Countries tab + here
-// in the same release if you want to expand the destination list).
+// Full set of 18 currently-configured destinations. To add a new country,
+// admin first adds it via the Countries tab in the admin sidebar, then add
+// it here (until both forms move to DB-driven dropdown in a future release).
 const COUNTRIES = [
   { code: "Canada", flag: "🇨🇦" }, { code: "Australia", flag: "🇦🇺" },
   { code: "Germany", flag: "🇩🇪" }, { code: "United Arab Emirates", flag: "🇦🇪" },
@@ -30,6 +31,8 @@ const COUNTRIES = [
   { code: "Singapore", flag: "🇸🇬" }, { code: "Japan", flag: "🇯🇵" },
   { code: "United States of America", flag: "🇺🇸" }, { code: "Ireland", flag: "🇮🇪" },
   { code: "Qatar", flag: "🇶🇦" }, { code: "Oman", flag: "🇴🇲" },
+  { code: "Kuwait", flag: "🇰🇼" }, { code: "Bahrain", flag: "🇧🇭" },
+  { code: "Israel", flag: "🇮🇱" }, { code: "Malaysia", flag: "🇲🇾" },
 ];
 
 const COMMON_SKILLS = [
