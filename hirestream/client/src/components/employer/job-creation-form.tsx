@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,21 +19,25 @@ import { CITIES_BY_COUNTRY, FIELD_LIMITS, JOB_CATEGORIES } from "@/lib/reference
 import { SalaryRangePicker, EXPERIENCE_OPTIONS } from "@/components/shared/salary-range-picker";
 import { HiringCriteriaSection } from "@/components/shared/HiringCriteriaSection";
 
-// Keys MUST match country_info.name exactly — see country-validator.service.ts.
-// Full set of 18 currently-configured destinations. To add a new country,
-// admin first adds it via the Countries tab in the admin sidebar, then add
-// it here (until both forms move to DB-driven dropdown in a future release).
-const COUNTRIES = [
-  { code: "Canada", flag: "🇨🇦" }, { code: "Australia", flag: "🇦🇺" },
-  { code: "Germany", flag: "🇩🇪" }, { code: "United Arab Emirates", flag: "🇦🇪" },
-  { code: "United Kingdom", flag: "🇬🇧" }, { code: "New Zealand", flag: "🇳🇿" },
-  { code: "Maldives", flag: "🇲🇻" }, { code: "Saudi Arabia", flag: "🇸🇦" },
-  { code: "Singapore", flag: "🇸🇬" }, { code: "Japan", flag: "🇯🇵" },
-  { code: "United States of America", flag: "🇺🇸" }, { code: "Ireland", flag: "🇮🇪" },
-  { code: "Qatar", flag: "🇶🇦" }, { code: "Oman", flag: "🇴🇲" },
-  { code: "Kuwait", flag: "🇰🇼" }, { code: "Bahrain", flag: "🇧🇭" },
-  { code: "Israel", flag: "🇮🇱" }, { code: "Malaysia", flag: "🇲🇾" },
-];
+// Countries dropdown is DB-driven via useActiveCountries() below.
+function flagForIsoCode(code: string): string {
+  if (!code || !/^[A-Z]{2}$/.test(code.toUpperCase())) return "🌐";
+  const [a, b] = code.toUpperCase().split("");
+  const offset = 0x1F1E6 - 0x41;
+  return String.fromCodePoint(a.charCodeAt(0) + offset) + String.fromCodePoint(b.charCodeAt(0) + offset);
+}
+function useActiveCountries(): { name: string; flag: string }[] {
+  const { data } = useQuery({
+    queryKey: ["/api/v1/content/countries?activeOnly=true"],
+    queryFn: async () => {
+      const r = await fetch("/api/v1/content/countries?activeOnly=true", { credentials: "include" });
+      if (!r.ok) return { data: [] };
+      return r.json();
+    },
+    staleTime: 60_000,
+  });
+  return ((data as any)?.data ?? []).map((c: any) => ({ name: c.name, flag: flagForIsoCode(c.code) }));
+}
 
 const COMMON_SKILLS = [
   "React", "Node.js", "TypeScript", "Python", "Java", "AWS",
@@ -73,6 +77,7 @@ export function JobCreationForm({ editJob, trigger, controlledOpen, onOpenChange
   };
   const isEdit = !!editJob;
   const [skillInput, setSkillInput] = useState("");
+  const activeCountries = useActiveCountries();
   const initialCountry = editJob?.country ?? "";
   const initialLocation = editJob?.location ?? "";
   const [cityChoice, setCityChoice] = useState<string>(
@@ -262,9 +267,12 @@ export function JobCreationForm({ editJob, trigger, controlledOpen, onOpenChange
                     </div>
                   </SelectTrigger>
                   <SelectContent>
-                    {COUNTRIES.map((c) => (
-                      <SelectItem key={c.code} value={c.code}>
-                        <span className="mr-2">{c.flag}</span>{c.code}
+                    {activeCountries.length === 0 && (
+                      <div className="px-2 py-1.5 text-xs text-slate-400">Loading destinations…</div>
+                    )}
+                    {activeCountries.map((c) => (
+                      <SelectItem key={c.name} value={c.name}>
+                        <span className="mr-2">{c.flag}</span>{c.name}
                       </SelectItem>
                     ))}
                   </SelectContent>

@@ -329,13 +329,24 @@ router.post("/announcements/:id/save", protect, async (req, res, next) => {
 // climate). Public GETs; admin PUT to edit copy.
 // ═══════════════════════════════════════════════════════════════════
 
-// Public list (used by admin UI) + per-country GET keyed by ISO code OR
-// by freetext country name (job records store free-text country names).
-router.get("/countries", async (_req, res, next) => {
+// Public list (used by admin UI + by job-create dropdowns) + per-country GET
+// keyed by ISO code OR by freetext country name (job records store free-text
+// country names). `?activeOnly=true` filters to enabled rows — that's the
+// query the job-create dropdowns use; the admin Countries panel uses the
+// unfiltered list so disabled rows can still be re-enabled.
+router.get("/countries", async (req, res, next) => {
   try {
     const db = storage.db;
     if (!db) return res.status(500).json({ success: false });
-    const rows = await db.select().from(countryInfo).orderBy(countryInfo.name);
+    const activeOnly = String(req.query.activeOnly || "").toLowerCase() === "true";
+    let rows;
+    if (activeOnly) {
+      rows = await db.select().from(countryInfo)
+        .where(eq(countryInfo.isActive, true))
+        .orderBy(countryInfo.name);
+    } else {
+      rows = await db.select().from(countryInfo).orderBy(countryInfo.name);
+    }
     res.json({ success: true, data: rows });
   } catch (err) { next(err); }
 });
@@ -363,6 +374,9 @@ router.put("/countries/:code", protect, requireRole(["admin"]), async (req, res,
     const db = storage.db;
     if (!db) return res.status(500).json({ success: false });
     const code = String(req.params.code || "").toUpperCase();
+    if (!/^[A-Z]{2}$/.test(code)) {
+      return res.status(400).json({ success: false, message: "code must be a 2-letter ISO 3166 alpha-2 (e.g. NL, CH, KE)" });
+    }
     const body = req.body ?? {};
     const patch: any = { updatedAt: new Date(), updatedBy: (req.user as any)?.id };
     for (const f of ["name","embassyPhone","embassyEmail","embassyAddress","embassyWebsite",
@@ -370,6 +384,16 @@ router.put("/countries/:code", protect, requireRole(["admin"]), async (req, res,
       if (typeof body[f] === "string") patch[f] = body[f];
     }
     if (typeof body.visaTimelineDays === "number") patch.visaTimelineDays = body.visaTimelineDays;
+    if (typeof body.isActive === "boolean") patch.isActive = body.isActive;
+
+    // Guard: reject creating "India" as a destination — overseas portal scope.
+    const nameForCheck = String(patch.name ?? "").trim().toLowerCase();
+    if (nameForCheck === "india") {
+      return res.status(400).json({
+        success: false,
+        message: "HireStream is the overseas placement portal — India cannot be added as a destination country.",
+      });
+    }
 
     const [existing] = await db.select().from(countryInfo).where(eq(countryInfo.code, code)).limit(1);
     let row;
@@ -379,8 +403,27 @@ router.put("/countries/:code", protect, requireRole(["admin"]), async (req, res,
       if (!patch.name) return res.status(400).json({ success: false, message: "name required when creating" });
       [row] = await db.insert(countryInfo).values({ code, ...patch }).returning();
     }
-    // Refresh the in-memory country validator cache so the new/renamed
+    // Refresh the in-memory country validator cache so the new/renamed/toggled
     // country is immediately valid for job-create without an app restart.
+    const { loadValidCountries } = await import("../services/country-validator.service");
+    loadValidCountries().catch(() => {});
+    return res.json({ success: true, data: row });
+  } catch (err) { next(err); }
+});
+
+// Soft-disable a country (mirrors PUT with isActive=false; kept as a separate
+// endpoint for clarity in the admin UI's "Disable destination" button).
+router.delete("/countries/:code", protect, requireRole(["admin"]), async (req, res, next) => {
+  try {
+    const db = storage.db;
+    if (!db) return res.status(500).json({ success: false });
+    const code = String(req.params.code || "").toUpperCase();
+    const [row] = await db.update(countryInfo)
+      .set({ isActive: false, updatedAt: new Date(), updatedBy: (req.user as any)?.id })
+      .where(eq(countryInfo.code, code))
+      .returning();
+    if (!row) return res.status(404).json({ success: false, message: "country not found" });
+
     const { loadValidCountries } = await import("../services/country-validator.service");
     loadValidCountries().catch(() => {});
     return res.json({ success: true, data: row });

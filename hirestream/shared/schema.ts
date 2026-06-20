@@ -844,6 +844,11 @@ export const countryInfo = pgTable("country_info", {
   climateNote: text("climate_note"),         // "summer 45°C+; Ramadan work hours reduce"
   entryRequirements: text("entry_requirements"), // passport validity, police clearance, medical, etc.
   emergencyContact: text("emergency_contact"),   // MEA 24x7 helpline per region
+  // v0.7.4.0 — soft enable/disable. When false, the country is hidden from
+  // job-create dropdowns + rejected by the job-create validator, but the row
+  // (and all historical jobs/candidates referencing it) is preserved. Used to
+  // pause new postings to a destination without losing audit history.
+  isActive: boolean("is_active").notNull().default(true),
   updatedAt: timestamp("updated_at").defaultNow(),
   updatedBy: varchar("updated_by").references(() => users.id),
 });

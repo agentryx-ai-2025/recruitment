@@ -20,22 +20,33 @@
 import { storage } from "../storage";
 import { countryInfo } from "@shared/schema";
 import { logger } from "../config/logger.config";
+import { eq } from "drizzle-orm";
 
 const _names = new Set<string>();
 let _loaded = false;
 
+/**
+ * Load only ACTIVE country names. Disabled countries (is_active=false) are
+ * excluded so the validator + job-create dropdown stay in sync — disabling
+ * a country in the admin UI immediately blocks new postings to it.
+ * Historical jobs referencing a now-disabled country remain valid; only
+ * NEW create/update with that country is rejected.
+ */
 export async function loadValidCountries(): Promise<void> {
   if (!storage.db) {
     logger.warn("country-validator: skip load — no DB");
     return;
   }
-  const rows = await storage.db.select({ name: countryInfo.name }).from(countryInfo);
+  const rows = await storage.db
+    .select({ name: countryInfo.name })
+    .from(countryInfo)
+    .where(eq(countryInfo.isActive, true));
   _names.clear();
   for (const r of rows) {
     if (r.name) _names.add(String(r.name));
   }
   _loaded = true;
-  logger.info(`country-validator: loaded ${_names.size} destination countries`);
+  logger.info(`country-validator: loaded ${_names.size} active destination countries`);
 }
 
 export function isValidCountry(name: string | null | undefined): boolean {

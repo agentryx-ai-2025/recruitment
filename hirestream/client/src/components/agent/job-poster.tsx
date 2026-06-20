@@ -2,7 +2,7 @@ import { useState, forwardRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -42,22 +42,30 @@ const jobSchema = z.object({
 
 type JobFormValues = z.infer<typeof jobSchema>;
 
-// Keys MUST match country_info.name exactly — the server validator rejects
-// any country not in country_info (see server/services/country-validator.service.ts).
-// Full set of 18 currently-configured destinations. To add a new country,
-// admin first adds it via the Countries tab in the admin sidebar, then add
-// it here (until both forms move to DB-driven dropdown in a future release).
-const COUNTRIES = [
-  { code: "Canada", flag: "🇨🇦" }, { code: "Australia", flag: "🇦🇺" },
-  { code: "Germany", flag: "🇩🇪" }, { code: "United Arab Emirates", flag: "🇦🇪" },
-  { code: "United Kingdom", flag: "🇬🇧" }, { code: "New Zealand", flag: "🇳🇿" },
-  { code: "Maldives", flag: "🇲🇻" }, { code: "Saudi Arabia", flag: "🇸🇦" },
-  { code: "Singapore", flag: "🇸🇬" }, { code: "Japan", flag: "🇯🇵" },
-  { code: "United States of America", flag: "🇺🇸" }, { code: "Ireland", flag: "🇮🇪" },
-  { code: "Qatar", flag: "🇶🇦" }, { code: "Oman", flag: "🇴🇲" },
-  { code: "Kuwait", flag: "🇰🇼" }, { code: "Bahrain", flag: "🇧🇭" },
-  { code: "Israel", flag: "🇮🇱" }, { code: "Malaysia", flag: "🇲🇾" },
-];
+// Countries dropdown is DB-driven: useActiveCountries() below fetches the
+// active rows from country_info via /api/v1/content/countries?activeOnly=true.
+// Single source of truth — admin adds/disables a country in the Countries
+// admin panel, the dropdown updates within a minute (TanStack Query staleTime).
+
+function flagForIsoCode(code: string): string {
+  if (!code || !/^[A-Z]{2}$/.test(code.toUpperCase())) return "🌐";
+  const [a, b] = code.toUpperCase().split("");
+  const offset = 0x1F1E6 - 0x41;
+  return String.fromCodePoint(a.charCodeAt(0) + offset) + String.fromCodePoint(b.charCodeAt(0) + offset);
+}
+
+function useActiveCountries(): { name: string; flag: string }[] {
+  const { data } = useQuery({
+    queryKey: ["/api/v1/content/countries?activeOnly=true"],
+    queryFn: async () => {
+      const r = await fetch("/api/v1/content/countries?activeOnly=true", { credentials: "include" });
+      if (!r.ok) return { data: [] };
+      return r.json();
+    },
+    staleTime: 60_000,
+  });
+  return ((data as any)?.data ?? []).map((c: any) => ({ name: c.name, flag: flagForIsoCode(c.code) }));
+}
 
 const COMMON_SKILLS = [
   "React", "Node.js", "TypeScript", "Python", "AWS", "Docker",
@@ -96,6 +104,10 @@ export function JobPoster({ isVerified, editJob, trigger, controlledOpen, onOpen
     (editJob?.languagesRequired && typeof editJob.languagesRequired === "object") ? editJob.languagesRequired : {}
   );
 
+  // Active destinations from country_info via the API (single source of truth).
+  // If the API isn't reachable yet at first render, dropdown is briefly empty —
+  // the country field is still saved free-text; server validator rejects unknowns.
+  const activeCountries = useActiveCountries();
   const initialCountry = editJob?.country ?? "";
   const initialLocation = editJob?.location ?? "";
   const initialCityFromList =
@@ -269,9 +281,12 @@ export function JobPoster({ isVerified, editJob, trigger, controlledOpen, onOpen
                     </div>
                   </SelectTrigger>
                   <SelectContent>
-                    {COUNTRIES.map((c) => (
-                      <SelectItem key={c.code} value={c.code}>
-                        <span className="mr-2">{c.flag}</span>{c.code}
+                    {activeCountries.length === 0 && (
+                      <div className="px-2 py-1.5 text-xs text-slate-400">Loading destinations…</div>
+                    )}
+                    {activeCountries.map((c) => (
+                      <SelectItem key={c.name} value={c.name}>
+                        <span className="mr-2">{c.flag}</span>{c.name}
                       </SelectItem>
                     ))}
                   </SelectContent>

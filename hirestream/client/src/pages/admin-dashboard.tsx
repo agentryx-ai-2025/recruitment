@@ -297,28 +297,38 @@ export default function AdminDashboard() {
               </div>
 
               {/* By Country — REAL with Pie Chart */}
+              {(() => {
+                // Normalise empty / missing country into a labelled "Not specified"
+                // slice instead of an unlabelled wedge. Jobs in draft with no
+                // country are real data but should be displayed explicitly so
+                // operators can spot them.
+                const chartData = countries.map((c: any) => ({
+                  ...c,
+                  displayName: (c.country && String(c.country).trim()) ? c.country : "Not specified (drafts)",
+                }));
+                return (
               <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">Jobs by Destination Country</h3>
-                {countries.length === 0 ? (
+                {chartData.length === 0 ? (
                   <p className="text-gray-500 text-sm">No country data yet</p>
                 ) : (
                   <div className="flex items-center gap-6">
                     <ResponsiveContainer width="50%" height={200}>
                       <PieChart>
-                        <Pie data={countries.map((c: any) => ({ name: c.country, value: c.total_jobs }))}
+                        <Pie data={chartData.map((c: any) => ({ name: c.displayName, value: c.total_jobs }))}
                           dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label={(e: any) => e.name}>
-                          {countries.map((_: any, i: number) => (
-                            <Cell key={i} fill={["#3b82f6", "#10b981", "#f59e0b", "#8b5cf6", "#ef4444", "#06b6d4", "#ec4899"][i % 7]} />
+                          {chartData.map((c: any, i: number) => (
+                            <Cell key={i} fill={c.displayName.startsWith("Not specified") ? "#cbd5e1" : ["#3b82f6", "#10b981", "#f59e0b", "#8b5cf6", "#ef4444", "#06b6d4", "#ec4899"][i % 7]} />
                           ))}
                         </Pie>
                         <Tooltip />
                       </PieChart>
                     </ResponsiveContainer>
                     <div className="space-y-2">
-                      {countries.map((c: any, i: number) => (
+                      {chartData.map((c: any, i: number) => (
                         <div key={i} className="flex items-center gap-2">
-                          <div className="w-3 h-3 rounded-full" style={{ backgroundColor: ["#3b82f6", "#10b981", "#f59e0b", "#8b5cf6", "#ef4444", "#06b6d4", "#ec4899"][i % 7] }} />
-                          <span className="text-sm text-gray-700">{c.country}</span>
+                          <div className="w-3 h-3 rounded-full" style={{ backgroundColor: c.displayName.startsWith("Not specified") ? "#cbd5e1" : ["#3b82f6", "#10b981", "#f59e0b", "#8b5cf6", "#ef4444", "#06b6d4", "#ec4899"][i % 7] }} />
+                          <span className="text-sm text-gray-700">{c.displayName}</span>
                           <span className="text-xs text-gray-400">{c.total_jobs} jobs, {c.total_applications} apps</span>
                         </div>
                       ))}
@@ -326,6 +336,8 @@ export default function AdminDashboard() {
                   </div>
                 )}
               </div>
+              );
+              })()}
             </div>
 
             {/* Right — Status + Actions */}
@@ -721,6 +733,21 @@ function DuplicatesPanel() {
 }
 
 // ── Country Info Admin Panel ─────────────────────────────────────────
+// Manage the canonical list of overseas destination countries. Edit
+// per-country reference info (embassy / visa / wage / labor law / climate /
+// entry requirements), enable / disable a destination without losing
+// history, and add new countries by ISO 3166 alpha-2 code.
+//
+// Flow:
+//   * Left rail: searchable list with active / disabled badges + data-
+//     completeness pip. Click a row → load it into the edit pane.
+//   * Right pane: fields grouped into sections (Identity / Embassy /
+//     Logistics / Practical / Danger Zone) so it's not a wall of inputs.
+//   * "+ Add country" button at top of left rail opens a small modal
+//     asking only for ISO code + name → creates the row, selects it,
+//     operator fills the rest.
+//   * Disable / Re-enable button in the Danger Zone — soft toggle; jobs
+//     historically posted to a disabled country are preserved.
 function CountryInfoAdminPanel() {
   const { toast } = useToast();
   const qc = useQueryClient();
@@ -728,13 +755,59 @@ function CountryInfoAdminPanel() {
     queryKey: ["/api/v1/content/countries"],
     queryFn: () => fetchJson("/api/v1/content/countries"),
   });
-  const countries: any[] = res?.data ?? [];
-  const [selected, setSelected] = useState<string | null>(null);
-  const current = countries.find((c) => c.code === selected) ?? countries[0];
-  const [draft, setDraft] = useState<any>(null);
+  const allCountries: any[] = res?.data ?? [];
 
-  // Sync draft when selection changes
+  const [search, setSearch] = useState("");
+  const [selected, setSelected] = useState<string | null>(null);
+  const [draft, setDraft] = useState<any>(null);
+  const [addOpen, setAddOpen] = useState(false);
+  const [addForm, setAddForm] = useState<{ code: string; name: string }>({ code: "", name: "" });
+
+  // Lowercase haystack for the search filter.
+  const filtered = allCountries.filter((c) =>
+    !search
+      ? true
+      : (c.name ?? "").toLowerCase().includes(search.toLowerCase())
+        || (c.code ?? "").toLowerCase().includes(search.toLowerCase())
+  );
+
+  // Auto-select first row on first load + when selection becomes invalid.
+  React.useEffect(() => {
+    if (!selected && allCountries.length) setSelected(allCountries[0].code);
+    if (selected && !allCountries.find((c) => c.code === selected) && allCountries.length) {
+      setSelected(allCountries[0].code);
+    }
+  }, [allCountries, selected]);
+
+  const current = allCountries.find((c) => c.code === selected) ?? null;
   React.useEffect(() => { if (current) setDraft({ ...current }); }, [current?.code]);
+
+  // ─ Data-completeness pip: rough heuristic, not a hard validation ─
+  // A country is "complete" when it has all 12 reference fields filled.
+  function completenessOf(c: any): { filled: number; total: number; pct: number } {
+    if (!c) return { filled: 0, total: 12, pct: 0 };
+    const FIELDS_FOR_COMPLETENESS = [
+      "embassyPhone","embassyEmail","embassyAddress","embassyWebsite",
+      "visaTimelineDays","minWageNote","laborLawSummary","costOfLivingNote",
+      "climateNote","entryRequirements","emergencyContact",
+    ];
+    const filled = FIELDS_FOR_COMPLETENESS.filter((k) => {
+      const v = c[k];
+      if (typeof v === "number") return v > 0;
+      return typeof v === "string" && v.trim().length > 0;
+    }).length;
+    const total = FIELDS_FOR_COMPLETENESS.length + 1; // +1 for name (always present for valid rows)
+    return { filled: filled + 1, total, pct: Math.round(((filled + 1) / total) * 100) };
+  }
+
+  function flagFor(code: string): string {
+    // ISO 3166 alpha-2 → regional indicator emoji. Works for every valid
+    // 2-letter code; falls back to a globe if invalid.
+    if (!/^[A-Z]{2}$/.test(code)) return "🌐";
+    const [a, b] = code.toUpperCase().split("");
+    const offset = 0x1F1E6 - 0x41;
+    return String.fromCodePoint(a.charCodeAt(0) + offset) + String.fromCodePoint(b.charCodeAt(0) + offset);
+  }
 
   const save = useMutation({
     mutationFn: async () => {
@@ -754,52 +827,230 @@ function CountryInfoAdminPanel() {
     onError: (e: any) => toast({ title: "Couldn't save", description: e.message, variant: "destructive" }),
   });
 
-  const FIELDS: { key: string; label: string; long?: boolean }[] = [
-    { key: "name", label: "Name" },
-    { key: "embassyPhone", label: "Embassy phone" },
-    { key: "embassyEmail", label: "Embassy email" },
-    { key: "embassyAddress", label: "Embassy address" },
-    { key: "embassyWebsite", label: "Embassy website" },
-    { key: "visaTimelineDays", label: "Visa timeline (days)" },
-    { key: "minWageNote", label: "Wage & pay notes", long: true },
-    { key: "laborLawSummary", label: "Labor law summary", long: true },
-    { key: "costOfLivingNote", label: "Cost of living vs Himachal", long: true },
-    { key: "climateNote", label: "Climate & work hours", long: true },
-    { key: "entryRequirements", label: "Entry requirements", long: true },
-    { key: "emergencyContact", label: "Emergency contacts", long: true },
+  const toggleActive = useMutation({
+    mutationFn: async (nextIsActive: boolean) => {
+      const r = await fetch(`/api/v1/content/countries/${current.code}`, {
+        method: "PUT", credentials: "include",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ isActive: nextIsActive }),
+      });
+      const j = await r.json();
+      if (!j.success) throw new Error(j.message ?? "Toggle failed");
+      return j.data;
+    },
+    onSuccess: (data) => {
+      toast({ title: data.isActive ? "Destination enabled" : "Destination disabled — no new postings allowed" });
+      qc.invalidateQueries({ queryKey: ["/api/v1/content/countries"] });
+    },
+    onError: (e: any) => toast({ title: "Couldn't toggle", description: e.message, variant: "destructive" }),
+  });
+
+  const create = useMutation({
+    mutationFn: async () => {
+      const code = addForm.code.toUpperCase().trim();
+      const name = addForm.name.trim();
+      if (!/^[A-Z]{2}$/.test(code)) throw new Error("Code must be 2 uppercase letters (ISO 3166 alpha-2, e.g. NL, CH, KE).");
+      if (!name) throw new Error("Name is required.");
+      const r = await fetch(`/api/v1/content/countries/${code}`, {
+        method: "PUT", credentials: "include",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ name, isActive: true }),
+      });
+      const j = await r.json();
+      if (!j.success) throw new Error(j.message ?? "Create failed");
+      return j.data;
+    },
+    onSuccess: (data) => {
+      toast({ title: `Added ${data.name}`, description: "Fill in the embassy, visa, and labor-law details next." });
+      qc.invalidateQueries({ queryKey: ["/api/v1/content/countries"] });
+      setAddOpen(false);
+      setAddForm({ code: "", name: "" });
+      setSelected(data.code);
+    },
+    onError: (e: any) => toast({ title: "Couldn't add country", description: e.message, variant: "destructive" }),
+  });
+
+  // ─ Field groups for the edit form ─
+  const SECTIONS: { title: string; fields: { key: string; label: string; long?: boolean; placeholder?: string }[] }[] = [
+    { title: "Identity", fields: [
+      { key: "name", label: "Display name", placeholder: "e.g. United Arab Emirates" },
+    ]},
+    { title: "Indian Embassy / High Commission", fields: [
+      { key: "embassyPhone", label: "Phone", placeholder: "+971-2-4492700" },
+      { key: "embassyEmail", label: "Email", placeholder: "cons1.abudhabi@mea.gov.in" },
+      { key: "embassyAddress", label: "Address" },
+      { key: "embassyWebsite", label: "Website", placeholder: "https://www.eoiabudhabi.gov.in" },
+    ]},
+    { title: "Logistics", fields: [
+      { key: "visaTimelineDays", label: "Typical visa timeline (days)", placeholder: "30" },
+      { key: "entryRequirements", label: "Entry requirements", long: true, placeholder: "Passport 6+ months validity, medical fitness, police clearance…" },
+    ]},
+    { title: "Practical info shown to candidates", fields: [
+      { key: "minWageNote", label: "Wage & pay notes", long: true },
+      { key: "laborLawSummary", label: "Labor law summary", long: true },
+      { key: "costOfLivingNote", label: "Cost of living vs Himachal", long: true },
+      { key: "climateNote", label: "Climate & work hours", long: true },
+      { key: "emergencyContact", label: "Emergency contacts", long: true },
+    ]},
   ];
+
+  const activeCount = allCountries.filter((c) => c.isActive).length;
+  const disabledCount = allCountries.length - activeCount;
 
   return (
     <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
-      <h3 className="text-base font-semibold text-slate-900 mb-3 flex items-center gap-2">
-        <Globe className="w-4 h-4 text-blue-600" /> Country reference info
-      </h3>
-      <p className="text-xs text-slate-500 mb-4">Edit the per-country card candidates see on every overseas job (embassy contact, visa timeline, labor law, cost of living, climate, emergency contacts).</p>
-      {isLoading ? <Skeleton className="h-40 w-full" /> : (
-        <div className="grid md:grid-cols-[200px_1fr] gap-4">
-          <div className="space-y-1 max-h-96 overflow-y-auto">
-            {countries.map((c) => (
-              <button key={c.code} onClick={() => setSelected(c.code)}
-                className={`w-full text-left px-3 py-2 rounded-md text-sm ${current?.code === c.code ? "bg-blue-50 text-blue-900 font-semibold" : "hover:bg-slate-50 text-slate-700"}`}>
-                <span className="font-mono text-[10px] text-slate-400 mr-2">{c.code}</span>{c.name}
-              </button>
-            ))}
+      <div className="flex items-start justify-between mb-4 gap-3">
+        <div>
+          <h3 className="text-base font-semibold text-slate-900 flex items-center gap-2">
+            <Globe className="w-4 h-4 text-blue-600" /> Destination countries
+          </h3>
+          <p className="text-xs text-slate-500 mt-1">
+            Canonical list of overseas destinations. Edit per-country info shown to candidates; add new
+            destinations by ISO code; disable a destination to pause new postings without losing history.
+            <span className="ml-2 font-medium text-slate-700">{activeCount} active · {disabledCount} disabled</span>
+          </p>
+        </div>
+        <Button size="sm" onClick={() => setAddOpen(true)} className="bg-blue-600 hover:bg-blue-700 text-white whitespace-nowrap">
+          + Add country
+        </Button>
+      </div>
+
+      {/* Add modal */}
+      {addOpen && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-xl p-5 max-w-md w-full space-y-3">
+            <h4 className="text-sm font-bold text-slate-900">Add a new destination country</h4>
+            <p className="text-xs text-slate-500">After it's created, you'll edit the embassy, visa, wage and labor-law details. India cannot be added — this is the overseas placement portal.</p>
+            <div>
+              <label className="text-[11px] font-medium text-slate-600">ISO 3166 alpha-2 code <span className="text-red-500">*</span></label>
+              <Input value={addForm.code} onChange={(e) => setAddForm({ ...addForm, code: e.target.value.toUpperCase().slice(0, 2) })}
+                placeholder="e.g. NL, CH, KE" className="text-sm h-9 font-mono uppercase" maxLength={2} />
+              <p className="text-[10px] text-slate-400 mt-1">2 uppercase letters. Standard reference: <a href="https://en.wikipedia.org/wiki/ISO_3166-1_alpha-2" target="_blank" rel="noreferrer" className="text-blue-600 hover:underline">ISO 3166</a></p>
+            </div>
+            <div>
+              <label className="text-[11px] font-medium text-slate-600">Display name <span className="text-red-500">*</span></label>
+              <Input value={addForm.name} onChange={(e) => setAddForm({ ...addForm, name: e.target.value })}
+                placeholder="e.g. Netherlands" className="text-sm h-9" />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" size="sm" onClick={() => { setAddOpen(false); setAddForm({ code: "", name: "" }); }}>Cancel</Button>
+              <Button size="sm" onClick={() => create.mutate()} disabled={create.isPending} className="bg-blue-600 hover:bg-blue-700 text-white">
+                {create.isPending ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : null}
+                Add
+              </Button>
+            </div>
           </div>
-          {draft && (
-            <div className="space-y-3">
-              <div className="text-[10px] uppercase tracking-wide text-slate-500 font-semibold">Editing: {draft.code}</div>
-              {FIELDS.map((f) => (
-                <div key={f.key}>
-                  <label className="text-[11px] font-medium text-slate-600">{f.label}</label>
-                  {f.long
-                    ? <Textarea value={draft[f.key] ?? ""} onChange={(e) => setDraft({ ...draft, [f.key]: e.target.value })} className="text-sm" rows={2} />
-                    : <Input value={draft[f.key] ?? ""} onChange={(e) => setDraft({ ...draft, [f.key]: f.key === "visaTimelineDays" ? (parseInt(e.target.value) || 0) : e.target.value })} className="text-sm h-9" />}
+        </div>
+      )}
+
+      {isLoading ? <Skeleton className="h-96 w-full" /> : (
+        <div className="grid md:grid-cols-[260px_1fr] gap-4">
+          {/* ── Left rail: searchable country list ── */}
+          <div className="space-y-2">
+            <Input value={search} onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search…" className="text-sm h-9" />
+            <div className="space-y-0.5 max-h-[600px] overflow-y-auto -mx-1 px-1">
+              {filtered.length === 0 && (
+                <div className="text-xs text-slate-400 px-2 py-3 text-center">No countries match "{search}"</div>
+              )}
+              {filtered.map((c) => {
+                const isActive = c.isActive !== false;
+                const comp = completenessOf(c);
+                const isSelected = current?.code === c.code;
+                return (
+                  <button key={c.code} onClick={() => setSelected(c.code)}
+                    className={`w-full text-left px-2.5 py-2 rounded-lg text-sm transition-all ${
+                      isSelected
+                        ? "bg-blue-50 text-blue-900 ring-1 ring-blue-200"
+                        : "hover:bg-slate-50 text-slate-700"
+                    } ${!isActive ? "opacity-60" : ""}`}>
+                    <div className="flex items-center gap-2.5">
+                      <span className="text-lg flex-shrink-0">{flagFor(c.code)}</span>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <span className="truncate font-medium">{c.name}</span>
+                          {!isActive && (
+                            <Badge variant="outline" className="text-[9px] px-1.5 py-0 border-slate-300 text-slate-500">Off</Badge>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1 mt-0.5">
+                          <span className="font-mono text-[9px] text-slate-400">{c.code}</span>
+                          <div className="flex-1 h-1 bg-slate-100 rounded-full overflow-hidden">
+                            <div className={`h-full ${comp.pct === 100 ? "bg-emerald-400" : comp.pct >= 70 ? "bg-blue-400" : "bg-amber-400"}`} style={{ width: `${comp.pct}%` }} />
+                          </div>
+                          <span className="text-[9px] text-slate-400 tabular-nums">{comp.filled}/{comp.total}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* ── Right pane: sectioned edit form ── */}
+          {draft ? (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between bg-slate-50 rounded-lg p-3">
+                <div className="flex items-center gap-3">
+                  <span className="text-2xl">{flagFor(draft.code)}</span>
+                  <div>
+                    <div className="text-sm font-bold text-slate-900">{draft.name || "(no name yet)"}</div>
+                    <div className="font-mono text-[10px] text-slate-500">{draft.code}</div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Badge className={draft.isActive !== false ? "bg-emerald-100 text-emerald-700 border-0" : "bg-slate-200 text-slate-600 border-0"}>
+                    {draft.isActive !== false ? "Active" : "Disabled"}
+                  </Badge>
+                </div>
+              </div>
+
+              {SECTIONS.map((section) => (
+                <div key={section.title} className="border border-slate-100 rounded-lg p-3">
+                  <h4 className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-2">{section.title}</h4>
+                  <div className={`grid ${section.fields.length > 1 ? "md:grid-cols-2" : ""} gap-3`}>
+                    {section.fields.map((f) => (
+                      <div key={f.key} className={f.long ? "md:col-span-2" : ""}>
+                        <label className="text-[11px] font-medium text-slate-600">{f.label}</label>
+                        {f.long
+                          ? <Textarea value={draft[f.key] ?? ""} onChange={(e) => setDraft({ ...draft, [f.key]: e.target.value })}
+                              placeholder={f.placeholder} className="text-sm" rows={3} />
+                          : <Input value={draft[f.key] ?? ""} onChange={(e) => setDraft({ ...draft, [f.key]: f.key === "visaTimelineDays" ? (parseInt(e.target.value) || 0) : e.target.value })}
+                              placeholder={f.placeholder} className="text-sm h-9" />}
+                      </div>
+                    ))}
+                  </div>
                 </div>
               ))}
-              <Button onClick={() => save.mutate()} disabled={save.isPending} className="bg-blue-600 hover:bg-blue-700 text-white">
-                {save.isPending ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <CheckCircle className="w-4 h-4 mr-1" />}
-                Save changes
-              </Button>
+
+              <div className="flex items-center justify-between gap-3 pt-2 border-t border-slate-100">
+                <Button onClick={() => save.mutate()} disabled={save.isPending}
+                  className="bg-blue-600 hover:bg-blue-700 text-white">
+                  {save.isPending ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <CheckCircle className="w-4 h-4 mr-1.5" />}
+                  Save changes
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => toggleActive.mutate(draft.isActive === false)}
+                  disabled={toggleActive.isPending}
+                  className={draft.isActive !== false ? "border-amber-200 text-amber-700 hover:bg-amber-50" : "border-emerald-200 text-emerald-700 hover:bg-emerald-50"}>
+                  {toggleActive.isPending ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> :
+                    (draft.isActive !== false ? <XCircle className="w-3.5 h-3.5 mr-1.5" /> : <CheckCircle className="w-3.5 h-3.5 mr-1.5" />)}
+                  {draft.isActive !== false ? "Disable destination" : "Re-enable"}
+                </Button>
+              </div>
+              {draft.isActive === false && (
+                <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-md p-2">
+                  ⚠ This destination is disabled. New jobs cannot be posted to it. Historical jobs are preserved.
+                </p>
+              )}
+              {draft.updatedAt && (
+                <p className="text-[10px] text-slate-400">Last updated {new Date(draft.updatedAt).toLocaleString("en-IN")}{draft.updatedBy ? ` by ${draft.updatedBy.slice(0, 8)}` : ""}</p>
+              )}
+            </div>
+          ) : (
+            <div className="text-center py-12 text-slate-400">
+              <Globe className="w-10 h-10 mx-auto mb-3 opacity-40" />
+              <p className="text-sm">Select a country to edit, or add a new one.</p>
             </div>
           )}
         </div>
