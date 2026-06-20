@@ -71,7 +71,7 @@ describe('Phase 5 — Job lifecycle cron (PWS §4)', () => {
       ? new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0]
       : null;
     const res = await request(app).post('/api/v1/jobs').set('Cookie', agentCookie).send({
-      title: 'Lifecycle test', company: 'LifeCo', location: 'Dubai', country: 'UAE',
+      title: 'Lifecycle test', company: 'LifeCo', location: 'Dubai', country: 'United Arab Emirates',
       description: 'lifecycle', experience: 1, requirements: [], skills: ['Test'],
       ...(futureDeadline ? { hiringDeadline: futureDeadline } : {}),
     });

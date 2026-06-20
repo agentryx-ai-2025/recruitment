@@ -131,6 +131,37 @@ export async function truncateAllTables(): Promise<void> {
       users
     CASCADE
   `);
+
+  // TRUNCATE users CASCADE wipes country_info too (because country_info
+  // has a FK on updated_by → users.id). Re-seed the destinations tests
+  // actually use, then reload the country validator's in-memory cache.
+  // Without this, every job-create with a country fails as UNKNOWN_COUNTRY.
+  const { countryInfo } = await import('../shared/schema');
+  const { loadValidCountries } = await import('../server/services/country-validator.service');
+  const TEST_COUNTRIES = [
+    { code: 'AE', name: 'United Arab Emirates' },
+    { code: 'GB', name: 'United Kingdom' },
+    { code: 'US', name: 'United States of America' },
+    { code: 'CA', name: 'Canada' },
+    { code: 'DE', name: 'Germany' },
+    { code: 'SA', name: 'Saudi Arabia' },
+    { code: 'QA', name: 'Qatar' },
+    { code: 'OM', name: 'Oman' },
+    { code: 'KW', name: 'Kuwait' },
+    { code: 'BH', name: 'Bahrain' },
+    { code: 'SG', name: 'Singapore' },
+    { code: 'AU', name: 'Australia' },
+    { code: 'NZ', name: 'New Zealand' },
+    { code: 'JP', name: 'Japan' },
+    { code: 'MY', name: 'Malaysia' },
+    { code: 'IL', name: 'Israel' },
+    { code: 'MV', name: 'Maldives' },
+    { code: 'IE', name: 'Ireland' },
+  ];
+  for (const c of TEST_COUNTRIES) {
+    await db.insert(countryInfo).values({ code: c.code, name: c.name, isActive: true }).onConflictDoNothing();
+  }
+  await loadValidCountries();
 }
 
 /**

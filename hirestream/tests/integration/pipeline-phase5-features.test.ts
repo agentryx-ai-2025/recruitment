@@ -58,7 +58,7 @@ beforeEach(async () => {
 describe('Phase 5 — Clone job (PWS §7.15)', () => {
   it('clone creates a new draft with copied fields', async () => {
     const src = await request(app).post('/api/v1/jobs').set('Cookie', agentCookie).send({
-      title: 'Original', company: 'SrcCo', location: 'Dubai', country: 'UAE',
+      title: 'Original', company: 'SrcCo', location: 'Dubai', country: 'United Arab Emirates',
       description: 'original description', experience: 3, requirements: [], skills: ['Nursing'],
     });
     const srcId = src.body.data.id;
@@ -77,7 +77,7 @@ describe('Phase 5 — Clone job (PWS §7.15)', () => {
   it('agent cannot clone another agent\'s job', async () => {
     const otherCookie = await makeAgent('ag-p5b-other@test.com', 'LIC-P5B-OTHER');
     const src = await request(app).post('/api/v1/jobs').set('Cookie', otherCookie).send({
-      title: 'Private', company: 'PrivCo', location: 'Dubai', country: 'UAE',
+      title: 'Private', company: 'PrivCo', location: 'Dubai', country: 'United Arab Emirates',
       description: 'private', experience: 1, requirements: [], skills: ['X'],
     });
     const clone = await request(app).post(`/api/v1/jobs/${src.body.data.id}/clone`).set('Cookie', agentCookie);
@@ -86,7 +86,7 @@ describe('Phase 5 — Clone job (PWS §7.15)', () => {
 
   it('cloning an employer requisition preserves visibility=agents_only', async () => {
     const req = await request(app).post('/api/v1/jobs').set('Cookie', employerCookie).send({
-      title: 'Requisition', company: 'EmpCo', location: 'London', country: 'UK',
+      title: 'Requisition', company: 'EmpCo', location: 'London', country: 'United Kingdom',
       description: 'req desc', experience: 2, requirements: [], skills: ['ICU'],
     });
     const clone = await request(app).post(`/api/v1/jobs/${req.body.data.id}/clone`).set('Cookie', employerCookie);
@@ -134,7 +134,7 @@ describe('Phase 5 — Draft cap (PWS §7.18)', () => {
     // Publish 5 full jobs
     for (let i = 0; i < 5; i++) {
       await request(app).post('/api/v1/jobs').set('Cookie', agentCookie).send({
-        title: `Published ${i}`, company: 'Co', location: 'Dubai', country: 'UAE',
+        title: `Published ${i}`, company: 'Co', location: 'Dubai', country: 'United Arab Emirates',
         description: 'ok', experience: 1, requirements: [], skills: ['x'], isDraft: false,
       });
     }

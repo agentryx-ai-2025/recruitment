@@ -85,7 +85,7 @@ describe('Phase 1 — Data model foundation (PWS §2)', () => {
         title: 'Schema test job',
         company: 'Test Co',
         location: 'Dubai',
-        country: 'UAE',
+        country: 'United Arab Emirates',
       }).returning();
       expect(job.visibility).toBe('public');
       expect(job.parentRequisitionId).toBeNull();
@@ -217,7 +217,7 @@ describe('Phase 1 — Regression: existing routes still work', () => {
       title: 'Regression job',
       company: 'Regression Co',
       location: 'Dubai',
-      country: 'UAE',
+      country: 'United Arab Emirates',
       description: 'A regression test job to confirm default visibility survives the migration.',
       experience: 2,
       requirements: [],

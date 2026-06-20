@@ -171,7 +171,7 @@ describe('Phase 3 — Integration: status change fires events', () => {
       .send({ fullName: 'Full Cand', email: 'cand-full@test.com', skills: ['Nursing'], experience: 3, preferredCountries: ['UK'] });
 
     const jobRes = await request(app).post('/api/v1/jobs').set('Cookie', agentCookie).send({
-      title: 'Full Nurse', company: 'FullCo', location: 'London', country: 'UK',
+      title: 'Full Nurse', company: 'FullCo', location: 'London', country: 'United Kingdom',
       description: 'Full test job for integration', experience: 2, requirements: [], skills: ['Nursing'],
     });
     const jobId = jobRes.body.data.id;

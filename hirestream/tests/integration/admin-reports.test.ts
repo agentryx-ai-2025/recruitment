@@ -43,7 +43,7 @@ beforeEach(async () => {
 
   // Create job + apply
   const job = await request(app).post('/api/v1/jobs').set('Cookie', agentCookie)
-    .send({ title: 'Dev', company: 'TechCorp', location: 'Dubai', country: 'UAE', skills: ['React'], experience: 2 });
+    .send({ title: 'Dev', company: 'TechCorp', location: 'Dubai', country: 'United Arab Emirates', skills: ['React'], experience: 2 });
   await request(app).post(`/api/v1/jobs/${job.body.data.id}/apply`).set('Cookie', candidateCookie);
 });
 

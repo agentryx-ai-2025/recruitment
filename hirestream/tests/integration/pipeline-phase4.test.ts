@@ -95,7 +95,7 @@ beforeEach(async () => {
 
   // Employer posts a requisition
   const reqRes = await request(app).post('/api/v1/jobs').set('Cookie', employerCookie).send({
-    title: 'Phase 4 Nurse', company: 'RoyalHealth PLC', location: 'London', country: 'UK',
+    title: 'Phase 4 Nurse', company: 'RoyalHealth PLC', location: 'London', country: 'United Kingdom',
     description: 'Cascade test requisition', experience: 2, requirements: [], skills: ['Nursing'],
   });
   requisitionId = reqRes.body.data.id;

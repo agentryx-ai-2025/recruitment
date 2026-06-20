@@ -45,7 +45,7 @@ beforeEach(async () => {
   const jobRes = await request(app)
     .post('/api/v1/jobs')
     .set('Cookie', agentCookie)
-    .send({ title: 'Dev', company: 'Corp', location: 'Dubai', country: 'UAE', skills: ['React', 'Node.js'], experience: 2 });
+    .send({ title: 'Dev', company: 'Corp', location: 'Dubai', country: 'United Arab Emirates', skills: ['React', 'Node.js'], experience: 2 });
   jobId = jobRes.body.data.id;
 });
 
@@ -152,11 +152,11 @@ describe('GET /api/v1/applications/recommendations/for-me', () => {
   it('returns recommended jobs sorted by match score', async () => {
     // Create multiple jobs
     await request(app).post('/api/v1/jobs').set('Cookie', agentCookie)
-      .send({ title: 'React Dev', company: 'AlphaCo', location: 'Dubai', country: 'UAE', skills: ['React'], experience: 2 });
+      .send({ title: 'React Dev', company: 'AlphaCo', location: 'Dubai', country: 'United Arab Emirates', skills: ['React'], experience: 2 });
     await request(app).post('/api/v1/jobs').set('Cookie', agentCookie)
       .send({ title: 'Python Dev', company: 'BetaCo', location: 'Ottawa', country: 'Canada', skills: ['Python'], experience: 5 });
     await request(app).post('/api/v1/jobs').set('Cookie', agentCookie)
-      .send({ title: 'Full Stack', company: 'GammaCo', location: 'Abu Dhabi', country: 'UAE', skills: ['React', 'Node.js'], experience: 3 });
+      .send({ title: 'Full Stack', company: 'GammaCo', location: 'Abu Dhabi', country: 'United Arab Emirates', skills: ['React', 'Node.js'], experience: 3 });
 
     const res = await request(app)
       .get('/api/v1/applications/recommendations/for-me')
@@ -183,7 +183,7 @@ describe('GET /api/v1/applications/recommendations/for-me', () => {
 
     // Create another job
     await request(app).post('/api/v1/jobs').set('Cookie', agentCookie)
-      .send({ title: 'New Job', company: 'DeltaCo', location: 'Dubai', country: 'UAE', skills: ['React'], experience: 1 });
+      .send({ title: 'New Job', company: 'DeltaCo', location: 'Dubai', country: 'United Arab Emirates', skills: ['React'], experience: 1 });
 
     const res = await request(app)
       .get('/api/v1/applications/recommendations/for-me')
@@ -481,14 +481,14 @@ describe('GET /api/v1/agent/placements — employer derivative scope', () => {
 
     const reqRes = await request(app).post('/api/v1/jobs')
       .set('Cookie', empCookie)
-      .send({ title: 'Reactor', company: 'EmpCo', location: 'Dubai', country: 'UAE', skills: ['React'], experience: 1 });
+      .send({ title: 'Reactor', company: 'EmpCo', location: 'Dubai', country: 'United Arab Emirates', skills: ['React'], experience: 1 });
     const requisitionId = reqRes.body.data.id;
 
     // Agent picks up the requisition → derivative job (employer_id NULL on the derivative)
     const derivRes = await request(app).post('/api/v1/jobs')
       .set('Cookie', agentCookie)
       .send({
-        title: 'Reactor (Picked)', company: 'EmpCo', location: 'Dubai', country: 'UAE',
+        title: 'Reactor (Picked)', company: 'EmpCo', location: 'Dubai', country: 'United Arab Emirates',
         skills: ['React'], experience: 1, parentRequisitionId: requisitionId,
       });
     const derivJobId = derivRes.body.data.id;

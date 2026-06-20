@@ -135,7 +135,7 @@ describe('HPSEDC Item 8 — job category', () => {
     title: 'Welder',
     company: 'Acme Overseas',
     location: 'Dubai',
-    country: 'UAE',
+    country: 'United Arab Emirates',
     description: 'Welding offshore platforms',
     experience: 2,
     skills: ['Welding'],

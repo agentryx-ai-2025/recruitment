@@ -53,7 +53,7 @@ async function createJob(cookie: string[], overrides: any = {}) {
       title: 'Software Developer',
       company: 'TechCorp',
       location: 'Dubai',
-      country: 'UAE',
+      country: 'United Arab Emirates',
       salary: '3000 USD',
       description: 'Full stack developer needed',
       skills: ['React', 'Node.js'],
@@ -87,9 +87,9 @@ describe('POST /api/v1/jobs', () => {
 
 describe('GET /api/v1/jobs', () => {
   beforeEach(async () => {
-    await createJob(agentCookie, { title: 'React Developer', country: 'UAE', skills: ['React'] });
+    await createJob(agentCookie, { title: 'React Developer', country: 'United Arab Emirates', skills: ['React'] });
     await createJob(agentCookie, { title: 'Python Engineer', country: 'Canada', skills: ['Python'] });
-    await createJob(agentCookie, { title: 'Node.js Backend', country: 'UAE', skills: ['Node.js'] });
+    await createJob(agentCookie, { title: 'Node.js Backend', country: 'United Arab Emirates', skills: ['Node.js'] });
   });
 
   it('returns all active jobs', async () => {
@@ -251,7 +251,7 @@ describe('POST /api/v1/jobs/:id/apply', () => {
 
   it('calculates real match score (not random)', async () => {
     // Candidate has skills: ['React', 'Node.js'], exp: 3, preferred: ['UAE']
-    // Job has skills: ['React', 'Node.js'], exp: 2, country: 'UAE'
+    // Job has skills: ['React', 'Node.js'], exp: 2, country: 'United Arab Emirates'
     // Expected: 50 (skill) + 30 (exp) + 20 (country) = 100
     const created = await createJob(agentCookie);
     const res = await request(app)

@@ -84,7 +84,7 @@ beforeEach(async () => {
 
 async function postRequisition(): Promise<string> {
   const r = await request(app).post('/api/v1/jobs').set('Cookie', employerCookie).send({
-    title: 'ICU Nurse', company: 'NHS', location: 'London', country: 'UK',
+    title: 'ICU Nurse', company: 'NHS', location: 'London', country: 'United Kingdom',
     skills: ['Nursing'], experience: 2, category: 'caregiver', targetHires: 2,
     description: 'NHS ICU role.',
   });
@@ -96,7 +96,7 @@ async function pickup(agentCookie: string[], requisitionId: string): Promise<str
   // Pickup is modelled as the agent creating a derivative job with
   // parentRequisitionId. Matches the seed-time mechanic in pipeline-phase2.
   const r = await request(app).post('/api/v1/jobs').set('Cookie', agentCookie).send({
-    title: 'ICU Nurse (Picked)', company: 'NHS', location: 'London', country: 'UK',
+    title: 'ICU Nurse (Picked)', company: 'NHS', location: 'London', country: 'United Kingdom',
     skills: ['Nursing'], experience: 2, category: 'caregiver',
     description: 'Derivative job.',
     parentRequisitionId: requisitionId,

@@ -134,7 +134,7 @@ describe('M3: Job Management', () => {
         title: "Software Engineer",
         company: "Tech Corp",
         location: "Dubai",
-        country: "UAE",
+        country: "United Arab Emirates",
         salary: "Open"
       });
     
@@ -154,7 +154,7 @@ describe('M3: Job Management', () => {
         title: "Software Engineer",
         company: "Tech Corp",
         location: "Dubai",
-        country: "UAE",
+        country: "United Arab Emirates",
         salary: "$5000",
       });
     

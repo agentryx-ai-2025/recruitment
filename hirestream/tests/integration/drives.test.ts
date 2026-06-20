@@ -169,7 +169,7 @@ describe('POST /api/v1/drives/:driveId/interviews', () => {
     await request(app).patch(`/api/v1/drives/${drive.body.data.id}/approve`).set('Cookie', adminCookie);
 
     const job = await request(app).post('/api/v1/jobs').set('Cookie', agentCookie)
-      .send({ title: 'Dev', company: 'Corp', location: 'Dubai', country: 'UAE', skills: ['React'], experience: 2 });
+      .send({ title: 'Dev', company: 'Corp', location: 'Dubai', country: 'United Arab Emirates', skills: ['React'], experience: 2 });
 
     const app1 = await request(app).post(`/api/v1/jobs/${job.body.data.id}/apply`).set('Cookie', candidateCookie);
 
@@ -189,7 +189,7 @@ describe('PATCH /api/v1/drives/interviews/:id/result', () => {
     await request(app).patch(`/api/v1/drives/${drive.body.data.id}/approve`).set('Cookie', adminCookie);
 
     const job = await request(app).post('/api/v1/jobs').set('Cookie', agentCookie)
-      .send({ title: 'Dev', company: 'Corp', location: 'Dubai', country: 'UAE', skills: ['React'], experience: 2 });
+      .send({ title: 'Dev', company: 'Corp', location: 'Dubai', country: 'United Arab Emirates', skills: ['React'], experience: 2 });
 
     const appRes = await request(app).post(`/api/v1/jobs/${job.body.data.id}/apply`).set('Cookie', candidateCookie);
 
@@ -225,7 +225,7 @@ describe('POST /api/v1/drives/placements', () => {
     await request(app).patch(`/api/v1/drives/${drive.body.data.id}/approve`).set('Cookie', adminCookie);
 
     const job = await request(app).post('/api/v1/jobs').set('Cookie', agentCookie)
-      .send({ title: 'Dev', company: 'Corp', location: 'Dubai', country: 'UAE', skills: ['React'], experience: 2 });
+      .send({ title: 'Dev', company: 'Corp', location: 'Dubai', country: 'United Arab Emirates', skills: ['React'], experience: 2 });
 
     const appRes = await request(app).post(`/api/v1/jobs/${job.body.data.id}/apply`).set('Cookie', candidateCookie);
 
@@ -238,7 +238,7 @@ describe('POST /api/v1/drives/placements', () => {
     // Now create placement
     const res = await request(app).post('/api/v1/drives/placements')
       .set('Cookie', agentCookie)
-      .send({ applicationId: appRes.body.data.id, country: 'UAE', salary: '3000 USD', startDate: '2026-06-01' });
+      .send({ applicationId: appRes.body.data.id, country: 'United Arab Emirates', salary: '3000 USD', startDate: '2026-06-01' });
 
     expect(res.status).toBe(201);
     expect(res.body.data.status).toBe('offered');
@@ -247,12 +247,12 @@ describe('POST /api/v1/drives/placements', () => {
 
   it('rejects placement for non-selected application → 400', async () => {
     const job = await request(app).post('/api/v1/jobs').set('Cookie', agentCookie)
-      .send({ title: 'Dev', company: 'Corp', location: 'Dubai', country: 'UAE', skills: ['React'], experience: 2 });
+      .send({ title: 'Dev', company: 'Corp', location: 'Dubai', country: 'United Arab Emirates', skills: ['React'], experience: 2 });
     const appRes = await request(app).post(`/api/v1/jobs/${job.body.data.id}/apply`).set('Cookie', candidateCookie);
 
     const res = await request(app).post('/api/v1/drives/placements')
       .set('Cookie', agentCookie)
-      .send({ applicationId: appRes.body.data.id, country: 'UAE' });
+      .send({ applicationId: appRes.body.data.id, country: 'United Arab Emirates' });
 
     expect(res.status).toBe(400);
   });
@@ -264,14 +264,14 @@ describe('PATCH /api/v1/drives/placements/:id/accept', () => {
     const drive = await createDrive(agentCookie);
     await request(app).patch(`/api/v1/drives/${drive.body.data.id}/approve`).set('Cookie', adminCookie);
     const job = await request(app).post('/api/v1/jobs').set('Cookie', agentCookie)
-      .send({ title: 'Dev', company: 'Corp', location: 'Dubai', country: 'UAE', skills: ['React'], experience: 2 });
+      .send({ title: 'Dev', company: 'Corp', location: 'Dubai', country: 'United Arab Emirates', skills: ['React'], experience: 2 });
     const appRes = await request(app).post(`/api/v1/jobs/${job.body.data.id}/apply`).set('Cookie', candidateCookie);
     const interview = await request(app).post(`/api/v1/drives/${drive.body.data.id}/interviews`)
       .set('Cookie', agentCookie).send({ applicationId: appRes.body.data.id, scheduledAt: '2026-05-01T14:00:00Z' });
     await request(app).patch(`/api/v1/drives/interviews/${interview.body.data.id}/result`)
       .set('Cookie', agentCookie).send({ result: 'selected' });
     const placement = await request(app).post('/api/v1/drives/placements').set('Cookie', agentCookie)
-      .send({ applicationId: appRes.body.data.id, country: 'UAE' });
+      .send({ applicationId: appRes.body.data.id, country: 'United Arab Emirates' });
 
     // Accept
     const res = await request(app).patch(`/api/v1/drives/placements/${placement.body.data.id}/accept`)
@@ -288,14 +288,14 @@ describe('PATCH /api/v1/drives/placements/:id/decline', () => {
     const drive = await createDrive(agentCookie);
     await request(app).patch(`/api/v1/drives/${drive.body.data.id}/approve`).set('Cookie', adminCookie);
     const job = await request(app).post('/api/v1/jobs').set('Cookie', agentCookie)
-      .send({ title: 'Dev', company: 'Corp', location: 'Dubai', country: 'UAE', skills: ['React'], experience: 2 });
+      .send({ title: 'Dev', company: 'Corp', location: 'Dubai', country: 'United Arab Emirates', skills: ['React'], experience: 2 });
     const appRes = await request(app).post(`/api/v1/jobs/${job.body.data.id}/apply`).set('Cookie', candidateCookie);
     const interview = await request(app).post(`/api/v1/drives/${drive.body.data.id}/interviews`)
       .set('Cookie', agentCookie).send({ applicationId: appRes.body.data.id, scheduledAt: '2026-05-01T14:00:00Z' });
     await request(app).patch(`/api/v1/drives/interviews/${interview.body.data.id}/result`)
       .set('Cookie', agentCookie).send({ result: 'selected' });
     const placement = await request(app).post('/api/v1/drives/placements').set('Cookie', agentCookie)
-      .send({ applicationId: appRes.body.data.id, country: 'UAE' });
+      .send({ applicationId: appRes.body.data.id, country: 'United Arab Emirates' });
 
     const res = await request(app).patch(`/api/v1/drives/placements/${placement.body.data.id}/decline`)
       .set('Cookie', candidateCookie)
@@ -332,7 +332,7 @@ describe('v0.4.17 IDOR guards on drive.routes', () => {
     const drive = await createDrive(agentCookie);
     await request(app).patch(`/api/v1/drives/${drive.body.data.id}/approve`).set('Cookie', adminCookie);
     const job = await request(app).post('/api/v1/jobs').set('Cookie', agentCookie)
-      .send({ title: 'Dev', company: 'Corp', location: 'Dubai', country: 'UAE', skills: ['React'], experience: 2 });
+      .send({ title: 'Dev', company: 'Corp', location: 'Dubai', country: 'United Arab Emirates', skills: ['React'], experience: 2 });
     const appRes = await request(app).post(`/api/v1/jobs/${job.body.data.id}/apply`).set('Cookie', candidateCookie);
     return { driveId: drive.body.data.id, appId: appRes.body.data.id };
   }
@@ -378,7 +378,7 @@ describe('v0.4.17 IDOR guards on drive.routes', () => {
 
     const res = await request(app).post('/api/v1/drives/placements')
       .set('Cookie', otherAgent)
-      .send({ applicationId: appId, country: 'UAE' });
+      .send({ applicationId: appId, country: 'United Arab Emirates' });
     expect(res.status).toBe(403);
   });
 
@@ -390,7 +390,7 @@ describe('v0.4.17 IDOR guards on drive.routes', () => {
     await request(app).patch(`/api/v1/drives/interviews/${iv.body.data.id}/result`)
       .set('Cookie', agentCookie).send({ result: 'selected' });
     const placement = await request(app).post('/api/v1/drives/placements')
-      .set('Cookie', agentCookie).send({ applicationId: appId, country: 'UAE' });
+      .set('Cookie', agentCookie).send({ applicationId: appId, country: 'United Arab Emirates' });
 
     // Register a totally unrelated candidate and try to read the placement
     const stranger = await request(app).post('/api/v1/auth/register')
@@ -410,7 +410,7 @@ describe('v0.4.17 IDOR guards on drive.routes', () => {
     await request(app).patch(`/api/v1/drives/interviews/${iv.body.data.id}/result`)
       .set('Cookie', agentCookie).send({ result: 'selected' });
     const placement = await request(app).post('/api/v1/drives/placements')
-      .set('Cookie', agentCookie).send({ applicationId: appId, country: 'UAE' });
+      .set('Cookie', agentCookie).send({ applicationId: appId, country: 'United Arab Emirates' });
 
     const res = await request(app).get(`/api/v1/drives/placements/${placement.body.data.id}`)
       .set('Cookie', candidateCookie);

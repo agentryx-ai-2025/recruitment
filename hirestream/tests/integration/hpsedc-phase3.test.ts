@@ -155,7 +155,7 @@ describe('Phase 3 — 7-factor scoring on the v2 engine', () => {
 
 describe('Phase 3 — IELTS-country language routing', () => {
   it('UK job uses IELTS scoring (candidate 7.0 vs required 6.0 → full marks)', async () => {
-    const job = await postJob({ country: 'UK', requiredIeltsBand: '6.0' });
+    const job = await postJob({ country: 'United Kingdom', requiredIeltsBand: '6.0' });
     const apply = await request(app).post(`/api/v1/jobs/${job.id}/apply`).set('Cookie', candidateCookie);
     const detail = await request(app).get(`/api/v1/applications/${apply.body.data.id}`).set('Cookie', candidateCookie);
     const lang = detail.body.data.scoreBreakdown.language;
@@ -166,7 +166,7 @@ describe('Phase 3 — IELTS-country language routing', () => {
   it('UK job, candidate one band below required → half marks', async () => {
     const db = getDb();
     await db.execute(sql`UPDATE candidates SET ielts_band = '5.0' WHERE user_id = ${candidateUserId}`);
-    const job = await postJob({ country: 'UK', requiredIeltsBand: '6.0' });
+    const job = await postJob({ country: 'United Kingdom', requiredIeltsBand: '6.0' });
     const apply = await request(app).post(`/api/v1/jobs/${job.id}/apply`).set('Cookie', candidateCookie);
     const detail = await request(app).get(`/api/v1/applications/${apply.body.data.id}`).set('Cookie', candidateCookie);
     const lang = detail.body.data.scoreBreakdown.language;
@@ -174,7 +174,7 @@ describe('Phase 3 — IELTS-country language routing', () => {
   });
 
   it('UAE (non-IELTS) job uses CEFR (candidate English C1 vs required B2 → full)', async () => {
-    const job = await postJob({ country: 'UAE', languagesRequired: { english: 'B2' } });
+    const job = await postJob({ country: 'United Arab Emirates', languagesRequired: { english: 'B2' } });
     const apply = await request(app).post(`/api/v1/jobs/${job.id}/apply`).set('Cookie', candidateCookie);
     const detail = await request(app).get(`/api/v1/applications/${apply.body.data.id}`).set('Cookie', candidateCookie);
     const lang = detail.body.data.scoreBreakdown.language;
@@ -185,7 +185,7 @@ describe('Phase 3 — IELTS-country language routing', () => {
   it('IELTS job requires a band but candidate has none → ZERO (candidate-missing policy)', async () => {
     const db = getDb();
     await db.execute(sql`UPDATE candidates SET ielts_band = NULL WHERE user_id = ${candidateUserId}`);
-    const job = await postJob({ country: 'UK', requiredIeltsBand: '6.0' });
+    const job = await postJob({ country: 'United Kingdom', requiredIeltsBand: '6.0' });
     const apply = await request(app).post(`/api/v1/jobs/${job.id}/apply`).set('Cookie', candidateCookie);
     const detail = await request(app).get(`/api/v1/applications/${apply.body.data.id}`).set('Cookie', candidateCookie);
     const lang = detail.body.data.scoreBreakdown.language;
@@ -196,7 +196,7 @@ describe('Phase 3 — IELTS-country language routing', () => {
   it('IELTS country, job did NOT set a band, candidate has none → FULL (job-missing policy, both-missing → job-side wins)', async () => {
     const db = getDb();
     await db.execute(sql`UPDATE candidates SET ielts_band = NULL WHERE user_id = ${candidateUserId}`);
-    const job = await postJob({ country: 'UK' });  // no requiredIeltsBand
+    const job = await postJob({ country: 'United Kingdom' });  // no requiredIeltsBand
     const apply = await request(app).post(`/api/v1/jobs/${job.id}/apply`).set('Cookie', candidateCookie);
     const detail = await request(app).get(`/api/v1/applications/${apply.body.data.id}`).set('Cookie', candidateCookie);
     const lang = detail.body.data.scoreBreakdown.language;
@@ -219,7 +219,7 @@ describe('Phase 3 — IELTS-country language routing', () => {
       } });
     const db = getDb();
     await db.execute(sql`UPDATE candidates SET ielts_band = NULL WHERE user_id = ${candidateUserId}`);
-    const job = await postJob({ country: 'UK', requiredIeltsBand: '6.0' });
+    const job = await postJob({ country: 'United Kingdom', requiredIeltsBand: '6.0' });
     const apply = await request(app).post(`/api/v1/jobs/${job.id}/apply`).set('Cookie', candidateCookie);
     const detail = await request(app).get(`/api/v1/applications/${apply.body.data.id}`).set('Cookie', candidateCookie);
     const lang = detail.body.data.scoreBreakdown.language;

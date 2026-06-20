@@ -88,7 +88,7 @@ beforeEach(async () => {
     title: 'ICU Nurse',
     company: 'Royal London Hospital',
     location: 'London',
-    country: 'UK',
+    country: 'United Kingdom',
     description: 'NHS ICU position with visa sponsorship and accommodation.',
     experience: 2,
     targetHires: 3,
@@ -108,7 +108,7 @@ describe('Phase 2 — Auto-visibility on create (PWS §3)', () => {
 
   it('agent-posted job is stored as visibility=public', async () => {
     const res = await request(app).post('/api/v1/jobs').set('Cookie', agentCookie).send({
-      title: 'Dubai Welder', company: 'GulfOps Ltd', location: 'Dubai', country: 'UAE',
+      title: 'Dubai Welder', company: 'GulfOps Ltd', location: 'Dubai', country: 'United Arab Emirates',
       description: 'Gulf welding role', experience: 3, requirements: [], skills: ['Welding'],
     });
     expect(res.status).toBeLessThan(300);
@@ -228,7 +228,7 @@ describe('Phase 2 — Pinned-only pairing mode (PWS §7)', () => {
 describe('Phase 2 — Pickup guards (PWS §2)', () => {
   it('cannot pick up a job that is not agents_only (i.e. an already-public agent job)', async () => {
     const postRes = await request(app).post('/api/v1/jobs').set('Cookie', agentCookie).send({
-      title: 'Standalone Job', company: 'DirectCo', location: 'Dubai', country: 'UAE',
+      title: 'Standalone Job', company: 'DirectCo', location: 'Dubai', country: 'United Arab Emirates',
       description: 'Agent sourced demand', experience: 2, requirements: [], skills: ['x'],
     });
     const pick = await request(app).post(`/api/v1/agent/requisitions/${postRes.body.data.id}/pickup`).set('Cookie', agentTwoCookie);

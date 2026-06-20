@@ -57,7 +57,7 @@ beforeEach(async () => {
 
   // Job + application + interview
   const jobRes = await request(app).post('/api/v1/jobs').set('Cookie', agentCookie).send({
-    title: 'Engineer', company: 'Co', location: 'Dubai', country: 'UAE',
+    title: 'Engineer', company: 'Co', location: 'Dubai', country: 'United Arab Emirates',
     skills: ['React'], experience: 2, category: 'it', description: 'Build',
   });
   const jobId = jobRes.body.data.id;

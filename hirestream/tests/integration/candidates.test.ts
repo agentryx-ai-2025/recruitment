@@ -48,7 +48,7 @@ describe('GET /api/v1/candidates/profile/pdf', () => {
     await request(app)
       .post('/api/v1/candidates/experience')
       .set('Cookie', candidateCookie)
-      .send({ company: 'TCS', role: 'Developer', years: 3, country: 'India' });
+      .send({ company: 'TCS', role: 'Developer', years: 3, country: 'United Arab Emirates' });
 
     const res = await request(app)
       .get('/api/v1/candidates/profile/pdf')
@@ -171,7 +171,7 @@ describe('POST /api/v1/candidates/experience', () => {
     const res = await request(app)
       .post('/api/v1/candidates/experience')
       .set('Cookie', candidateCookie)
-      .send({ company: 'TCS', role: 'Developer', years: 3, country: 'India' });
+      .send({ company: 'TCS', role: 'Developer', years: 3, country: 'United Arab Emirates' });
 
     expect(res.status).toBe(201);
     expect(res.body.data.company).toBe('TCS');

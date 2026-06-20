@@ -37,7 +37,7 @@ test.describe("Operator Console — superadmin access", () => {
     await expect(page.locator("text=Log Search").first()).toBeVisible();
   });
 
-  test("system config tab renders all 6 feature cards", async ({ page }) => {
+  test("system config tab renders all 5 feature cards", async ({ page }) => {
     await loginAs(page, "superadmin", "hpsedc@super2026");
     await page.goto("/admin/operator-console");
 
@@ -45,12 +45,11 @@ test.describe("Operator Console — superadmin access", () => {
     await page.getByRole("tab", { name: /system config/i }).click();
     await page.waitForLoadState("networkidle", { timeout: 5000 }).catch(() => {});
 
-    // All six feature labels visible
+    // All five feature labels visible (DocuMind dropped in v0.7.x — different app).
     await expect(page.locator("text=Synthetic Monitor").first()).toBeVisible({ timeout: 5000 });
     await expect(page.locator("text=LLM Triage").first()).toBeVisible();
     await expect(page.locator("text=Daily Log Digest").first()).toBeVisible();
     await expect(page.locator("text=Loki").first()).toBeVisible();
-    await expect(page.locator("text=DocuMind").first()).toBeVisible();
     await expect(page.locator("text=Notifications").first()).toBeVisible();
   });
 

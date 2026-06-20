@@ -217,7 +217,7 @@ describe('HPSEDC Item 1 — Employer KYB', () => {
 // ── Job-posting gate ────────────────────────────────────────────────
 describe('HPSEDC Item 1 — Post-Job gate', () => {
   const baseJob = {
-    title: 'Welder', company: 'Acme', location: 'Dubai', country: 'UAE',
+    title: 'Welder', company: 'Acme', location: 'Dubai', country: 'United Arab Emirates',
     description: 'Welding offshore', experience: 2, skills: ['Welding'], category: 'driver',
   };
 
