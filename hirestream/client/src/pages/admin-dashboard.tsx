@@ -17,6 +17,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { ISO_COUNTRIES, COMMON_DESTINATION_CODES } from "@/lib/iso-countries";
 import { AgencyApprovalList } from "@/components/admin/agency-approval-list";
 import { KYBReviewList } from "@/components/admin/KYBReviewList";
 import { MatchingEnginePanel } from "@/components/admin/MatchingEnginePanel";
@@ -761,7 +762,8 @@ function CountryInfoAdminPanel() {
   const [selected, setSelected] = useState<string | null>(null);
   const [draft, setDraft] = useState<any>(null);
   const [addOpen, setAddOpen] = useState(false);
-  const [addForm, setAddForm] = useState<{ code: string; name: string }>({ code: "", name: "" });
+  const [addSearch, setAddSearch] = useState("");
+  const [addSelected, setAddSelected] = useState<{ code: string; name: string } | null>(null);
 
   // Lowercase haystack for the search filter.
   const filtered = allCountries.filter((c) =>
@@ -847,14 +849,11 @@ function CountryInfoAdminPanel() {
 
   const create = useMutation({
     mutationFn: async () => {
-      const code = addForm.code.toUpperCase().trim();
-      const name = addForm.name.trim();
-      if (!/^[A-Z]{2}$/.test(code)) throw new Error("Code must be 2 uppercase letters (ISO 3166 alpha-2, e.g. NL, CH, KE).");
-      if (!name) throw new Error("Name is required.");
-      const r = await fetch(`/api/v1/content/countries/${code}`, {
+      if (!addSelected) throw new Error("Pick a country from the list first.");
+      const r = await fetch(`/api/v1/content/countries/${addSelected.code}`, {
         method: "PUT", credentials: "include",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ name, isActive: true }),
+        body: JSON.stringify({ name: addSelected.name, isActive: true }),
       });
       const j = await r.json();
       if (!j.success) throw new Error(j.message ?? "Create failed");
@@ -864,7 +863,8 @@ function CountryInfoAdminPanel() {
       toast({ title: `Added ${data.name}`, description: "Fill in the embassy, visa, and labor-law details next." });
       qc.invalidateQueries({ queryKey: ["/api/v1/content/countries"] });
       setAddOpen(false);
-      setAddForm({ code: "", name: "" });
+      setAddSearch("");
+      setAddSelected(null);
       setSelected(data.code);
     },
     onError: (e: any) => toast({ title: "Couldn't add country", description: e.message, variant: "destructive" }),
@@ -915,33 +915,103 @@ function CountryInfoAdminPanel() {
         </Button>
       </div>
 
-      {/* Add modal */}
-      {addOpen && (
-        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl shadow-xl p-5 max-w-md w-full space-y-3">
-            <h4 className="text-sm font-bold text-slate-900">Add a new destination country</h4>
-            <p className="text-xs text-slate-500">After it's created, you'll edit the embassy, visa, wage and labor-law details. India cannot be added — this is the overseas placement portal.</p>
-            <div>
-              <label className="text-[11px] font-medium text-slate-600">ISO 3166 alpha-2 code <span className="text-red-500">*</span></label>
-              <Input value={addForm.code} onChange={(e) => setAddForm({ ...addForm, code: e.target.value.toUpperCase().slice(0, 2) })}
-                placeholder="e.g. NL, CH, KE" className="text-sm h-9 font-mono uppercase" maxLength={2} />
-              <p className="text-[10px] text-slate-400 mt-1">2 uppercase letters. Standard reference: <a href="https://en.wikipedia.org/wiki/ISO_3166-1_alpha-2" target="_blank" rel="noreferrer" className="text-blue-600 hover:underline">ISO 3166</a></p>
-            </div>
-            <div>
-              <label className="text-[11px] font-medium text-slate-600">Display name <span className="text-red-500">*</span></label>
-              <Input value={addForm.name} onChange={(e) => setAddForm({ ...addForm, name: e.target.value })}
-                placeholder="e.g. Netherlands" className="text-sm h-9" />
-            </div>
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" size="sm" onClick={() => { setAddOpen(false); setAddForm({ code: "", name: "" }); }}>Cancel</Button>
-              <Button size="sm" onClick={() => create.mutate()} disabled={create.isPending} className="bg-blue-600 hover:bg-blue-700 text-white">
-                {create.isPending ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : null}
-                Add
-              </Button>
+      {/* Add modal — searchable country picker */}
+      {addOpen && (() => {
+        // Build picker items: full ISO list minus countries already in
+        // country_info (so operator can't add Germany twice). Common Indian
+        // overseas destinations (Gulf, ASEAN, Western) are surfaced at the
+        // top when no search is typed.
+        const existingCodes = new Set(allCountries.map((c: any) => c.code));
+        const allAvailable = ISO_COUNTRIES.filter((c) => !existingCodes.has(c.code));
+        const q = addSearch.trim().toLowerCase();
+        const matches = q
+          ? allAvailable.filter((c) => c.name.toLowerCase().includes(q) || c.code.toLowerCase().includes(q))
+          : allAvailable;
+        const common = q ? [] : allAvailable.filter((c) => COMMON_DESTINATION_CODES.includes(c.code));
+        const rest   = q ? matches : allAvailable.filter((c) => !COMMON_DESTINATION_CODES.includes(c.code));
+        return (
+          <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-xl shadow-xl p-5 max-w-md w-full space-y-3 max-h-[85vh] flex flex-col">
+              <div>
+                <h4 className="text-sm font-bold text-slate-900">Add a destination country</h4>
+                <p className="text-xs text-slate-500 mt-1">
+                  Pick from the standard ISO 3166 country list. After it's added, you'll fill in the
+                  embassy, visa, wage and labor-law details. India is intentionally excluded — this
+                  is the overseas placement portal.
+                </p>
+              </div>
+
+              <Input
+                value={addSearch}
+                onChange={(e) => { setAddSearch(e.target.value); setAddSelected(null); }}
+                placeholder="Search by name (e.g. Netherlands) or ISO code (e.g. NL)…"
+                className="text-sm h-9"
+                autoFocus
+              />
+
+              <div className="flex-1 overflow-y-auto border border-slate-200 rounded-lg">
+                {matches.length === 0 ? (
+                  <div className="text-center py-8 text-xs text-slate-400">
+                    {q ? `No countries match "${addSearch}".` : "All countries already added."}
+                  </div>
+                ) : (
+                  <div className="divide-y divide-slate-100">
+                    {!q && common.length > 0 && (
+                      <>
+                        <div className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 bg-slate-50">
+                          Common Indian overseas destinations
+                        </div>
+                        {common.map((c) => (
+                          <button key={c.code} onClick={() => setAddSelected(c)}
+                            className={`w-full text-left px-3 py-2 text-sm hover:bg-slate-50 flex items-center gap-2.5 ${
+                              addSelected?.code === c.code ? "bg-blue-50 text-blue-900" : "text-slate-700"
+                            }`}>
+                            <span className="text-lg">{flagFor(c.code)}</span>
+                            <span className="flex-1">{c.name}</span>
+                            <span className="font-mono text-[10px] text-slate-400">{c.code}</span>
+                          </button>
+                        ))}
+                        {rest.length > 0 && (
+                          <div className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 bg-slate-50">
+                            All other countries
+                          </div>
+                        )}
+                      </>
+                    )}
+                    {rest.map((c) => (
+                      <button key={c.code} onClick={() => setAddSelected(c)}
+                        className={`w-full text-left px-3 py-2 text-sm hover:bg-slate-50 flex items-center gap-2.5 ${
+                          addSelected?.code === c.code ? "bg-blue-50 text-blue-900" : "text-slate-700"
+                        }`}>
+                        <span className="text-lg">{flagFor(c.code)}</span>
+                        <span className="flex-1">{c.name}</span>
+                        <span className="font-mono text-[10px] text-slate-400">{c.code}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {addSelected && (
+                <div className="text-xs text-slate-600 bg-blue-50 border border-blue-200 rounded-md p-2 flex items-center gap-2">
+                  <span className="text-lg">{flagFor(addSelected.code)}</span>
+                  Selected: <span className="font-semibold">{addSelected.name}</span>
+                  <span className="font-mono text-[10px] text-slate-400">({addSelected.code})</span>
+                </div>
+              )}
+
+              <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+                <Button variant="outline" size="sm" onClick={() => { setAddOpen(false); setAddSearch(""); setAddSelected(null); }}>Cancel</Button>
+                <Button size="sm" onClick={() => create.mutate()} disabled={create.isPending || !addSelected}
+                  className="bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50">
+                  {create.isPending ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : null}
+                  Add {addSelected?.name ?? "country"}
+                </Button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {isLoading ? <Skeleton className="h-96 w-full" /> : (
         <div className="grid md:grid-cols-[260px_1fr] gap-4">
