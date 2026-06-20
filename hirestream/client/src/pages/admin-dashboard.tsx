@@ -81,6 +81,10 @@ export default function AdminDashboard() {
   const countries = countryRes?.data || [];
   const notifications = notifsRes?.data || [];
   const grievanceList = grievancesRes?.data || [];
+  // "Open" grievances = not terminal — matches the Pending Verifications card
+  // and the dashboard's `grievances.open` count. Tab badge + section header
+  // both use this so they stay in sync with the rest of the dashboard.
+  const openGrievances = grievanceList.filter((g: any) => g.status !== "resolved" && g.status !== "escalated" && g.status !== "closed");
   const pendingDrives = pendingDrivesRes?.data || [];
 
   // Controlled tab state so cross-card shortcuts (e.g. "Review now →") can switch panes.
@@ -133,7 +137,7 @@ export default function AdminDashboard() {
           <TabsTrigger value="welfare">Welfare SLA</TabsTrigger>
           <TabsTrigger value="reports">Reports</TabsTrigger>
           <TabsTrigger value="drives">Drives ({pendingDrives.length} pending)</TabsTrigger>
-          <TabsTrigger value="grievances">Grievances ({grievanceList.length})</TabsTrigger>
+          <TabsTrigger value="grievances">Grievances ({openGrievances.length})</TabsTrigger>
           <TabsTrigger value="users">Users</TabsTrigger>
           <TabsTrigger value="audit">Audit Log</TabsTrigger>
           <TabsTrigger value="lifecycle">Lifecycle</TabsTrigger>
@@ -187,7 +191,7 @@ export default function AdminDashboard() {
                 </div>
                 {funnel.funnel?.length > 0 && (
                   <ResponsiveContainer width="100%" height={250}>
-                    <BarChart data={funnel.funnel.map((s: any) => ({ name: s.status?.replace(/_/g, ' '), count: s.count }))}>
+                    <BarChart data={funnel.funnel.map((s: any) => ({ name: (s.stage ?? s.status ?? "").replace(/_/g, ' '), count: s.count }))}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                       <XAxis dataKey="name" tick={{ fontSize: 11 }} />
                       <YAxis tick={{ fontSize: 11 }} />

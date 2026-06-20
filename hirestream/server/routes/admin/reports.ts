@@ -41,7 +41,12 @@ router.get("/dashboard", async (_req, res, next) => {
       db.select({ c: count() }).from(jobs),
       db.select({ c: count() }).from(jobs).where(eq(jobs.status, "active")),
       db.select({ c: count() }).from(applications),
-      db.select({ c: count() }).from(placements),
+      // Placements: only count SUCCESSFUL placements (accepted/active/completed).
+      // Pending/rejected/withdrawn placements exist but should not inflate the
+      // "Placements" card on the Overview — that card implies actual placements
+      // achieved. Matches the semantics of the Application Pipeline "Placed"
+      // stage in /admin/oversight/funnel.
+      db.select({ c: count() }).from(placements).where(sql`${placements.status} IN ('accepted','active','completed')`),
       db.select({ c: count() }).from(recruitmentAgents).where(eq(recruitmentAgents.verified, false)),
       db.select({ c: count() }).from(recruitmentDrives).where(eq(recruitmentDrives.status, "pending")),
       db.select({ c: count() }).from(grievances).where(

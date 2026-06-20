@@ -365,7 +365,23 @@ router.get("/funnel", async (req, res, next) => {
       const prev = i === 0 ? funnel[0].count : funnel[i - 1].count;
       (funnel[i] as any).dropPct = prev > 0 ? Math.round(((prev - funnel[i].count) / prev) * 100) : 0;
     }
-    res.json({ success: true, data: { funnel, raw: byStatus } });
+
+    // Top-line summary for the 3 colored boxes above the funnel chart in
+    // admin-dashboard.tsx. Counts are scoped by the same country/agent filters
+    // as the rest of the endpoint so cards stay coherent with the chart.
+    const candidateConds: any[] = [];
+    // (no candidate-level filter for country/agent — registered = all candidates)
+    const [registeredRow] = await db.select({ c: count() }).from(candidates);
+    const [appliedRow] = await db.select({ c: count() }).from(applications)
+      .innerJoin(jobs, eq(applications.jobId, jobs.id))
+      .where(conds.length ? and(...conds) : undefined as any);
+    const summary = {
+      registered: Number(registeredRow?.c ?? 0),
+      applied: Number(appliedRow?.c ?? 0),
+      placed: Number(placementsCount[0]?.c ?? 0),
+    };
+
+    res.json({ success: true, data: { funnel, raw: byStatus, summary } });
   } catch (err) { next(err); }
 });
 
