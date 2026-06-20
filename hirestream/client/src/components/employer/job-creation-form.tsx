@@ -19,15 +19,17 @@ import { CITIES_BY_COUNTRY, FIELD_LIMITS, JOB_CATEGORIES } from "@/lib/reference
 import { SalaryRangePicker, EXPERIENCE_OPTIONS } from "@/components/shared/salary-range-picker";
 import { HiringCriteriaSection } from "@/components/shared/HiringCriteriaSection";
 
+// Keys MUST match country_info.name exactly — see country-validator.service.ts.
+// Netherlands removed (not in country_info; add via admin Countries tab + here
+// in the same release if you want to expand the destination list).
 const COUNTRIES = [
   { code: "Canada", flag: "🇨🇦" }, { code: "Australia", flag: "🇦🇺" },
-  { code: "Germany", flag: "🇩🇪" }, { code: "UAE", flag: "🇦🇪" },
-  { code: "UK", flag: "🇬🇧" }, { code: "New Zealand", flag: "🇳🇿" },
+  { code: "Germany", flag: "🇩🇪" }, { code: "United Arab Emirates", flag: "🇦🇪" },
+  { code: "United Kingdom", flag: "🇬🇧" }, { code: "New Zealand", flag: "🇳🇿" },
   { code: "Maldives", flag: "🇲🇻" }, { code: "Saudi Arabia", flag: "🇸🇦" },
   { code: "Singapore", flag: "🇸🇬" }, { code: "Japan", flag: "🇯🇵" },
-  { code: "USA", flag: "🇺🇸" }, { code: "Ireland", flag: "🇮🇪" },
+  { code: "United States of America", flag: "🇺🇸" }, { code: "Ireland", flag: "🇮🇪" },
   { code: "Qatar", flag: "🇶🇦" }, { code: "Oman", flag: "🇴🇲" },
-  { code: "Netherlands", flag: "🇳🇱" },
 ];
 
 const COMMON_SKILLS = [

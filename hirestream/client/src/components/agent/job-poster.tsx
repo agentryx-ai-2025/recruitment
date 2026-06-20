@@ -42,13 +42,16 @@ const jobSchema = z.object({
 
 type JobFormValues = z.infer<typeof jobSchema>;
 
+// Keys MUST match country_info.name exactly — the server validator rejects
+// any country not in country_info (see server/services/country-validator.service.ts).
+// Order: most common HireStream destinations first.
 const COUNTRIES = [
   { code: "Canada", flag: "🇨🇦" }, { code: "Australia", flag: "🇦🇺" },
-  { code: "Germany", flag: "🇩🇪" }, { code: "UAE", flag: "🇦🇪" },
-  { code: "UK", flag: "🇬🇧" }, { code: "New Zealand", flag: "🇳🇿" },
+  { code: "Germany", flag: "🇩🇪" }, { code: "United Arab Emirates", flag: "🇦🇪" },
+  { code: "United Kingdom", flag: "🇬🇧" }, { code: "New Zealand", flag: "🇳🇿" },
   { code: "Maldives", flag: "🇲🇻" }, { code: "Saudi Arabia", flag: "🇸🇦" },
   { code: "Singapore", flag: "🇸🇬" }, { code: "Japan", flag: "🇯🇵" },
-  { code: "USA", flag: "🇺🇸" }, { code: "Ireland", flag: "🇮🇪" },
+  { code: "United States of America", flag: "🇺🇸" }, { code: "Ireland", flag: "🇮🇪" },
   { code: "Qatar", flag: "🇶🇦" }, { code: "Oman", flag: "🇴🇲" },
 ];
 

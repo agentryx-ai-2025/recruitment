@@ -89,6 +89,18 @@ router.post("/", protect, async (req, res, next) => {
     }
     const validatedData = parsed.data as any;
 
+    // Country validation — overseas portal scope. Drafts allowed without
+    // country; non-draft posts must be a valid destination in country_info
+    // (admin-curated). India is rejected with a scoped error message.
+    const { validateCountry } = await import("../services/country-validator.service");
+    const countryCheck = validateCountry(validatedData.country);
+    if (!countryCheck.ok) {
+      return res.status(400).json({
+        success: false,
+        error: { code: countryCheck.code, message: countryCheck.message },
+      });
+    }
+
     // v0.4.31 (HPSEDC Item 8): canonicalise the category against the controlled
     // vocabulary. Required for non-draft posts. We accept any seed key plus an
     // admin-extended key from `job.categories.extra` so HPSEDC can broaden the
@@ -412,6 +424,19 @@ router.put("/:id", protect, async (req, res, next) => {
         });
       }
       updateData.category = canonical;
+    }
+
+    // Country validation — same rules as create. Drafts can be incomplete;
+    // any non-empty country must be a valid overseas destination (not India).
+    if (updateData.country !== undefined) {
+      const { validateCountry } = await import("../services/country-validator.service");
+      const countryCheck = validateCountry(updateData.country);
+      if (!countryCheck.ok) {
+        return res.status(400).json({
+          success: false,
+          error: { code: countryCheck.code, message: countryCheck.message },
+        });
+      }
     }
 
     // If publishing a draft (was "draft" and isDraft is false), validate fully.

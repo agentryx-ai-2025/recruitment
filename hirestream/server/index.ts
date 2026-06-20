@@ -165,6 +165,7 @@ import { startJobLifecycleCron } from "./services/job-lifecycle.service";
 import { startSavedSearchesCron } from "./services/saved-searches-digest.service";
 import { seedCountryInfo } from "./services/country-info.seed";
 import { seedSystemConfig } from "./services/system-config.service";
+import { loadValidCountries } from "./services/country-validator.service";
 
 (async () => {
   await initSettings().catch((e) => logger.warn(`Settings init skipped: ${e?.message}`));
@@ -172,6 +173,7 @@ import { seedSystemConfig } from "./services/system-config.service";
   await seedNotificationTemplates().catch((e) => logger.warn(`Template seed skipped: ${e?.message}`));
   await seedCountryInfo().catch((e) => logger.warn(`Country info seed skipped: ${e?.message}`));
   await seedSystemConfig().catch((e) => logger.warn(`System config seed skipped: ${e?.message}`));
+  await loadValidCountries().catch((e) => logger.warn(`Country validator load skipped: ${e?.message}`));
   if (env.NODE_ENV !== "test") {
     startJobLifecycleCron();
     startSavedSearchesCron();

@@ -372,14 +372,18 @@ router.put("/countries/:code", protect, requireRole(["admin"]), async (req, res,
     if (typeof body.visaTimelineDays === "number") patch.visaTimelineDays = body.visaTimelineDays;
 
     const [existing] = await db.select().from(countryInfo).where(eq(countryInfo.code, code)).limit(1);
+    let row;
     if (existing) {
-      const [row] = await db.update(countryInfo).set(patch).where(eq(countryInfo.code, code)).returning();
-      return res.json({ success: true, data: row });
+      [row] = await db.update(countryInfo).set(patch).where(eq(countryInfo.code, code)).returning();
     } else {
       if (!patch.name) return res.status(400).json({ success: false, message: "name required when creating" });
-      const [row] = await db.insert(countryInfo).values({ code, ...patch }).returning();
-      return res.json({ success: true, data: row });
+      [row] = await db.insert(countryInfo).values({ code, ...patch }).returning();
     }
+    // Refresh the in-memory country validator cache so the new/renamed
+    // country is immediately valid for job-create without an app restart.
+    const { loadValidCountries } = await import("../services/country-validator.service");
+    loadValidCountries().catch(() => {});
+    return res.json({ success: true, data: row });
   } catch (err) { next(err); }
 });
 

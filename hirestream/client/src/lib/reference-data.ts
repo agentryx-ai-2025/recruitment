@@ -142,8 +142,17 @@ export const ALL_SKILLS = SKILL_CATEGORIES.flatMap(c => c.skills);
 // ── Major cities per destination country ────────────────────────────
 // Covers ~90%+ of overseas hiring destinations. Use with "Other" escape hatch for
 // edge cases (smaller towns, newly-named districts, etc.)
+// Keys MUST match country_info.name exactly — the server validator rejects
+// jobs whose country isn't in country_info. The old aliases ("UAE", "UK",
+// "USA") were normalised in the v0.7.3.2 data migration; client-side
+// lookups now use the full canonical names.
+//
+// Countries beyond the 18 in country_info (Italy, Poland, Romania,
+// South Korea) are kept here as historical city data — they won't appear
+// in any country dropdown until added to country_info via the admin
+// Countries tab.
 export const CITIES_BY_COUNTRY: Record<string, string[]> = {
-  UAE: ["Dubai", "Abu Dhabi", "Sharjah", "Ajman", "Fujairah", "Ras Al Khaimah", "Umm Al Quwain", "Al Ain"],
+  "United Arab Emirates": ["Dubai", "Abu Dhabi", "Sharjah", "Ajman", "Fujairah", "Ras Al Khaimah", "Umm Al Quwain", "Al Ain"],
   "Saudi Arabia": ["Riyadh", "Jeddah", "Mecca", "Medina", "Dammam", "Khobar", "Dhahran", "Taif", "Tabuk", "Buraidah", "Hail", "Jubail", "Yanbu", "Abha", "Najran"],
   Qatar: ["Doha", "Al Rayyan", "Al Wakrah", "Al Khor", "Lusail", "Mesaieed"],
   Oman: ["Muscat", "Salalah", "Sohar", "Nizwa", "Sur", "Duqm", "Ibri"],
@@ -152,18 +161,19 @@ export const CITIES_BY_COUNTRY: Record<string, string[]> = {
   Canada: ["Toronto", "Vancouver", "Montreal", "Calgary", "Edmonton", "Ottawa", "Winnipeg", "Quebec City", "Hamilton", "Kitchener", "Halifax", "Victoria", "Saskatoon", "Regina", "London (ON)", "Mississauga", "Brampton", "Surrey"],
   Australia: ["Sydney", "Melbourne", "Brisbane", "Perth", "Adelaide", "Gold Coast", "Canberra", "Newcastle", "Wollongong", "Hobart", "Geelong", "Darwin", "Townsville", "Cairns"],
   "New Zealand": ["Auckland", "Wellington", "Christchurch", "Hamilton", "Tauranga", "Dunedin", "Palmerston North", "Napier", "Queenstown", "Nelson"],
-  UK: ["London", "Birmingham", "Manchester", "Leeds", "Liverpool", "Sheffield", "Bristol", "Newcastle", "Nottingham", "Leicester", "Glasgow", "Edinburgh", "Cardiff", "Belfast", "Southampton", "Portsmouth", "Oxford", "Cambridge", "Coventry", "Bradford", "Aberdeen", "Brighton", "Reading", "Milton Keynes", "Plymouth", "York"],
+  "United Kingdom": ["London", "Birmingham", "Manchester", "Leeds", "Liverpool", "Sheffield", "Bristol", "Newcastle", "Nottingham", "Leicester", "Glasgow", "Edinburgh", "Cardiff", "Belfast", "Southampton", "Portsmouth", "Oxford", "Cambridge", "Coventry", "Bradford", "Aberdeen", "Brighton", "Reading", "Milton Keynes", "Plymouth", "York"],
   Germany: ["Berlin", "Munich", "Hamburg", "Frankfurt", "Cologne", "Stuttgart", "Düsseldorf", "Leipzig", "Dortmund", "Essen", "Bremen", "Dresden", "Hanover", "Nuremberg", "Erlangen", "Heidelberg", "Bonn", "Mannheim"],
   Ireland: ["Dublin", "Cork", "Galway", "Limerick", "Waterford", "Drogheda", "Dundalk", "Swords", "Bray"],
   Singapore: ["Singapore"],
   Malaysia: ["Kuala Lumpur", "George Town", "Johor Bahru", "Ipoh", "Shah Alam", "Petaling Jaya", "Kota Kinabalu", "Kuching", "Malacca", "Penang", "Putrajaya", "Cyberjaya"],
   Japan: ["Tokyo", "Osaka", "Yokohama", "Nagoya", "Sapporo", "Fukuoka", "Kobe", "Kyoto", "Kawasaki", "Saitama", "Hiroshima", "Sendai", "Chiba"],
   "South Korea": ["Seoul", "Busan", "Incheon", "Daegu", "Daejeon", "Gwangju", "Suwon", "Ulsan", "Yongin", "Changwon"],
-  USA: ["New York", "Los Angeles", "Chicago", "Houston", "Phoenix", "Philadelphia", "San Antonio", "San Diego", "Dallas", "San Jose", "Austin", "Jacksonville", "Fort Worth", "Columbus", "Charlotte", "San Francisco", "Indianapolis", "Seattle", "Denver", "Washington DC", "Boston", "Nashville", "Atlanta", "Miami", "Portland"],
+  "United States of America": ["New York", "Los Angeles", "Chicago", "Houston", "Phoenix", "Philadelphia", "San Antonio", "San Diego", "Dallas", "San Jose", "Austin", "Jacksonville", "Fort Worth", "Columbus", "Charlotte", "San Francisco", "Indianapolis", "Seattle", "Denver", "Washington DC", "Boston", "Nashville", "Atlanta", "Miami", "Portland"],
   Italy: ["Rome", "Milan", "Naples", "Turin", "Palermo", "Genoa", "Bologna", "Florence", "Bari", "Catania", "Venice", "Verona"],
   Poland: ["Warsaw", "Kraków", "Łódź", "Wrocław", "Poznań", "Gdańsk", "Szczecin", "Bydgoszcz", "Lublin", "Katowice"],
   Romania: ["Bucharest", "Cluj-Napoca", "Timișoara", "Iași", "Constanța", "Craiova", "Brașov", "Galați", "Ploiești", "Oradea"],
   Maldives: ["Malé", "Hulhumalé", "Addu City"],
+  Israel: ["Tel Aviv", "Jerusalem", "Haifa", "Rishon LeZion", "Petah Tikva", "Ashdod", "Netanya", "Beersheba"],
 };
 
 export const MAX_CUSTOM_CITY_LEN = 80;
