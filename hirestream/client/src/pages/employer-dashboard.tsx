@@ -160,12 +160,34 @@ export default function EmployerDashboard() {
         </div>
       )}
 
+      {/* v0.7.5.0 — Verified employers can edit their profile post-approval.
+          Contact fields edit freely; regulated fields reset verification. */}
+      {isVerified && (
+        <div className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 p-3 flex items-center gap-3">
+          <CheckCircle className="w-5 h-5 text-emerald-600 flex-shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-emerald-900">
+              {employerProfile.companyName || "Verified employer"} — verified by HPSEDC
+            </p>
+            <p className="text-xs text-emerald-700 mt-0.5">
+              You can update contact info freely. Changes to company name, CIN, GST, PAN, or signatory identity will require re-verification.
+            </p>
+          </div>
+          <Button size="sm" variant="outline" onClick={() => setVerifyOpen(true)}
+            className="border-emerald-300 text-emerald-700 hover:bg-emerald-100 flex-shrink-0">
+            Edit profile
+          </Button>
+        </div>
+      )}
+
       <Dialog open={verifyOpen} onOpenChange={setVerifyOpen}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Company Verification</DialogTitle>
+            <DialogTitle>{isVerified ? "Edit Company Profile" : "Company Verification"}</DialogTitle>
             <DialogDescription>
-              Provide your company KYB details + upload supporting documents. HPSEDC reviews submissions within 48 hours.
+              {isVerified
+                ? "Update your company info. Contact fields apply immediately; changes to regulated fields (company name, CIN, GST, PAN, signatory identity) will reset verification and require HPSEDC to re-approve."
+                : "Provide your company KYB details + upload supporting documents. HPSEDC reviews submissions within 48 hours."}
             </DialogDescription>
           </DialogHeader>
           <EmployerVerificationForm onDone={() => setVerifyOpen(false)} />

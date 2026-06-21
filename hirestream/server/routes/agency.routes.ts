@@ -413,6 +413,13 @@ router.get("/leaderboard/top", async (_req, res, next) => {
 // ─────────────────────────────────────────────────────────────────────
 
 // PATCH /me — agent updates their KYB fields (post-register fill-in).
+// v0.7.5.0 — Post-verification edit policy (mirrors employer):
+//   CONTACT_FIELDS  → free to edit, verification stays intact
+//   REGULATED_FIELDS → editing any of these on a verified agency resets
+//                      `verified=false`, writes audit log entry. HPSEDC
+//                      must re-approve. Critical because licenseNumber +
+//                      meaLicenseExpiry + signatory identity are the
+//                      regulatory anchor for the agency.
 router.patch("/me", protect, async (req, res, next) => {
   try {
     const userId = (req.user as any)?.id;
@@ -425,22 +432,57 @@ router.patch("/me", protect, async (req, res, next) => {
     const existing = await storage.db.select().from(recruitmentAgents).where(eq(recruitmentAgents.userId, userId)).limit(1);
     if (!existing.length) return res.status(404).json({ success: false, message: "Register the agency first." });
 
-    const fields = [
-      "agencyName", "licenseNumber", "specializations",
+    const CONTACT_FIELDS = [
+      "specializations",
       "contactEmail", "contactPhone",
       "registeredAddressLine1", "registeredAddressLine2", "registeredCity",
       "registeredState", "registeredPinCode",
-      "authorisedSignatoryName", "authorisedSignatoryDesignation",
-      "meaLicenseExpiry",
+      "authorisedSignatoryDesignation",
     ];
+    const REGULATED_FIELDS = [
+      "agencyName", "licenseNumber", "meaLicenseExpiry",
+      "authorisedSignatoryName",
+    ];
+    const ALL_FIELDS = [...CONTACT_FIELDS, ...REGULATED_FIELDS];
+
+    const row = existing[0] as any;
     const update: any = {};
-    for (const f of fields) if (req.body[f] !== undefined) update[f] = req.body[f];
+    const regulatedChanges: Record<string, { from: any; to: any }> = {};
+    for (const f of ALL_FIELDS) {
+      if (req.body[f] === undefined) continue;
+      const newVal = req.body[f];
+      const oldVal = row[f];
+      if (REGULATED_FIELDS.includes(f) && String(newVal ?? "") !== String(oldVal ?? "")) {
+        regulatedChanges[f] = { from: oldVal ?? null, to: newVal ?? null };
+      }
+      update[f] = newVal;
+    }
     if (!Object.keys(update).length) {
       return res.status(400).json({ success: false, message: "No updatable fields supplied" });
     }
+
+    const requiresReVerification = row.verified === true && Object.keys(regulatedChanges).length > 0;
+    if (requiresReVerification) {
+      update.verified = false;
+      update.submittedForReviewAt = null;
+      update.rejectionReason = null;
+    }
+
     const updated = await storage.db.update(recruitmentAgents).set(update)
-      .where(eq(recruitmentAgents.id, existing[0].id)).returning();
-    res.json({ success: true, data: updated[0] });
+      .where(eq(recruitmentAgents.id, row.id)).returning();
+
+    if (Object.keys(regulatedChanges).length > 0) {
+      const { auditLog } = await import("@shared/schema");
+      await storage.db.insert(auditLog).values({
+        userId,
+        action: requiresReVerification ? "agency.regulated_edit_reset_verification" : "agency.regulated_edit",
+        resourceType: "agency",
+        resourceId: row.id,
+        details: { changes: regulatedChanges, wasVerified: row.verified === true } as any,
+      }).catch(() => {});
+    }
+
+    res.json({ success: true, data: updated[0], requiresReVerification });
   } catch (err) { next(err); }
 });
 

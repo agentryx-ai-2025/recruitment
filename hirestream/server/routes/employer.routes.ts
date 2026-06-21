@@ -504,6 +504,14 @@ router.get("/profile", async (req, res, next) => {
 
 // PATCH own profile — accept all KYB fields. Admin can also patch on
 // behalf of an employer using the same endpoint via :id (admin route below).
+//
+// v0.7.5.0 — Post-verification edit policy:
+//   CONTACT_FIELDS  → free to edit, verification stays intact
+//   REGULATED_FIELDS → editing ANY of these on a verified employer resets
+//                      `verified=false`, clears `submittedForReviewAt`, and
+//                      writes an audit log entry. HPSEDC must re-approve.
+//                      This prevents a verified employer from silently
+//                      changing their CIN / GST / PAN / signatory identity.
 router.patch("/profile", async (req, res, next) => {
   try {
     const db = storage.db;
@@ -512,18 +520,31 @@ router.patch("/profile", async (req, res, next) => {
     if (user.role !== "employer") return res.status(403).json({ success: false, message: "Employer-only" });
 
     const row = await getOrCreateEmployerRow(db, user.id);
-    const allowed: any = {};
-    const fields = [
-      "companyName", "industry", "location",
-      "cin", "gst", "pan",
+
+    const CONTACT_FIELDS = [
+      "industry", "location",
       "registeredAddressLine1", "registeredAddressLine2", "registeredCity",
       "registeredState", "registeredPinCode", "registeredCountry",
       "contactEmail", "contactPhone",
-      "authorisedSignatoryName", "authorisedSignatoryDesignation",
-      "authorisedSignatoryIdType", "authorisedSignatoryIdNumber",
+      "authorisedSignatoryDesignation",
     ];
-    for (const f of fields) {
-      if (req.body[f] !== undefined) allowed[f] = req.body[f];
+    const REGULATED_FIELDS = [
+      "companyName", "cin", "gst", "pan",
+      "authorisedSignatoryName", "authorisedSignatoryIdType", "authorisedSignatoryIdNumber",
+    ];
+    const ALL_FIELDS = [...CONTACT_FIELDS, ...REGULATED_FIELDS];
+
+    const allowed: any = {};
+    const regulatedChanges: Record<string, { from: any; to: any }> = {};
+    for (const f of ALL_FIELDS) {
+      if (req.body[f] === undefined) continue;
+      const newVal = req.body[f];
+      const oldVal = (row as any)[f];
+      // Only record a regulated change if it's actually different.
+      if (REGULATED_FIELDS.includes(f) && String(newVal ?? "") !== String(oldVal ?? "")) {
+        regulatedChanges[f] = { from: oldVal ?? null, to: newVal ?? null };
+      }
+      allowed[f] = newVal;
     }
     if (Object.keys(allowed).length === 0) {
       return res.status(400).json({ success: false, error: { code: 400, message: "No updatable fields supplied" } });
@@ -534,8 +555,29 @@ router.patch("/profile", async (req, res, next) => {
       return res.status(400).json({ success: false, error: { code: 400, message: "Company name must be 2-150 chars" } });
     }
 
+    // If verified AND any regulated field changed → reset verification.
+    const requiresReVerification = (row as any).verified === true && Object.keys(regulatedChanges).length > 0;
+    if (requiresReVerification) {
+      allowed.verified = false;
+      allowed.submittedForReviewAt = null;
+      allowed.rejectionReason = null;
+    }
+
     const updated = await db.update(employers).set(allowed).where(eq(employers.id, row.id)).returning();
-    res.json({ success: true, data: updated[0] });
+
+    // Audit-log every regulated change, even when not currently verified.
+    if (Object.keys(regulatedChanges).length > 0) {
+      const { auditLog } = await import("@shared/schema");
+      await db.insert(auditLog).values({
+        userId: user.id,
+        action: requiresReVerification ? "employer.regulated_edit_reset_verification" : "employer.regulated_edit",
+        resourceType: "employer",
+        resourceId: row.id,
+        details: { changes: regulatedChanges, wasVerified: (row as any).verified === true } as any,
+      }).catch(() => {});
+    }
+
+    res.json({ success: true, data: updated[0], requiresReVerification });
   } catch (err) { next(err); }
 });
 
