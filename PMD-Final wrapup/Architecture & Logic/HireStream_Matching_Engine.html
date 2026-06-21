@@ -1,0 +1,626 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>HireStream Matching Engine — Logic & Specification</title>
+<style>
+  @page { size: A4; margin: 0; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    color: #1e293b;
+    line-height: 1.4;
+    font-size: 10px;
+  }
+  .page {
+    width: 210mm;
+    height: 297mm;
+    padding: 12mm 14mm 10mm 14mm;
+    page-break-after: always;
+    page-break-inside: avoid;
+    position: relative;
+    overflow: hidden;
+  }
+  .page:last-child { page-break-after: auto; }
+
+  /* Cover header */
+  .cover-header {
+    background: linear-gradient(135deg, #1d4ed8, #4338ca);
+    color: white;
+    padding: 12px 18px;
+    border-radius: 8px;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .cover-header .title { font-size: 16px; font-weight: 800; letter-spacing: -0.3px; }
+  .cover-header .subtitle { font-size: 9px; color: #c7d2fe; margin-top: 2px; }
+  .cover-header .badge {
+    display: inline-block;
+    background: rgba(255,255,255,0.18);
+    border: 1px solid rgba(255,255,255,0.3);
+    padding: 2px 9px;
+    border-radius: 12px;
+    font-size: 8.5px;
+    font-weight: 700;
+  }
+
+  /* Section headers */
+  h2 {
+    font-size: 11.5px;
+    font-weight: 800;
+    color: #1e3a8a;
+    margin: 9px 0 5px 0;
+    padding-bottom: 3px;
+    border-bottom: 2px solid #dbeafe;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+  }
+  h2 .pill {
+    background: #1d4ed8;
+    color: white;
+    font-size: 8.5px;
+    padding: 1px 7px;
+    border-radius: 9px;
+    font-weight: 700;
+  }
+  h3 {
+    font-size: 10.5px;
+    font-weight: 700;
+    color: #0f172a;
+    margin: 6px 0 3px 0;
+  }
+  p { font-size: 10px; margin: 0 0 4px 0; color: #334155; }
+  ul { padding-left: 16px; }
+  li { font-size: 10px; margin: 1px 0; color: #334155; }
+  strong { color: #0f172a; }
+  code, .mono {
+    font-family: 'JetBrains Mono', Consolas, monospace;
+    font-size: 9px;
+    background: #f1f5f9;
+    padding: 1px 3px;
+    border-radius: 2px;
+    color: #1e293b;
+  }
+
+  /* Framework table */
+  table.framework {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 9.5px;
+    margin: 4px 0;
+  }
+  table.framework th {
+    background: #e0e7ff;
+    color: #3730a3;
+    padding: 4px 7px;
+    text-align: left;
+    font-size: 8.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    border-bottom: 2px solid #c7d2fe;
+  }
+  table.framework td {
+    padding: 3px 7px;
+    border-bottom: 1px solid #e2e8f0;
+    vertical-align: top;
+  }
+  table.framework tr.tier-hard td:first-child { background: #fef2f2; color: #991b1b; font-weight: 700; }
+  table.framework tr.tier-pref td:first-child { background: #fefce8; color: #854d0e; font-weight: 700; }
+  table.framework tr.tier-compat td:first-child { background: #f0fdf4; color: #166534; font-weight: 700; }
+  table.framework td.weight { text-align: center; font-weight: 800; font-family: monospace; }
+  table.framework tr.total-row td {
+    background: #1e293b;
+    color: white;
+    font-weight: 800;
+    border: none;
+    font-size: 10.5px;
+  }
+
+  /* Factor cards — compact single-line description per card */
+  .factor-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 5px;
+    margin: 3px 0;
+  }
+  .factor {
+    background: #f8fafc;
+    border-left: 3px solid #1d4ed8;
+    border-radius: 3px;
+    padding: 5px 8px;
+    font-size: 9.5px;
+  }
+  .factor.skills    { border-left-color: #ef4444; }
+  .factor.exp       { border-left-color: #f59e0b; }
+  .factor.qual      { border-left-color: #ec4899; }
+  .factor.country   { border-left-color: #06b6d4; }
+  .factor.language  { border-left-color: #8b5cf6; }
+  .factor.category  { border-left-color: #10b981; }
+  .factor.salary    { border-left-color: #84cc16; }
+  .factor .name {
+    font-weight: 800;
+    color: #0f172a;
+    font-size: 10px;
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 2px;
+  }
+  .factor .pts {
+    font-family: monospace;
+    background: #0f172a;
+    color: white;
+    padding: 1px 5px;
+    border-radius: 2px;
+    font-size: 8.5px;
+  }
+  .factor .formula {
+    font-family: monospace;
+    background: white;
+    border: 1px solid #e2e8f0;
+    padding: 2px 4px;
+    border-radius: 2px;
+    font-size: 8.5px;
+    margin: 2px 0;
+    color: #475569;
+  }
+  .factor .desc { font-size: 9px; color: #475569; line-height: 1.35; }
+
+  /* Callout */
+  .callout {
+    background: #ecfdf5;
+    border: 1px solid #6ee7b7;
+    border-radius: 5px;
+    padding: 6px 10px;
+    margin: 5px 0;
+    font-size: 9.5px;
+    color: #064e3b;
+  }
+  .callout.warn { background: #fffbeb; border-color: #fde68a; color: #92400e; }
+  .callout.info { background: #eff6ff; border-color: #bfdbfe; color: #1e40af; }
+  .callout strong { color: inherit; }
+
+  /* Two-column layout */
+  .two-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin: 3px 0;
+  }
+
+  /* Missing-criteria table */
+  table.missing {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 9px;
+    margin: 3px 0;
+  }
+  table.missing th, table.missing td {
+    border: 1px solid #e2e8f0;
+    padding: 3px 5px;
+    text-align: center;
+  }
+  table.missing th {
+    background: #f8fafc;
+    color: #475569;
+    font-weight: 700;
+    font-size: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+  }
+  table.missing td:first-child {
+    text-align: left;
+    font-weight: 700;
+    color: #1e293b;
+    background: #f1f5f9;
+  }
+  .pol-full { background: #dcfce7; color: #166534; font-weight: 700; }
+  .pol-half { background: #fef9c3; color: #854d0e; font-weight: 700; }
+  .pol-zero { background: #fee2e2; color: #991b1b; font-weight: 700; }
+  .pol-na   { background: #f1f5f9; color: #94a3b8; font-style: italic; }
+
+  /* Music equalizer visual */
+  .eq-container {
+    background: linear-gradient(180deg, #0f172a 0%, #1e293b 100%);
+    border-radius: 7px;
+    padding: 11px 14px 8px 14px;
+    margin: 6px 0;
+    position: relative;
+  }
+  .eq-title {
+    color: #94a3b8;
+    font-size: 8.5px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 6px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .eq-title .sum {
+    background: #10b981;
+    color: white;
+    padding: 1px 7px;
+    border-radius: 6px;
+    font-weight: 800;
+    font-size: 9px;
+  }
+  .eq-bars {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-around;
+    height: 95px;
+    gap: 6px;
+    padding: 0 3px;
+  }
+  .eq-bar {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    position: relative;
+  }
+  .eq-track {
+    width: 19px;
+    flex: 1;
+    background: linear-gradient(180deg, #334155 0%, #1e293b 100%);
+    border-radius: 9.5px;
+    position: relative;
+    box-shadow: inset 0 2px 4px rgba(0,0,0,0.4);
+  }
+  .eq-fill {
+    position: absolute;
+    bottom: 2px;
+    left: 2px;
+    right: 2px;
+    border-radius: 7.5px;
+    background: linear-gradient(180deg, var(--c1) 0%, var(--c2) 100%);
+    box-shadow: 0 0 8px var(--c1);
+  }
+  .eq-knob {
+    position: absolute;
+    left: -3px;
+    right: -3px;
+    height: 5px;
+    background: linear-gradient(180deg, #f8fafc 0%, #cbd5e1 100%);
+    border-radius: 3px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.4);
+  }
+  .eq-value {
+    color: white;
+    font-family: monospace;
+    font-size: 9px;
+    font-weight: 800;
+    background: rgba(0,0,0,0.4);
+    padding: 1px 4px;
+    border-radius: 2px;
+  }
+  .eq-label {
+    color: #cbd5e1;
+    font-size: 8px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    text-align: center;
+    line-height: 1.1;
+  }
+
+  /* Preview tile */
+  .preview-tile {
+    background: #f8fafc;
+    border: 1px dashed #cbd5e1;
+    border-radius: 5px;
+    padding: 6px 9px;
+    font-size: 9.5px;
+    color: #475569;
+  }
+
+  /* Footer */
+  .footer {
+    position: absolute;
+    bottom: 6mm;
+    left: 14mm;
+    right: 14mm;
+    padding-top: 5px;
+    border-top: 1px solid #e2e8f0;
+    display: flex;
+    justify-content: space-between;
+    font-size: 8px;
+    color: #94a3b8;
+  }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════ PAGE 1 ═══════════════════════ -->
+<div class="page">
+  <div class="cover-header">
+    <div>
+      <div class="title">HireStream Matching Engine</div>
+      <div class="subtitle">Logic &amp; Specification — Government of Himachal Pradesh · HPSEDC Overseas Placement Portal</div>
+    </div>
+    <span class="badge">v2 · STAGING</span>
+  </div>
+
+  <h2><span class="pill">1</span> Purpose</h2>
+  <p>
+    The HireStream Matching Engine produces a <strong>0–100 fit score</strong> for every candidate ↔ job pair. The score drives the candidate's <em>Recommended Jobs</em>, the agent's ranked applicant list, and the match badge on every application. Every score comes with a per-factor breakdown so candidates and agents can see <em>why</em> — the algorithm is fully explainable. All weights, missing-criteria policies and the recommendation threshold are admin-tunable at runtime via the Matching Engine Parameters module (§7) — no code redeploy needed.
+  </p>
+
+  <h2><span class="pill">2</span> Scoring Framework</h2>
+  <p>
+    Total <strong>100 points</strong> across <strong>7 factors</strong> in three tiers — Hard criteria (60) gate the match, Preferences (25) rank it, Compatibility (15) breaks ties.
+  </p>
+  <table class="framework">
+    <thead>
+      <tr><th style="width:18%;">Tier</th><th>Factor</th><th class="weight" style="width:9%;">Wt</th><th>What it measures</th></tr>
+    </thead>
+    <tbody>
+      <tr class="tier-hard"><td rowspan="3">Hard criteria<br/><span style="font-weight:400; opacity:0.7;">(60 pts)</span></td><td>Skills match</td><td class="weight">30</td><td>Overlap between job's required skills and candidate's listed skills</td></tr>
+      <tr class="tier-hard"><td>Experience</td><td class="weight">20</td><td>Candidate meets job's years-of-experience requirement</td></tr>
+      <tr class="tier-hard"><td>Qualification</td><td class="weight">10</td><td>Candidate's education level meets the job's stated minimum</td></tr>
+      <tr class="tier-pref"><td rowspan="2">Preferences<br/><span style="font-weight:400; opacity:0.7;">(25 pts)</span></td><td>Country</td><td class="weight">15</td><td>Job's destination is in candidate's preferred countries list</td></tr>
+      <tr class="tier-pref"><td>Language proficiency</td><td class="weight">10</td><td>Candidate meets job's language requirement (CEFR or IELTS)</td></tr>
+      <tr class="tier-compat"><td rowspan="2">Compatibility<br/><span style="font-weight:400; opacity:0.7;">(15 pts)</span></td><td>Job category</td><td class="weight">10</td><td>Job's role category is in candidate's preferred categories</td></tr>
+      <tr class="tier-compat"><td>Salary expectation</td><td class="weight">5</td><td>Job salary falls within candidate's expected range</td></tr>
+      <tr class="total-row"><td colspan="2" style="text-align:right; padding-right:12px;">TOTAL</td><td class="weight">100</td><td>Final match score (0–100)</td></tr>
+    </tbody>
+  </table>
+
+  <h2><span class="pill">3</span> Per-Factor Logic</h2>
+  <div class="factor-grid">
+    <div class="factor skills">
+      <div class="name">Skills match <span class="pts">30 pts</span></div>
+      <div class="formula">round((matched / required) × 30)</div>
+      <div class="desc">Case-insensitive overlap of <code>job.skills[]</code> against <code>candidate.skills[]</code>. Job with no skills listed → neutral 15.</div>
+    </div>
+    <div class="factor exp">
+      <div class="name">Experience <span class="pts">20 pts</span></div>
+      <div class="formula">round(min(have/required, 1) × 20)</div>
+      <div class="desc">Candidate's years vs job's required. Capped at 100% — extra experience not penalised. <code>required=0</code> → full 20.</div>
+    </div>
+    <div class="factor qual">
+      <div class="name">Qualification <span class="pts">10 pts</span></div>
+      <div class="formula">school &lt; diploma &lt; bachelor &lt; master &lt; doctorate</div>
+      <div class="desc">Meets/exceeds: 10. One tier below: 5. Two+ below: 0. No requirement on job: 10.</div>
+    </div>
+    <div class="factor country">
+      <div class="name">Country preference <span class="pts">15 pts</span></div>
+      <div class="formula">job.country ∈ candidate.preferred ? 15 : 0</div>
+      <div class="desc">Hard match against the candidate's preferred destinations. Empty candidate prefs → neutral 7.</div>
+    </div>
+    <div class="factor language">
+      <div class="name">Language proficiency <span class="pts">10 pts</span></div>
+      <div class="formula">prorated  |  CEFR for non-English  |  IELTS band for English</div>
+      <div class="desc">Each required language scored individually then averaged. <strong>For IELTS countries</strong> (UK / AUS / NZ / CAN / IE), job stores required IELTS overall band (e.g. 6.0); candidate stores their actual band. Meets/exceeds = full marks, one band/level below = half, more below = 0. No requirement → 10.</div>
+    </div>
+    <div class="factor category">
+      <div class="name">Job category <span class="pts">10 pts</span></div>
+      <div class="formula">job.category ∈ candidate.preferred ? 10 : 0</div>
+      <div class="desc">Controlled vocabulary (Factory Worker, Construction, Driver, Electrician, Plumber, Helper, Hospitality, Caregiver, Healthcare, IT, …). Empty candidate prefs → neutral 5.</div>
+    </div>
+    <div class="factor salary" style="grid-column: span 2;">
+      <div class="name">Salary expectation <span class="pts">5 pts</span></div>
+      <div class="formula">within range → 5 pts  |  ≤10% below expected → 3 pts  |  outside → 0 pts  |  either side blank → 5 pts (neutral)</div>
+      <div class="desc">Compares <code>job.salary</code> against the candidate's expected range (min/max, currency-normalised). Lowest-weighted because salary in overseas placement is often negotiated post-shortlist.</div>
+    </div>
+  </div>
+
+  <div class="callout info">
+    <strong>Defaults are baseline only.</strong> All seven weights + missing-criteria policies + the recommendation threshold are stored in <code>system_settings.matching.*</code> and exposed to admin via the Matching Engine Parameters module (§7). Engine reads the live config on every score request — tuning takes effect immediately.
+  </div>
+
+  <div class="footer">
+    <span>HireStream Matching Engine · HPSEDC Overseas Placement</span>
+    <span>Page 1 of 3</span>
+  </div>
+</div>
+
+<!-- ═══════════════════════ PAGE 2 ═══════════════════════ -->
+<div class="page">
+  <h2><span class="pill">4</span> Missing-Criteria Behaviour</h2>
+  <p>
+    What happens when a job doesn't specify a criterion (e.g. no language requirement), or a candidate hasn't filled a field (e.g. no salary expectation)? The engine applies a per-factor <strong>"missing → neutral"</strong> policy. Defaults below; admin can override each cell from §7.
+    <br/><span style="font-size:9px; color:#64748b;"><strong>How to read each cell:</strong> <code>policy → points awarded</code> out of that factor's weight (shown in parentheses next to the factor name). E.g. <code>Half → 15 pts</code> means the Half policy awards 15 of Skills' 30 points. The arrow is "results in", not multiplication.</span>
+  </p>
+  <table class="missing">
+    <thead>
+      <tr>
+        <th style="text-align:left;">Factor</th>
+        <th>Job-side missing</th>
+        <th>Candidate-side missing</th>
+        <th>Both missing</th>
+        <th style="text-align:left;">Rationale</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td>Skills (30)</td>     <td class="pol-half">Half → 15 pts</td>  <td class="pol-zero">Zero → 0 pts</td>   <td class="pol-half">Half</td>  <td style="text-align:left; font-size:9px;">Job-blank: generous (employer was sloppy). Candidate-blank: 0 — no skills to match against a job that needs them.</td></tr>
+      <tr><td>Experience (20)</td>  <td class="pol-full">Full → 20 pts</td> <td class="pol-zero">Zero → 0 pts</td>   <td class="pol-full">Full</td>  <td style="text-align:left; font-size:9px;">Job-blank (0 yrs required): no constraint. Candidate-blank = 0 yrs, scored 0 against any positive requirement.</td></tr>
+      <tr><td>Qualification (10)</td><td class="pol-full">Full → 10 pts</td><td class="pol-half">Half → 5 pts</td>    <td class="pol-full">Full</td>  <td style="text-align:left; font-size:9px;">Encourages profile completion without blocking</td></tr>
+      <tr><td>Country (15)</td>     <td class="pol-na">n/a*</td>         <td class="pol-half">Half → 7 pts</td>    <td class="pol-half">Half</td>  <td style="text-align:left; font-size:9px;">Empty prefs ≠ disinterest — neutral instead of zero</td></tr>
+      <tr><td>Language (10)</td>    <td class="pol-full">Full → 10 pts</td> <td class="pol-zero">Zero → 0 pts</td><td class="pol-full">Full</td>  <td style="text-align:left; font-size:9px;">Gaps must surface — candidate hasn't claimed proficiency</td></tr>
+      <tr><td>Category (10)</td>    <td class="pol-na">n/a*</td>         <td class="pol-half">Half → 5 pts</td>    <td class="pol-half">Half</td>  <td style="text-align:left; font-size:9px;">Candidate may have wide interests</td></tr>
+      <tr><td>Salary (5)</td>       <td class="pol-full">Full → 5 pts</td>  <td class="pol-full">Full → 5 pts</td>   <td class="pol-full">Full</td>  <td style="text-align:left; font-size:9px;">Salary often disclosed post-shortlist — don't penalise either side</td></tr>
+    </tbody>
+  </table>
+
+  <p style="font-size:9px; color:#555; margin:6px 0 0;">
+    <strong>Both-missing rule:</strong> the engine checks the <em>job side first</em>. If the job didn't specify a criterion it is treated as "no constraint" and the <em>Job-side missing</em> policy applies — so when both sides are blank, the job-side value wins. Each direction is independently tunable per factor from the admin Parameters Module (§7): <em>Job didn't specify</em> and <em>Candidate didn't provide</em> are separate Full / Half / Zero knobs.
+    <br/><strong>* n/a</strong> = that side is a <em>required field</em> on the job (Country, Category) so it can never actually be blank — the job-side-missing case simply cannot occur. Every factor still counts toward the fixed 100-point total; missing inputs earn the policy value above (they are <em>not</em> dropped from the denominator).
+  </p>
+
+  <div class="callout">
+    <strong>Worked example.</strong> Job: Software Engineer in UAE, skills [React, Node], 3y experience — no qualification / languages / salary specified. Candidate: skills [React, Node, Python], 5y, preferredCountries=[UAE], no qualification / categories / salary set.<br/>
+    Score: <code>Skills 30 + Exp 20 + Qual 10 (job missing) + Country 15 + Lang 10 (job missing) + Cat 5 (cand half) + Salary 5 (both missing) = <strong>95/100</strong></code>. A partially-filled profile against a partially-filled job still yields a meaningful, defensible score.
+  </div>
+
+  <h2><span class="pill">5</span> Threshold, Sort &amp; Explainability</h2>
+  <div class="two-col">
+    <div>
+      <h3>Recommendation cut-off</h3>
+      <p>The candidate's Recommended Jobs view shows only jobs scoring ≥ the configured threshold. Default <strong>50</strong>; admin adjusts at runtime via <code>matching.recommendation_threshold_pct</code> (§7).</p>
+      <h3>Sort &amp; tie-break</h3>
+      <p>Default sort on agent's per-job list: match score descending; ties broken by application <code>appliedAt</code> (most recent first). Agent can override via dropdown.</p>
+    </div>
+    <div>
+      <h3>Explainability</h3>
+      <p>Every score is returned with a structured per-factor breakdown (score + max + plain-English detail) that the UI renders inline on every match.</p>
+      <p>Why it matters: HPSEDC is a government scheme — candidates have a right to know why they were or weren't matched. Showing the breakdown avoids grievance escalations and gives agents data to coach candidates ("Add Hindi → you'd jump from 65 to 72").</p>
+    </div>
+  </div>
+
+  <h2><span class="pill">6</span> Implementation</h2>
+  <div class="two-col">
+    <div>
+      <h3>Where it lives</h3>
+      <ul>
+        <li><code>calculateScoreBreakdown(candidate, job)</code> in <code>server/routes/application.routes.ts</code></li>
+        <li>Cached on <code>applications.matchScore</code> at apply-time; recomputed on candidate profile change (toggleable setting).</li>
+        <li>Engine version exposed via <code>/api/v1/matching/version</code>.</li>
+      </ul>
+    </div>
+    <div>
+      <h3>Backward compatibility</h3>
+      <ul>
+        <li>v2 adds four new factors. Each defaults per §4 when its input is missing — v1-era profiles don't lose points unfairly.</li>
+        <li>Old scores stored in <code>applications.matchScore</code> stay valid until next recompute.</li>
+        <li>v2 rolls out without a one-time backfill.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="footer">
+    <span>HireStream Matching Engine · HPSEDC Overseas Placement</span>
+    <span>Page 2 of 3</span>
+  </div>
+</div>
+
+<!-- ═══════════════════════ PAGE 3 ═══════════════════════ -->
+<div class="page">
+  <h2><span class="pill">7</span> Matching Engine Parameters Module (Admin)</h2>
+  <p>
+    Every parameter the engine uses is admin-tunable from a dedicated <strong>Matching Engine</strong> tab in the Admin Console. No code change required — HPSEDC ops can fine-tune as the candidate pool, job mix and feedback loop evolve.
+  </p>
+
+  <h3>7.1 · Weight tuner — "music equalizer" UI</h3>
+  <p>
+    Seven vertical sliders, one per factor. Move a slider to change its weight; the engine reads the live config on every score request. Sum-to-100 enforced on save.
+  </p>
+
+  <div class="eq-container">
+    <div class="eq-title">
+      <span>Matching Engine — Weight Tuner</span>
+      <span class="sum">Σ = 100 ✓</span>
+    </div>
+    <div class="eq-bars">
+      <div class="eq-bar">
+        <div class="eq-value">30</div>
+        <div class="eq-track">
+          <div class="eq-fill" style="height: 60%; --c1: #f87171; --c2: #b91c1c;"></div>
+          <div class="eq-knob" style="bottom: calc(60% - 1px);"></div>
+        </div>
+        <div class="eq-label">Skills</div>
+      </div>
+      <div class="eq-bar">
+        <div class="eq-value">20</div>
+        <div class="eq-track">
+          <div class="eq-fill" style="height: 40%; --c1: #fbbf24; --c2: #b45309;"></div>
+          <div class="eq-knob" style="bottom: calc(40% - 1px);"></div>
+        </div>
+        <div class="eq-label">Exp</div>
+      </div>
+      <div class="eq-bar">
+        <div class="eq-value">10</div>
+        <div class="eq-track">
+          <div class="eq-fill" style="height: 20%; --c1: #f472b6; --c2: #a21caf;"></div>
+          <div class="eq-knob" style="bottom: calc(20% - 1px);"></div>
+        </div>
+        <div class="eq-label">Qual</div>
+      </div>
+      <div class="eq-bar">
+        <div class="eq-value">15</div>
+        <div class="eq-track">
+          <div class="eq-fill" style="height: 30%; --c1: #22d3ee; --c2: #0e7490;"></div>
+          <div class="eq-knob" style="bottom: calc(30% - 1px);"></div>
+        </div>
+        <div class="eq-label">Country</div>
+      </div>
+      <div class="eq-bar">
+        <div class="eq-value">10</div>
+        <div class="eq-track">
+          <div class="eq-fill" style="height: 20%; --c1: #a78bfa; --c2: #6d28d9;"></div>
+          <div class="eq-knob" style="bottom: calc(20% - 1px);"></div>
+        </div>
+        <div class="eq-label">Lang</div>
+      </div>
+      <div class="eq-bar">
+        <div class="eq-value">10</div>
+        <div class="eq-track">
+          <div class="eq-fill" style="height: 20%; --c1: #34d399; --c2: #047857;"></div>
+          <div class="eq-knob" style="bottom: calc(20% - 1px);"></div>
+        </div>
+        <div class="eq-label">Cat</div>
+      </div>
+      <div class="eq-bar">
+        <div class="eq-value">5</div>
+        <div class="eq-track">
+          <div class="eq-fill" style="height: 10%; --c1: #a3e635; --c2: #4d7c0f;"></div>
+          <div class="eq-knob" style="bottom: calc(10% - 1px);"></div>
+        </div>
+        <div class="eq-label">Salary</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="two-col">
+    <div>
+      <h3 style="margin-top:0;">7.2 · Missing-criteria policy</h3>
+      <p>
+        Each cell in the §4 table is an admin-editable dropdown (<strong>Full</strong> / <strong>Half</strong> / <strong>Zero</strong>). Useful for tightening matching as the candidate pool matures — e.g. flip <em>Candidate-side missing → Qualification</em> from Half to Zero once profile-completion drives are done.
+      </p>
+    </div>
+    <div>
+      <h3 style="margin-top:0;">7.3 · Threshold &amp; engine toggle</h3>
+      <ul>
+        <li><strong>Recommendation threshold:</strong> slider 0–100, default 50</li>
+        <li><strong>Engine version:</strong> v1 / v2 radio (rollback safety)</li>
+        <li><strong>Recompute on profile change:</strong> on/off</li>
+        <li><strong>Show breakdown to candidate:</strong> on/off</li>
+      </ul>
+    </div>
+  </div>
+
+  <h3>7.4 · Live preview</h3>
+  <div class="preview-tile">
+    Admin picks a candidate + a job from dropdowns; the breakdown renders live as weights are dragged. Lets HPSEDC verify the impact of a tuning change <em>before</em> hitting Save — "If I drop Skills from 30 to 25, does Arjun Sharma still pass the threshold for AI Engineer?"
+  </div>
+
+  <h3>7.5 · Audit trail</h3>
+  <p>
+    Every weight, policy or threshold change writes to <code>audit_log</code> with <code>actor</code>, <code>from</code>, <code>to</code>, <code>timestamp</code> and an optional <code>reason</code> note. Admin sees the full history in a table within the same module — defensible if a candidate ever disputes their score.
+  </p>
+
+  <div class="callout warn">
+    <strong>Operational guardrail.</strong> Weights must sum to exactly 100. Admin UI rejects any non-summing change with the message <em>"Weights must sum to exactly 100 (current sum: X)."</em> A "Reset to defaults" button restores the v2 baseline.
+  </div>
+
+  <h2><span class="pill">8</span> Not in v2 (Future Roadmap)</h2>
+  <ul>
+    <li><strong>Soft skills weighting</strong> (collaboration, leadership) — requires text analysis; deferred until extractor in place.</li>
+    <li><strong>Employer reputation</strong> — placement success rate per employer feeding back into the score; needs ≥1000 placements.</li>
+    <li><strong>Freshness decay</strong> — score halves over 30 days; encourages active candidates.</li>
+    <li><strong>ML-driven re-rank</strong> — learn optimal weights from (features → placement_success) once we have enough outcomes data.</li>
+  </ul>
+
+  <div class="footer">
+    <span>HireStream Matching Engine · HPSEDC Overseas Placement</span>
+    <span>Page 3 of 3</span>
+  </div>
+</div>
+
+</body>
+</html>

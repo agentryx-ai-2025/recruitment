@@ -61,3 +61,6 @@ tmp/
 # Carries .venv directories + walkthrough videos (~622MB total). Living
 # reference; templates are copied INTO this repo's PMD-Final wrapup/ when used.
 PMD-DevFactory/
+
+# local DB backups (kept on disk, not in git)
+_backups/

@@ -126,8 +126,15 @@ feedbackRouter.get("/", requireAuth, async (req, res) => {
 
 // ── Stats for the dashboard card ────────────────────────────────────
 feedbackRouter.get("/stats", requireAuth, async (req, res) => {
+  const me = await currentReviewer(req.session.reviewerId!);
+  if (!me) return res.status(401).json({ error: "Reviewer not found" });
+
   const { projectId } = req.query as Record<string, string | undefined>;
-  const conds = projectId ? [eq(feedbackItems.projectId, projectId)] : [];
+  const conds: any[] = [];
+  if (projectId) conds.push(eq(feedbackItems.projectId, projectId));
+  // Mirror the list endpoint's visibility scoping so the dashboard count never
+  // disagrees with the inbox: non-triage reviewers count only their own.
+  if (!canTriage(me)) conds.push(eq(feedbackItems.submitterReviewerId, me.id));
   const rows = await db.select({ status: feedbackItems.status })
     .from(feedbackItems)
     .where(conds.length ? and(...conds) : undefined);

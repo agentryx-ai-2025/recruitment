@@ -5,7 +5,7 @@ import { Link } from "wouter";
 import { Header } from "../components/Header";
 import { api } from "../lib/api";
 import { useRequireAuth } from "../lib/useRequireAuth";
-import { FeedbackCard } from "../components/FeedbackCard";
+import { FeedbackCard, IdeasButton } from "../components/FeedbackCard";
 import { FeedbackDialog } from "../components/FeedbackDialog";
 import { SprintSection } from "../components/SprintSection";
 import { ActivityFeed } from "../components/ActivityFeed";
@@ -237,6 +237,7 @@ export function ProjectView() {
               title="Submit an enhancement idea or suggestion">
               💡 Suggest an idea
             </button>
+            <IdeasButton projectId={data.project.id} projectSlug={data.project.slug} />
             <a href={`/api/export/projects/${slug}/csv`} className="inline-flex items-center gap-2 text-sm bg-white border border-slate-200 rounded px-3 py-2 hover:border-agentryx-500"><Download className="w-4 h-4" />CSV</a>
             <a href={`/api/export/projects/${slug}/pdf`} className="inline-flex items-center gap-2 text-sm bg-white border border-slate-200 rounded px-3 py-2 hover:border-agentryx-500"><FileText className="w-4 h-4" />PDF</a>
           </div>
