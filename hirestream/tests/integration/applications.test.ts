@@ -39,7 +39,7 @@ beforeEach(async () => {
   await request(app)
     .patch('/api/v1/candidates/profile')
     .set('Cookie', candidateCookie)
-    .send({ fullName: 'Test Cand', email: 'cand@test.com', skills: ['React', 'Node.js'], experience: 3, preferredCountries: ['UAE'] });
+    .send({ fullName: 'Test Cand', email: 'cand@test.com', skills: ['React', 'Node.js'], experience: 3, preferredCountries: ['United Arab Emirates'] });
 
   // Create a job
   const jobRes = await request(app)
@@ -333,7 +333,7 @@ describe('POST /api/v1/applications/:id/interview-outcome', () => {
     const after = await db.select().from(placements).where(eq(placements.applicationId, appId));
     expect(after.length).toBe(1);
     // Defaults pulled from the parent job
-    expect((after[0] as any).country).toBe('UAE');
+    expect((after[0] as any).country).toBe('United Arab Emirates');
     expect((after[0] as any).status).toBe('offered');
   });
 });
@@ -360,7 +360,7 @@ describe('Placement auto-create on status → selected', () => {
     const db = getDb();
     const rows = await db.select().from(placements).where(eq(placements.applicationId, appId));
     expect(rows.length).toBe(1);
-    expect((rows[0] as any).country).toBe('UAE');
+    expect((rows[0] as any).country).toBe('United Arab Emirates');
     expect((rows[0] as any).status).toBe('offered');
   });
 

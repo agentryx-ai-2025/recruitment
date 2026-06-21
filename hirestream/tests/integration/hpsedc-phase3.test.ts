@@ -59,7 +59,7 @@ beforeEach(async () => {
     fullName: 'Phase Three Cand', email: 'cand.p3@test.com',
     skills: ['React', 'Node.js', 'TypeScript', 'PostgreSQL'],
     experience: 5,
-    preferredCountries: ['UAE', 'Canada'],
+    preferredCountries: ['United Arab Emirates', 'Canada'],
     qualificationLevel: 'bachelor',
     preferredCategories: ['it'],
     preferredSalaryMin: 50000,
@@ -97,7 +97,7 @@ describe('Phase 3 — GET /api/v1/matching/version', () => {
     expect(r.body.data.policy.skill.candidateMissing).toBe('zero');
     expect(r.body.data.policy.skill.jobMissing).toBe('half');
     expect(typeof r.body.data.thresholdPct).toBe('number');
-    expect(r.body.data.ieltsCountries).toContain('UK');
+    expect(r.body.data.ieltsCountries).toContain('United Kingdom');
   });
 });
 

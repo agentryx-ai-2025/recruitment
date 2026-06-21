@@ -66,8 +66,28 @@ router.post("/parse", protect, async (req, res) => {
     }
 
     // ── COUNTRY PREFERENCES ────────────────────────────────────────────
-    const countries = ["UAE", "Saudi Arabia", "Qatar", "Kuwait", "Bahrain", "Oman", "USA", "UK", "Canada", "Australia", "Germany", "Singapore", "Japan", "New Zealand"];
-    const foundCountries = countries.filter(c => new RegExp(`\\b${escapeRegex(c)}\\b`, "i").test(text));
+    // Match both canonical country_info names and the short aliases candidates
+    // typically write on a CV ("UAE" not "United Arab Emirates"). The output
+    // is normalised to canonical names so the rest of the matching/storage
+    // path stays consistent with v0.7.3.2 country validation.
+    const COUNTRY_ALIASES: Record<string, string> = {
+      "UAE": "United Arab Emirates", "United Arab Emirates": "United Arab Emirates",
+      "Saudi Arabia": "Saudi Arabia", "KSA": "Saudi Arabia",
+      "Qatar": "Qatar", "Kuwait": "Kuwait", "Bahrain": "Bahrain", "Oman": "Oman",
+      "USA": "United States of America", "US": "United States of America",
+      "United States": "United States of America", "America": "United States of America",
+      "UK": "United Kingdom", "Britain": "United Kingdom", "England": "United Kingdom",
+      "United Kingdom": "United Kingdom",
+      "Canada": "Canada", "Australia": "Australia", "Germany": "Germany",
+      "Singapore": "Singapore", "Japan": "Japan", "New Zealand": "New Zealand",
+      "Malaysia": "Malaysia", "Ireland": "Ireland", "Israel": "Israel",
+      "Maldives": "Maldives",
+    };
+    const foundCountries = Array.from(new Set(
+      Object.keys(COUNTRY_ALIASES)
+        .filter(alias => new RegExp(`\\b${escapeRegex(alias)}\\b`, "i").test(text))
+        .map(alias => COUNTRY_ALIASES[alias])
+    ));
 
     // ── CATEGORIZED SKILLS ─────────────────────────────────────────────
     const skillsByCategory: Record<string, string[]> = {};

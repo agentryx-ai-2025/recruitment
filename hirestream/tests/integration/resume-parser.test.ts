@@ -105,8 +105,11 @@ describe('POST /api/v1/resume/parse', () => {
       text: 'Open to opportunities in UAE, Canada, and Singapore.',
     });
     expect(res.status).toBe(200);
+    // v0.7.4.2: resume parser normalises CV aliases ('UAE') → canonical
+    // country_info names ('United Arab Emirates') so downstream matching
+    // stays consistent. Input text still uses 'UAE' (what candidates write).
     expect(res.body.data.extracted.preferredCountries).toEqual(
-      expect.arrayContaining(['UAE', 'Canada', 'Singapore'])
+      expect.arrayContaining(['United Arab Emirates', 'Canada', 'Singapore'])
     );
   });
 

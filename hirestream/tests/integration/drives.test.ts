@@ -242,7 +242,7 @@ describe('POST /api/v1/drives/placements', () => {
 
     expect(res.status).toBe(201);
     expect(res.body.data.status).toBe('offered');
-    expect(res.body.data.country).toBe('UAE');
+    expect(res.body.data.country).toBe('United Arab Emirates');
   });
 
   it('rejects placement for non-selected application → 400', async () => {
@@ -415,6 +415,6 @@ describe('v0.4.17 IDOR guards on drive.routes', () => {
     const res = await request(app).get(`/api/v1/drives/placements/${placement.body.data.id}`)
       .set('Cookie', candidateCookie);
     expect(res.status).toBe(200);
-    expect(res.body.data.country).toBe('UAE');
+    expect(res.body.data.country).toBe('United Arab Emirates');
   });
 });

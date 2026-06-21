@@ -42,7 +42,7 @@ beforeEach(async () => {
   await request(app)
     .patch('/api/v1/candidates/profile')
     .set('Cookie', candidateCookie)
-    .send({ fullName: 'Test Candidate', email: 'cand@test.com', skills: ['React', 'Node.js'], experience: 3, preferredCountries: ['UAE'] });
+    .send({ fullName: 'Test Candidate', email: 'cand@test.com', skills: ['React', 'Node.js'], experience: 3, preferredCountries: ['United Arab Emirates'] });
 });
 
 async function createJob(cookie: string[], overrides: any = {}) {
@@ -107,7 +107,9 @@ describe('GET /api/v1/jobs', () => {
   });
 
   it('filters by country', async () => {
-    const res = await request(app).get('/api/v1/jobs?country=UAE');
+    // v0.7.4.2: filter value matches canonical country_info name (jobs are now
+    // created with 'United Arab Emirates' rather than the old 'UAE' alias).
+    const res = await request(app).get('/api/v1/jobs?country=United+Arab+Emirates');
     expect(res.body.data.length).toBe(2);
   });
 
@@ -250,7 +252,7 @@ describe('POST /api/v1/jobs/:id/apply', () => {
   });
 
   it('calculates real match score (not random)', async () => {
-    // Candidate has skills: ['React', 'Node.js'], exp: 3, preferred: ['UAE']
+    // Candidate has skills: ['React', 'Node.js'], exp: 3, preferred: ['United Arab Emirates']
     // Job has skills: ['React', 'Node.js'], exp: 2, country: 'United Arab Emirates'
     // Expected: 50 (skill) + 30 (exp) + 20 (country) = 100
     const created = await createJob(agentCookie);

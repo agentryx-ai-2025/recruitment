@@ -29,7 +29,16 @@
 import { getSetting } from "./settings.service";
 
 // ── Constants ───────────────────────────────────────────────────────
-export const IELTS_COUNTRIES = new Set(["UK", "Australia", "New Zealand", "Canada", "Ireland", "USA"]);
+// Country names match country_info.name canonical values (v0.7.3.2). Both
+// the old short aliases (UK / USA) and the canonical forms are accepted
+// during the transition window so legacy in-flight jobs continue to score
+// correctly; new jobs created via the country-validated API path will only
+// ever use canonical names.
+export const IELTS_COUNTRIES = new Set([
+  "United Kingdom", "Australia", "New Zealand", "Canada", "Ireland", "United States of America",
+  // Legacy aliases — kept for back-compat with rows created before v0.7.3.2.
+  "UK", "USA",
+]);
 
 // Spec §3 default weights — sum must equal 100. Admin can tune via the
 // `matching.weights` setting (JSON object with these same keys).

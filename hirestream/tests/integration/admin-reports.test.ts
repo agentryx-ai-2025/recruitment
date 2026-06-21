@@ -139,7 +139,7 @@ describe('GET /api/v1/admin/reports/by-country', () => {
       .set('Cookie', adminCookie);
 
     expect(res.status).toBe(200);
-    const uae = res.body.data.find((r: any) => r.country === 'UAE');
+    const uae = res.body.data.find((r: any) => r.country === 'United Arab Emirates');
     expect(uae).toBeDefined();
     expect(uae.total_jobs).toBeGreaterThanOrEqual(1);
   });
