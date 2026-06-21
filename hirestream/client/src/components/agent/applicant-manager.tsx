@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -92,6 +92,35 @@ export function ApplicantManager({ jobId, jobTitle }: { jobId: string; jobTitle:
     }
   };
 
+  // v0.7.7.0 (FB-2026-0001) — keyboard shortcuts for reviewers.
+  // When applicants are selected (via checkbox), pressing:
+  //   A → accept   (status='selected')
+  //   P → partial  (status='shortlisted' — moved forward but not final)
+  //   R → reject   (status='rejected')
+  //   W → waive    (status='reviewed' — neutral "looked at, no decision")
+  // Ignored when focus is inside an input/textarea/select to avoid stealing
+  // form keystrokes. Modal must be open AND ≥1 applicant selected.
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: KeyboardEvent) => {
+      // Don't capture if user is typing in a form field
+      const t = e.target as HTMLElement;
+      if (t && /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)) return;
+      if ((t as any)?.isContentEditable) return;
+      // Don't fight modifier-key shortcuts (Cmd/Ctrl + anything)
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      if (selectedIds.size === 0) return;
+
+      const SHORTCUTS: Record<string, string> = { a: "selected", p: "shortlisted", r: "rejected", w: "reviewed" };
+      const status = SHORTCUTS[e.key.toLowerCase()];
+      if (!status) return;
+      e.preventDefault();
+      bulkMutation.mutate({ ids: Array.from(selectedIds), status });
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [open, selectedIds, bulkMutation]);
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
@@ -131,6 +160,14 @@ export function ApplicantManager({ jobId, jobTitle }: { jobId: string; jobTitle:
               Apply to {selectedIds.size}
             </Button>
             <Button size="sm" variant="outline" onClick={() => setSelectedIds(new Set())}>Clear</Button>
+            {/* v0.7.7.0 — keyboard shortcut hint */}
+            <div className="ml-auto text-[10px] text-blue-700 hidden md:flex items-center gap-1.5">
+              Quick action:
+              <kbd className="px-1.5 py-0.5 bg-white border border-blue-300 rounded font-mono text-[10px]">A</kbd>ccept
+              <kbd className="px-1.5 py-0.5 bg-white border border-blue-300 rounded font-mono text-[10px]">P</kbd>artial
+              <kbd className="px-1.5 py-0.5 bg-white border border-blue-300 rounded font-mono text-[10px]">R</kbd>eject
+              <kbd className="px-1.5 py-0.5 bg-white border border-blue-300 rounded font-mono text-[10px]">W</kbd>aive
+            </div>
           </div>
         )}
 

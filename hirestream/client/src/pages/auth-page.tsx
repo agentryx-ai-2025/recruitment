@@ -415,6 +415,11 @@ function RegisterForm() {
   const { toast } = useToast();
   const { t } = useTranslation();
   const [showPassword, setShowPassword] = useState(false);
+  // v0.7.6.1 (FB-2026-0007) — confirm-password field. Catches typo lockouts
+  // before account creation. Match is enforced client-side; the server still
+  // only sees `password`.
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [confirmTouched, setConfirmTouched] = useState(false);
 
   const form = useForm({
     resolver: zodResolver(registerSchema),
@@ -422,6 +427,8 @@ function RegisterForm() {
   });
 
   const selectedRole = form.watch("role");
+  const password = form.watch("password");
+  const passwordsMatch = !confirmPassword || confirmPassword === password;
 
   const roleDescriptions: Record<string, string> = {
     candidate: "Search and apply for verified overseas job opportunities",
@@ -430,6 +437,11 @@ function RegisterForm() {
   };
 
   const onSubmit = (data: any) => {
+    if (data.password !== confirmPassword) {
+      setConfirmTouched(true);
+      toast({ title: "Passwords don't match", description: "Re-type your password in the confirm field.", variant: "destructive" });
+      return;
+    }
     registerMutation.mutate({ ...data, username: data.email }, {
       onError: (err: any) => {
         toast({ title: "Registration Failed", description: err.message, variant: "destructive" });
@@ -538,9 +550,35 @@ function RegisterForm() {
           )}
         />
 
+        {/* v0.7.6.1 — Confirm password (FB-2026-0007). Client-only validation;
+            server still only receives `password`. */}
+        <FormItem>
+          <FormLabel htmlFor="confirmPassword">Confirm Password</FormLabel>
+          <FormControl>
+            <div className="relative">
+              <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+              <Input
+                id="confirmPassword"
+                type={showPassword ? "text" : "password"}
+                placeholder="Re-type your password"
+                maxLength={128}
+                className="pl-10"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                onBlur={() => setConfirmTouched(true)}
+                aria-invalid={confirmTouched && !passwordsMatch}
+                autoComplete="new-password"
+              />
+            </div>
+          </FormControl>
+          {confirmTouched && !passwordsMatch && (
+            <p className="text-xs text-red-600 mt-1">Passwords don't match — re-type to confirm.</p>
+          )}
+        </FormItem>
+
         <Button type="submit"
           className="w-full h-11 rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 transition-all"
-          disabled={registerMutation.isPending}>
+          disabled={registerMutation.isPending || !passwordsMatch || !confirmPassword}>
           {registerMutation.isPending ? (
             <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Creating account...</>
           ) : (

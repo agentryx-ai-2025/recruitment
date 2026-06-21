@@ -35,6 +35,7 @@ const AgentDriveDetailPage = lazy(() => import("@/pages/agent-drive-detail"));
 const EmployerReviewPage = lazy(() => import("@/pages/employer-review"));
 const SystemControlsPage = lazy(() => import("@/pages/system-controls"));
 const OperatorConsolePage = lazy(() => import("@/pages/admin/operator-console"));
+const AccessibilityPage = lazy(() => import("@/pages/accessibility"));
 
 function RouteFallback() {
   return (
@@ -146,6 +147,9 @@ function Router() {
         </Route>
         <Route path="/admin/operator-console">
           <PageLayout><OperatorConsolePage /></PageLayout>
+        </Route>
+        <Route path="/accessibility">
+          <PageLayout><AccessibilityPage /></PageLayout>
         </Route>
         <Route>
           <PageLayout><NotFound /></PageLayout>

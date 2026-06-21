@@ -34,13 +34,18 @@ const FUZZ_TARGETS = [
     method: "POST",
     path: "/auth/register",
     schema: "registerSchema",
+    // v0.7.6.2 — knownFields aligned with the actual registerSchema in
+    // shared/validators.ts. The server sets `username = email` internally;
+    // there is no separate `username` field, so fuzzing it was producing
+    // ~30 false-positive "server accepted malformed input" findings (Zod
+    // .object() strips unknown keys by default — correct behaviour, not a bug).
     knownFields: {
-      username: { kind: "string", required: true, min: 3, max: 50 },
       email: { kind: "email", required: true },
       password: { kind: "string", required: true, min: 8, max: 128 },
       role: { kind: "enum", required: true, allowed: ["candidate", "agent", "employer"] },
+      fullName: { kind: "string", min: 2, max: 100 },
     },
-    validPayload: () => ({ username: `fuzz_user_${Date.now()}`, email: `fuzz${Date.now()}@example.com`, password: "Test@1234", role: "candidate" }),
+    validPayload: () => ({ email: `fuzz${Date.now()}@example.com`, password: "Test@1234", role: "candidate", fullName: "Fuzz User" }),
   },
   {
     name: "candidate profile PATCH",
@@ -69,7 +74,10 @@ const FUZZ_TARGETS = [
       category: { kind: "string", min: 1, max: 60 },
       hiringDeadline: { kind: "date", future: true },
     },
-    validPayload: () => ({ title: "Software Engineer", company: "FuzzCo", location: "Remote", country: "India", experience: 3, targetHires: 5, category: "IT" }),
+    // v0.7.6.2 — country must be a valid country_info name (v0.7.3.2);
+    // "India" is rejected as INDIA_NOT_VALID_DESTINATION which counted as
+    // a false-positive on every fuzz run.
+    validPayload: () => ({ title: "Software Engineer", company: "FuzzCo", location: "Remote", country: "United Arab Emirates", experience: 3, targetHires: 5, category: "information_technology" }),
   },
   {
     name: "application creation",
