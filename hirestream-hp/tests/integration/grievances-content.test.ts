@@ -79,18 +79,33 @@ describe('GET /api/v1/grievances (admin)', () => {
   });
 });
 
-describe('PATCH /api/v1/grievances/:id (admin resolve)', () => {
-  it('resolves grievance with notes', async () => {
+describe('PATCH /api/v1/grievances/:id (staff acts → complainant confirms)', () => {
+  // Product model: staff drive the work (action_taken + resolution notes) but
+  // do NOT self-resolve — the complainant closes the loop. See grievance.routes.ts.
+  it('staff record action + notes; only the complainant can mark it resolved', async () => {
     const created = await request(app).post('/api/v1/grievances').set('Cookie', candidateCookie)
       .send({ category: 'application_issue', subject: 'Stuck', description: 'Help needed resolving this issue' });
+    const gid = created.body.data.id;
 
-    const res = await request(app).patch(`/api/v1/grievances/${created.body.data.id}`).set('Cookie', adminCookie)
-      .send({ status: 'resolved', resolutionNotes: 'Fixed the issue' });
+    // Staff mark action_taken with resolution notes (staff-only fields).
+    const staffRes = await request(app).patch(`/api/v1/grievances/${gid}`).set('Cookie', adminCookie)
+      .send({ status: 'action_taken', resolutionNotes: 'Fixed the issue' });
+    expect(staffRes.status).toBe(200);
+    expect(staffRes.body.data.status).toBe('action_taken');
+    expect(staffRes.body.data.resolutionNotes).toBe('Fixed the issue');
 
-    expect(res.status).toBe(200);
-    expect(res.body.data.status).toBe('resolved');
-    expect(res.body.data.resolutionNotes).toBe('Fixed the issue');
-    expect(res.body.data.resolvedAt).toBeTruthy();
+    // Staff cannot self-resolve — the complainant confirms the fix.
+    const selfResolve = await request(app).patch(`/api/v1/grievances/${gid}`).set('Cookie', adminCookie)
+      .send({ status: 'resolved' });
+    expect(selfResolve.status).toBe(403);
+
+    // The complainant closes the loop; resolvedAt is stamped, notes preserved.
+    const closeRes = await request(app).patch(`/api/v1/grievances/${gid}`).set('Cookie', candidateCookie)
+      .send({ status: 'resolved' });
+    expect(closeRes.status).toBe(200);
+    expect(closeRes.body.data.status).toBe('resolved');
+    expect(closeRes.body.data.resolutionNotes).toBe('Fixed the issue');
+    expect(closeRes.body.data.resolvedAt).toBeTruthy();
   });
 });
 

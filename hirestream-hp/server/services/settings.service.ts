@@ -11,7 +11,7 @@ import { logger } from "../config/logger.config";
  * Add new keys to DEFAULTS below; call `getSetting(key)` from any endpoint.
  */
 
-export type SettingCategory = "pipeline" | "rejection" | "access" | "notifications" | "matching" | "lifecycle" | "uploads" | "security";
+export type SettingCategory = "pipeline" | "rejection" | "access" | "notifications" | "matching" | "lifecycle" | "uploads" | "security" | "capability";
 
 export interface SettingSpec {
   key: string;
@@ -120,6 +120,39 @@ export const SETTING_SPECS: SettingSpec[] = [
     description: "When off, recruitment drives go live immediately without the HPSEDC approval gate.",
     type: "boolean",
     default: true,
+  },
+
+  // ── Capability (HP-3: single-agency / blue-collar fork gating) ────────
+  // These flags DISABLE (never delete) the multi-role marketplace surface so
+  // HireStream-HP runs as a single mega-agency (HPSEDC). The full multi-role
+  // architecture stays intact behind them — flip these ON to re-expand into a
+  // marketplace (external employers + agencies) with zero code changes.
+  // Reference portal (separate DB) keeps its own values; these HP defaults do
+  // not affect it.
+  {
+    key: "capability.employer_self_registration",
+    category: "capability",
+    label: "Allow employers to self-register",
+    description: "When off, the 'Employer' role is hidden from signup and employer self-registration is rejected. HPSEDC manages employer entities directly. Turn on to re-open the marketplace to self-serve employers.",
+    type: "boolean",
+    default: false,
+  },
+  {
+    key: "capability.agency_self_registration",
+    category: "capability",
+    label: "Allow agencies to self-register",
+    description: "When off, the 'Agency' role is hidden from signup and agent self-onboarding is rejected. HPSEDC operates as the sole agency. Turn on to admit external recruitment agencies.",
+    type: "boolean",
+    default: false,
+  },
+  {
+    key: "capability.agency_mode",
+    category: "capability",
+    label: "Agency operating mode",
+    description: "'single' = one mega-agency (HPSEDC) owns all jobs/candidates. 'marketplace' = multiple agencies compete (the reference-portal model).",
+    type: "string",
+    default: "single",
+    options: ["single", "marketplace"],
   },
 
   // ── Notifications ────────────────────────────────────────────────────

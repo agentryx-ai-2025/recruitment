@@ -14,13 +14,32 @@ import { sendPasswordResetEmail } from "../services/email.service";
 import { z } from "zod";
 import { notify } from "../services/notification.service";
 import { candidates, employers } from "@shared/schema";
+import { getSetting } from "../services/settings.service";
 
 const router = Router();
+
+// HP-3: capability flags gate which roles may self-register. The register
+// schema still validates the role literal; this rejects roles that are
+// architecturally present but disabled for the single-agency HP variant.
+// Flip the capability.* settings ON to re-open marketplace self-registration.
+const SELF_REGISTER_CAPABILITY: Record<string, string> = {
+  employer: "capability.employer_self_registration",
+  agent: "capability.agency_self_registration",
+};
 
 // ── Register ────────────────────────────────────────────────────────
 router.post("/register", validateRequest(registerSchema), async (req, res, next) => {
   try {
     const { email, password, role, fullName, phone } = req.body;
+
+    // HP-3: reject self-registration for roles disabled in this deployment.
+    const capKey = SELF_REGISTER_CAPABILITY[role];
+    if (capKey && !(await getSetting<boolean>(capKey))) {
+      return res.status(403).json({
+        success: false,
+        error: { code: 403, message: "This account type is not open for self-registration on this portal." },
+      });
+    }
 
     // Check if user exists
     const existing = await storage.getUserByUsername(email);

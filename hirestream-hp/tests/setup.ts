@@ -51,4 +51,14 @@ beforeAll(async () => {
     await db.insert(countryInfo).values({ code: c.code, name: c.name, isActive: true }).onConflictDoNothing();
   }
   await loadValidCountries();
+
+  // HP-3: the inherited multi-role suite registers employer/agent users, which
+  // the register gate blocks under HP's single-agency defaults. Enable the
+  // capability flags in the test env (baseline for suites that don't truncate;
+  // truncateAllTables re-enables them after each wipe). Disabled-default
+  // behaviour is covered by tests/integration/capability-gating.test.ts.
+  const { updateSetting } = await import('../server/services/settings.service');
+  await updateSetting('capability.employer_self_registration', true);
+  await updateSetting('capability.agency_self_registration', true);
+  await updateSetting('capability.agency_mode', 'marketplace');
 });

@@ -4,6 +4,7 @@ import { passport } from '../server/config/passport.config';
 import { mobileBearer } from '../server/middleware/mobileBearer.middleware';
 import { storage } from '../server/storage';
 import authRouter from '../server/routes/auth.routes';
+import publicConfigRouter from '../server/routes/public-config.routes';
 import candidateRouter from '../server/routes/candidate.routes';
 import adminRouter from '../server/routes/admin.routes';
 import adminOversightRouter from '../server/routes/admin-oversight.routes';
@@ -64,6 +65,7 @@ export function createTestApp(): express.Express {
   app.use(passport.session());
 
   app.use('/api/v1/auth', authRouter);
+  app.use('/api/v1/config', publicConfigRouter);
   app.use('/api/v1/candidates', candidateRouter);
   app.use('/api/v1/admin', adminRouter);
   app.use('/api/v1/superadmin', superadminRouter);
@@ -162,6 +164,18 @@ export async function truncateAllTables(): Promise<void> {
     await db.insert(countryInfo).values({ code: c.code, name: c.name, isActive: true }).onConflictDoNothing();
   }
   await loadValidCountries();
+
+  // HP-3: TRUNCATE wiped system_settings, resetting the capability flags to
+  // their single-agency HP defaults (employer + agency self-registration OFF).
+  // The inherited Jest suite exercises the PRESERVED multi-role marketplace
+  // (it registers employer/agent users), so enable those capabilities in the
+  // test env. updateSetting writes the DB row AND the in-memory settings cache
+  // that the register gate reads. The disabled-default behaviour is covered
+  // explicitly by tests/integration/capability-gating.test.ts.
+  const { updateSetting } = await import('../server/services/settings.service');
+  await updateSetting('capability.employer_self_registration', true);
+  await updateSetting('capability.agency_self_registration', true);
+  await updateSetting('capability.agency_mode', 'marketplace');
 }
 
 /**

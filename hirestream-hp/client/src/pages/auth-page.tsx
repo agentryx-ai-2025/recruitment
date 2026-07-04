@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "@/hooks/use-auth";
+import { useCapabilities } from "@/hooks/use-capabilities";
 import { useLocation } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -375,6 +376,10 @@ function RegisterForm() {
   const { registerMutation } = useAuth();
   const { toast } = useToast();
   const { t } = useTranslation();
+  // HP-3: only offer the roles this deployment opens for self-registration.
+  // Single-agency HP hides Employer + Agency; flip the server capability.*
+  // flags to re-expand into a marketplace.
+  const { capabilities } = useCapabilities();
   const [showPassword, setShowPassword] = useState(false);
   // v0.7.6.1 (FB-2026-0007) — confirm-password field. Catches typo lockouts
   // before account creation. Match is enforced client-side; the server still
@@ -429,12 +434,16 @@ function RegisterForm() {
                   <SelectItem value="candidate">
                     <span className="flex items-center gap-2"><User className="h-4 w-4" /> Job Seeker (Candidate)</span>
                   </SelectItem>
-                  <SelectItem value="agent">
-                    <span className="flex items-center gap-2"><Briefcase className="h-4 w-4" /> Recruitment Agency</span>
-                  </SelectItem>
-                  <SelectItem value="employer">
-                    <span className="flex items-center gap-2"><Building2 className="h-4 w-4" /> Employer</span>
-                  </SelectItem>
+                  {capabilities.agencySelfRegistration && (
+                    <SelectItem value="agent">
+                      <span className="flex items-center gap-2"><Briefcase className="h-4 w-4" /> Recruitment Agency</span>
+                    </SelectItem>
+                  )}
+                  {capabilities.employerSelfRegistration && (
+                    <SelectItem value="employer">
+                      <span className="flex items-center gap-2"><Building2 className="h-4 w-4" /> Employer</span>
+                    </SelectItem>
+                  )}
                 </SelectContent>
               </Select>
               {selectedRole && (
