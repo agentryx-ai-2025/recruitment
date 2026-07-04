@@ -2,13 +2,29 @@
 
 Running tracker. Update every working session, in the same commit as the code change.
 
-**Current version:** v0.2.0 (HP-3a capability-flag layer shipped)
+**Current version:** v0.3.0 (HP-3b single mega-agency shipped)
 **Live:** https://hirestream-hp.agentryx.dev · PM2 id 3 · port 5003
-**Last updated:** 2026-07-04 — HP-3a shipped (single-agency flag layer)
+**Last updated:** 2026-07-04 — HP-3b shipped (mega-agency + association + slim admin)
 
 ---
 
 ## Shipped
+
+### v0.3.0 — HP-3b · single HPSEDC mega-agency
+Builds on the HP-3a flag layer. Still disable-not-delete — no deleted routes.
+
+- **Mega-agency seed** (`default-agency.seed.ts`, wired into boot): idempotently creates the `hpsedc_agency` operator (role=agent) + a **verified** `recruitment_agents` row ("HPSEDC — Overseas Placement Cell"), and records its user id in `capability.default_agency_user_id`. Password from `DEFAULT_AGENCY_PASSWORD` (fallback `test123` + warning — **rotate before go-live**).
+- **Single-mode job association** (`job.routes.ts` choke point): in `agency_mode=single`, every new job is owned by the mega-agency regardless of creator; marketplace mode keeps creator ownership. Falls back to creator if the mega-agency isn't seeded.
+- **Slim admin** (`admin-dashboard.tsx`): the Agencies + Employers approval tabs (and the Overview agency metric card / "Agency Verifications" pending item / "Review now" button) are hidden when those capabilities are off. Code stays; re-enabling the flag restores them.
+- **Hermetic isolation test**: rebuilt the orphaned `data-isolation.test.ts` as a self-seeding suite (candidate + agent/job isolation) — **un-skipped**. Proves the preserved multi-agency isolation still holds (the expand-path guard).
+
+**Verification:**
+- Boot seed confirmed live: `hpsedc_agency` + verified agency + `default_agency_user_id` set; reference intact at 0.7.7.0.
+- Live smoke: mega-agency login → posts a job → `agent_id` = mega-agency, public (cleaned up).
+- New Jest coverage: single-mode association forces mega-agency ownership even for a different creator.
+- Admin slim-down verified structurally (typecheck + same `useCapabilities` mechanism Playwright-verified for the register dropdown in HP-3a). **Not** clicked live — no admin account on HP, and I declined to escalate one on the live DB unprompted.
+
+### v0.2.0 — HP-3a · capability-flag layer (disable-not-delete)
 
 ### v0.2.0 — HP-3a · capability-flag layer (disable-not-delete)
 Single-agency gating via a new `capability` settings category — **zero schema

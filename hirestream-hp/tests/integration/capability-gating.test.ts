@@ -1,8 +1,11 @@
 import { describe, beforeAll, beforeEach, it, expect } from '@jest/globals';
 import request from 'supertest';
 import type { Express } from 'express';
-import { createTestApp, truncateAllTables } from '../helpers';
+import { createTestApp, truncateAllTables, getDb } from '../helpers';
 import { updateSetting } from '../../server/services/settings.service';
+import { seedDefaultAgency, getDefaultAgencyUserId } from '../../server/services/default-agency.seed';
+import { recruitmentAgents, jobs } from '../../shared/schema';
+import { eq } from 'drizzle-orm';
 
 // HP-3: capability-flag gating of self-registration. In the test env, the
 // truncate helper enables the marketplace flags (so the inherited multi-role
@@ -55,5 +58,28 @@ describe('HP-3 capability gating — self-registration', () => {
     await updateSetting('capability.agency_self_registration', false);
     const a = await request(app).post('/api/v1/auth/register').send(reg('agent', 'cap_agent2@test.com'));
     expect(a.status).toBe(403);
+  });
+
+  it('single mode: a new job is owned by the mega-agency, not its creator', async () => {
+    await updateSetting('capability.agency_mode', 'single');
+    await seedDefaultAgency();
+    const megaId = await getDefaultAgencyUserId();
+    expect(megaId).toBeTruthy();
+
+    // A different verified agent creates a job (agent self-reg still enabled in test env).
+    const db = getDb();
+    const agentReg = await request(app).post('/api/v1/auth/register').send(reg('agent', 'cap_other_agent@test.com'));
+    const agentCookie = agentReg.headers['set-cookie'] as unknown as string[];
+    await request(app).post('/api/v1/agencies/register').set('Cookie', agentCookie)
+      .send({ agencyName: 'Other Agency', licenseNumber: 'OTH1', specializations: ['IT'] });
+    await db.update(recruitmentAgents).set({ verified: true }).where(eq(recruitmentAgents.userId, agentReg.body.data.id));
+
+    const job = await request(app).post('/api/v1/jobs').set('Cookie', agentCookie)
+      .send({ title: 'Mason', company: 'Gulf Build', location: 'Doha', country: 'Qatar', skills: ['masonry'], experience: 2 });
+    expect(job.status).toBe(201);
+
+    const [row] = await db.select().from(jobs).where(eq(jobs.id, job.body.data.id));
+    expect(row.agentId).toBe(megaId);            // forced to the mega-agency
+    expect(row.agentId).not.toBe(agentReg.body.data.id); // NOT the creator
   });
 });

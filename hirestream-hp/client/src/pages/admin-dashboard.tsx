@@ -3,6 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import React, { useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
+import { useCapabilities } from "@/hooks/use-capabilities";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -33,6 +34,9 @@ async function fetchJson(url: string) {
 export default function AdminDashboard() {
   const { toast } = useToast();
   const { user } = useAuth();
+  // HP-3b: slim admin — hide the external employer/agency approval queues when
+  // those roles are disabled (single-agency HP). Code stays; just not shown.
+  const { capabilities } = useCapabilities();
 
   // Real data from admin reports API
   const { data: dashRes, isLoading } = useQuery({
@@ -96,7 +100,7 @@ export default function AdminDashboard() {
   // Sidebar navigation — grouped semantically, replaces the 20-tab horizontal
   // overflow that was wrapping to 2 lines. New tabs land in any group without
   // a layout change. Pattern mirrors the superadmin Ops Console sidebar.
-  const navGroups: { label: string; items: { key: string; label: string; icon: any; count?: number }[] }[] = [
+  const navGroupsAll: { label: string; items: { key: string; label: string; icon: any; count?: number }[] }[] = [
     { label: "OVERVIEW & ANALYTICS", items: [
       { key: "overview", label: "Overview", icon: BarChart3 },
       { key: "reports", label: "Reports", icon: FileText },
@@ -131,6 +135,16 @@ export default function AdminDashboard() {
       { key: "settings", label: "System Config", icon: Settings },
     ]},
   ];
+  // Drop the employer/agency approval tabs when those capabilities are off;
+  // remove any group left empty. Re-enabling the capability restores them.
+  const navGroups = navGroupsAll
+    .map(g => ({
+      ...g,
+      items: g.items.filter(it =>
+        (it.key !== "employers" || capabilities.employerSelfRegistration) &&
+        (it.key !== "agencies" || capabilities.agencySelfRegistration)),
+    }))
+    .filter(g => g.items.length > 0);
   const flatNavItems = navGroups.flatMap(g => g.items);
 
   if (isLoading) {
@@ -236,7 +250,9 @@ export default function AdminDashboard() {
             <MetricCard icon={<Users />} color="bg-blue-600" label="Candidates" value={stats.users?.candidates || 0} onClick={() => setTab("users")} />
             <MetricCard icon={<Briefcase />} color="bg-emerald-600" label="Open Job Vacancies" value={stats.jobs?.active || 0} onClick={() => setTab("funnel")} />
             <MetricCard icon={<Handshake />} color="bg-orange-500" label="Placements" value={stats.placements?.total || 0} onClick={() => setTab("lifecycle")} />
-            <MetricCard icon={<Building />} color="bg-purple-600" label="Agencies" value={`${stats.agencies?.verified || 0} / ${stats.agencies?.total || 0}`} sub="verified" onClick={() => setTab("agencies")} />
+            {capabilities.agencySelfRegistration && (
+              <MetricCard icon={<Building />} color="bg-purple-600" label="Agencies" value={`${stats.agencies?.verified || 0} / ${stats.agencies?.total || 0}`} sub="verified" onClick={() => setTab("agencies")} />
+            )}
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
@@ -352,15 +368,19 @@ export default function AdminDashboard() {
               <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">Pending Verifications</h3>
                 <div className="space-y-3">
-                  <PendingItem icon={<UserCheck />} label="Agency Verifications" count={stats.agencies?.pendingVerification || 0} color="bg-yellow-50 border-yellow-200" onClick={() => setTab("agencies")} />
+                  {capabilities.agencySelfRegistration && (
+                    <PendingItem icon={<UserCheck />} label="Agency Verifications" count={stats.agencies?.pendingVerification || 0} color="bg-yellow-50 border-yellow-200" onClick={() => setTab("agencies")} />
+                  )}
                   <PendingItem icon={<Clock />} label="Drive Approvals" count={stats.drives?.pendingApproval || 0} color="bg-blue-50 border-blue-200" onClick={() => setTab("drives")} />
                   <PendingItem icon={<MessageSquare />} label="Open Grievances" count={stats.grievances?.open || 0} color="bg-red-50 border-red-200" onClick={() => setTab("grievances")} />
                 </div>
-                <button
-                  onClick={() => setTab("agencies")}
-                  className="mt-3 w-full text-xs font-semibold px-3 py-2 rounded bg-slate-900 text-white hover:bg-slate-800">
-                  Review now →
-                </button>
+                {capabilities.agencySelfRegistration && (
+                  <button
+                    onClick={() => setTab("agencies")}
+                    className="mt-3 w-full text-xs font-semibold px-3 py-2 rounded bg-slate-900 text-white hover:bg-slate-800">
+                    Review now →
+                  </button>
+                )}
               </div>
 
               {/* Skills Demand — REAL */}

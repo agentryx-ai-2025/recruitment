@@ -154,6 +154,14 @@ export const SETTING_SPECS: SettingSpec[] = [
     default: "single",
     options: ["single", "marketplace"],
   },
+  {
+    key: "capability.default_agency_user_id",
+    category: "capability",
+    label: "Default (mega) agency user id",
+    description: "In single mode, the agent user id that owns all jobs. Populated by the boot-time default-agency seed; do not edit by hand.",
+    type: "string",
+    default: "",
+  },
 
   // ── Notifications ────────────────────────────────────────────────────
   {

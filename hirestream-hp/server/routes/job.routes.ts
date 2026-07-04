@@ -162,10 +162,24 @@ router.post("/", protect, async (req, res, next) => {
       : (clientVisibility === "agents_only" || clientVisibility === "public"
           ? clientVisibility : "public");
 
+    // HP-3b: in single-agency mode every job is owned by the one mega-agency
+    // (HPSEDC), whichever staff account created it. Marketplace mode keeps
+    // creator ownership (reference behaviour). Falls back to creator ownership
+    // if the mega-agency isn't seeded yet.
+    let ownership: Record<string, string> = userRole === "agent" ? { agentId: userId } : { employerId: userId };
+    {
+      const { getSetting: getModeSetting } = await import("../services/settings.service");
+      if ((await getModeSetting("capability.agency_mode")) === "single") {
+        const { getDefaultAgencyUserId } = await import("../services/default-agency.seed");
+        const defaultAgencyUserId = await getDefaultAgencyUserId();
+        if (defaultAgencyUserId) ownership = { agentId: defaultAgencyUserId };
+      }
+    }
+
     const newJob = await db.insert(jobs).values({
       ...validatedData,
       ...draftDefaults,
-      ...(userRole === "agent" ? { agentId: userId } : { employerId: userId }),
+      ...ownership,
       visibility,
       status: isDraft ? "draft" : "active",
     }).returning();
