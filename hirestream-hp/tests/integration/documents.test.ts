@@ -1,4 +1,4 @@
-import { describe, beforeAll, beforeEach, it, expect, afterAll } from '@jest/globals';
+import { describe, beforeAll, beforeEach, it, expect } from '@jest/globals';
 import request from 'supertest';
 import type { Express } from 'express';
 import path from 'path';
@@ -16,17 +16,16 @@ const TEST_FILE_PATH = path.join(TEST_FILE_DIR, 'test-cv.pdf');
 beforeAll(async () => {
   app = createTestApp();
 
-  // Create test fixtures directory and a dummy PDF file
+  // Ensure the committed fixture exists; create it only if missing. Do NOT
+  // delete it in afterAll — test-cv.pdf is a committed asset (a fresh clone
+  // ships it), and unlinking it here would stage a spurious deletion after
+  // every `npm test` run.
   await fs.mkdir(TEST_FILE_DIR, { recursive: true });
-  // Write a minimal valid file (not a real PDF, but has .pdf name for testing)
-  await fs.writeFile(TEST_FILE_PATH, Buffer.from('%PDF-1.4 test content'));
-});
-
-afterAll(async () => {
-  // Clean up test fixtures
   try {
-    await fs.unlink(TEST_FILE_PATH);
-  } catch { /* ignore */ }
+    await fs.access(TEST_FILE_PATH);
+  } catch {
+    await fs.writeFile(TEST_FILE_PATH, Buffer.from('%PDF-1.4 test content'));
+  }
 });
 
 beforeEach(async () => {
