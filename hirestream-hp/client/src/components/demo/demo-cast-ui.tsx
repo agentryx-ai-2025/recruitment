@@ -5,6 +5,7 @@
  */
 import { useState } from "react";
 import { DEMO_CAST, DEMO_TAB_LABELS, type DemoTab, type DemoTone } from "@shared/demo-cast";
+import { useCapabilities } from "@/hooks/use-capabilities";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Loader2, RotateCcw } from "lucide-react";
 
@@ -93,10 +94,17 @@ export function DemoCastTabs({
   loadingUser: string | null;
   currentUsername?: string;
 }) {
-  const tabs = Object.keys(DEMO_CAST) as DemoTab[];
+  // HP-3/HP-4: hide the Agencies/Employers demo groups when those roles are
+  // disabled (single-agency HP) — mirrors the register-form gating so the auth
+  // page reflects the actual deployment shape.
+  const { capabilities } = useCapabilities();
+  const tabs = (Object.keys(DEMO_CAST) as DemoTab[]).filter((t) =>
+    (t !== "agencies" || capabilities.agencySelfRegistration) &&
+    (t !== "employers" || capabilities.employerSelfRegistration));
+  const defaultTab = tabs.includes("candidates") ? "candidates" : tabs[0];
   return (
-    <Tabs defaultValue="candidates" className="w-full">
-      <TabsList className="grid grid-cols-4 w-full h-8 p-0.5">
+    <Tabs defaultValue={defaultTab} className="w-full">
+      <TabsList className="grid w-full h-8 p-0.5" style={{ gridTemplateColumns: `repeat(${tabs.length}, minmax(0, 1fr))` }}>
         {tabs.map((t) => (
           <TabsTrigger key={t} value={t} className="text-[11px] px-1 data-[state=active]:bg-white data-[state=active]:shadow-sm">
             {DEMO_TAB_LABELS[t]}
