@@ -44,6 +44,7 @@ export default function SimpleApplyPage() {
   const [countries, setCountries] = useState<string[]>([]);
   const [phone, setPhone] = useState("");
   const [homeLocation, setHomeLocation] = useState("");
+  const [langExpanding, setLangExpanding] = useState<string | null>(null); // lifted from LanguageScreen
 
   const { data: profileRes } = useQuery<any>({ queryKey: ["/api/v1/candidates/profile"] });
   const { data: langRes } = useQuery<any>({ queryKey: ["/api/v1/candidates/languages"] });
@@ -191,7 +192,7 @@ export default function SimpleApplyPage() {
 
   // ── Screen 4: languages ────────────────────────────────────────────────
   const LanguageScreen = () => {
-    const [expanding, setExpanding] = useState<string | null>(null);
+    const expanding = langExpanding, setExpanding = setLangExpanding;
     const addLang = async (language: string, proficiency: string) => {
       await fetch("/api/v1/candidates/languages", {
         method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include",
@@ -317,7 +318,10 @@ export default function SimpleApplyPage() {
     );
   };
 
+  // Render the screen by CALLING the function (not <Current/>). Rendering an
+  // inline-defined component via <Current/> gives it a new identity every
+  // parent re-render, which remounts its inputs and drops focus after one
+  // keystroke. Calling it returns JSX that React reconciles in place.
   const screens = [TradeGrid, NameScreen, ExperienceScreen, EducationScreen, LanguageScreen, CountryScreen, ContactScreen, ReviewScreen];
-  const Current = screens[step];
-  return <Current />;
+  return <>{screens[step]()}</>;
 }
