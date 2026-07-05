@@ -10,6 +10,15 @@ Running tracker. Update every working session, in the same commit as the code ch
 
 ## Shipped
 
+### v0.4.0 — HP-2 · fast-win label fixes (UAT 1, 3)
+Live on staging. Pure UI label swaps in `profile-wizard.tsx` (hardcoded strings;
+locale files carry no keys for them, so no i18n change). Field/column names
+unchanged (`sex` stays as the column).
+- **UAT-1** "Sex (as per passport)" → **"Gender (as per passport)"**.
+- **UAT-3** the current/postal "Address" section header → **"Correspondence Address"** (Permanent Address unchanged).
+- Verified: both strings present in the live-served wizard bundle. (Full Playwright wizard render timed out on multi-step nav — harness issue, not a label failure. No test references these labels → no suite surface.)
+- **Item 2** ("Recommend") located but NOT changed — awaiting the replacement term. Candidates: agent-side `Recommendation` label (`agent-drive-detail.tsx:497`) + candidate-side "Recommended For You / Jobs" (`candidate-dashboard.tsx:547/1567`).
+
 ### HP-4a — profile data-model foundation (schema + migration)
 Additive, backward-compatible. Applied to **both** `hirestream_hp` (surgical
 `ALTER`/`CREATE ... IF NOT EXISTS`) and `hirestream_hp_test` (drizzle push).

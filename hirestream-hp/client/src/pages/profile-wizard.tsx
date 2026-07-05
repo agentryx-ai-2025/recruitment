@@ -542,8 +542,9 @@ function BasicInfoStep({ profile, onNext }: { profile: any; onNext: () => void }
               <p className="text-[11px] text-red-600 mt-1 pl-2">Phone must be digits only.</p>
             )}
           </FormField>
-          {/* Sex as per passport — emigration compliance + matching */}
-          <FormField label="Sex (as per passport)" icon={User} hint="Required for visa & emigration paperwork">
+          {/* Gender as per passport — emigration compliance + matching.
+              UAT-03 Item 1: label "Sex" → "Gender" (field/column stays `sex`). */}
+          <FormField label="Gender (as per passport)" icon={User} hint="Required for visa & emigration paperwork">
             <select value={sex} onChange={e => setSex(e.target.value)}
               className="pl-11 h-12 w-full rounded-xl border border-blue-200/80 bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all appearance-none">
               <option value="">Select…</option>
@@ -564,10 +565,11 @@ function BasicInfoStep({ profile, onNext }: { profile: any; onNext: () => void }
         </div>
       </motion.div>
 
-      {/* Address Section (current/postal) */}
+      {/* Correspondence (current/postal) Address — UAT-03 Item 3: "Address" →
+          "Correspondence Address". The Permanent Address section stays as-is. */}
       <motion.div variants={fadeUp} className="bg-gradient-to-br from-emerald-50/80 to-teal-50/40 rounded-xl border border-emerald-100/60 p-5">
         <p className="text-xs font-bold text-emerald-600 uppercase tracking-wider mb-4 flex items-center gap-2">
-          <MapPin className="w-4 h-4" /> Address
+          <MapPin className="w-4 h-4" /> Correspondence Address
         </p>
         <div className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
