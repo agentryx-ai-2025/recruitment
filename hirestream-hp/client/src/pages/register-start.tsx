@@ -54,7 +54,7 @@ export default function RegisterStart() {
     setSaving(true);
     try {
       await patchProfile({ registrationTier: tier });
-      setLocation(tier === "standard" ? "/apply" : "/profile");
+      setLocation(tier === "standard" ? "/apply" : "/apply/pro");
     } catch (e: any) { toast({ title: e.message || "Could not continue", variant: "destructive" }); setSaving(false); }
   };
 

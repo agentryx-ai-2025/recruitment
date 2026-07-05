@@ -18,6 +18,7 @@ Running tracker. Update every working session, in the same commit as the code ch
   - **Standard** → `/apply`. **Professional** → `/profile` (guided flow next). **Assisted** → name+phone → `wants_callback=true`.
   - **Admin callback queue** — `GET /admin/callback-requests` + "Callbacks" tab (click-to-call, "Done"). Verified end-to-end.
   - Guided **Professional** flow designed by Fable 5 (14 screens, branching education) — drafts ready, **integration pending**.
+- **v0.5.11 — Professional flow integrated (all 3 tiers now live).** New `simple-apply-pro.tsx` (14 one-question screens, branching education level→degree→field→institution, experience/cert add-lists, IELTS-conditional, passport) at `/apply/pro`. Same QuestionShell + call-as-function (focus-safe) pattern. Professional card + `/apply` escape route here (replacing the dense `/profile` wizard). Reuses existing endpoints — no new schema. Verified: branch write (B.Sc Nursing → proper `candidate_education` row) + UI renders/advances with focus retained.
 
 ### v0.5.6 — /apply: contact screen + experience-completion fix (profile 50% → 88%)
 Subhash flagged the `/apply` profile as too thin (50%, and it promised "we'll call your phone" but never asked for one). Diagnosis: the 8-check completion metric — `/apply` filled only 4 (name, email, skills, education). Fixes:

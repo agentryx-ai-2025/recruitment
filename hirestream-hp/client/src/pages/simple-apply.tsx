@@ -107,7 +107,7 @@ export default function SimpleApplyPage() {
         })}
       </div>
       <p className="text-center mt-6">
-        <button onClick={() => setLocation("/profile")} className="text-sm text-blue-600 hover:text-blue-700 underline underline-offset-4 py-3 px-2">
+        <button onClick={() => setLocation("/apply/pro")} className="text-sm text-blue-600 hover:text-blue-700 underline underline-offset-4 py-3 px-2">
           Have a degree or professional qualification? Use the detailed form →
         </button>
       </p>
