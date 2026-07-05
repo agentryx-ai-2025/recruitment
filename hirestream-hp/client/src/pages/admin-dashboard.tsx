@@ -142,7 +142,9 @@ export default function AdminDashboard() {
       ...g,
       items: g.items.filter(it =>
         (it.key !== "employers" || capabilities.employerSelfRegistration) &&
-        (it.key !== "agencies" || capabilities.agencySelfRegistration)),
+        (it.key !== "agencies" || capabilities.agencySelfRegistration) &&
+        // Agency leaderboard is meaningless with a single mega-agency.
+        (it.key !== "leaderboard" || capabilities.agencySelfRegistration)),
     }))
     .filter(g => g.items.length > 0);
   const flatNavItems = navGroups.flatMap(g => g.items);
@@ -173,7 +175,10 @@ export default function AdminDashboard() {
             </div>
           </div>
           <div className="flex gap-2 flex-wrap">
-            {["candidates", "jobs", "applications", "agencies", "placements"].map(entity => (
+            {/* HP-3/HP-4: drop the Agencies export in single-agency mode. */}
+            {["candidates", "jobs", "applications", "agencies", "placements"]
+              .filter(entity => entity !== "agencies" || capabilities.agencySelfRegistration)
+              .map(entity => (
               <Button key={entity} variant="outline" size="sm"
                 className="bg-white/10 border-white/20 text-white hover:bg-white/20 rounded-lg text-xs capitalize"
                 onClick={() => window.open(`/api/v1/admin/reports/export/${entity}.csv`, "_blank")}>
