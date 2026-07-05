@@ -41,6 +41,8 @@ Legend: ✅ delivered · 🟡 partial/foundation · 📐 designed (roadmap).
 | C2 | ✅ UAT-6 "Passed/Completed" toggle + UAT-7 "University/Affiliating Body" field in Education | MD MOM fixes, blue-collar-clear | v0.4.1 / HP-4b.1 |
 | C3 | ✅ UAT-12 Language proficiency — full CRUD API + wizard section (quick-add chips, Basic→Native) | First-class language capture for overseas placement; dedup-guarded | v0.4.2 / HP-4b.2 |
 | C4 | ✅ UAT-10 Experience in months (+ live "≈ N yrs" hint); **matching engine reads months** | Precise blue-collar experience; better match scores | v0.4.2 / HP-4b.3 |
+| C5 | ✅ UAT-5 Duplicate-education guard (server 409 + client message) | Data hygiene; no two "10th Grade" rows | v0.4.3 / HP-4b.4 |
+| C6 | ✅ UAT-9 Certification vs Skill Course helper (blue-collar examples) | Clear differentiation; ITI/NSDC trade certs land right | v0.4.3 / HP-4b.4 |
 
 ## D · Quality, testing & reliability (engineering value)
 
@@ -70,4 +72,4 @@ Legend: ✅ delivered · 🟡 partial/foundation · 📐 designed (roadmap).
 
 ---
 
-_Last updated: 2026-07-05 (session), after HP-4b.3 — 6 of 20 UAT items live._
+_Last updated: 2026-07-05 (session), after HP-4b.4 — 8 of 20 UAT items live._

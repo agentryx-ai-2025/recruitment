@@ -10,6 +10,11 @@ Running tracker. Update every working session, in the same commit as the code ch
 
 ## Shipped
 
+### v0.4.3 — HP-4b.4 · dedup education + cert/course differentiation (UAT 5, 9)
+- **UAT-5** Duplicate education blocked — server 409 on same `(type, degree)` (case-insensitive) for a candidate; wizard surfaces the message. Smoke: add "10th" twice → 201 then 409; "12th" still 201.
+- **UAT-9** Certification vs Skill Course — the `type` picker already separates them; added an inline helper explaining the difference with blue-collar examples (ITI/NSDC/NCVT trade cert vs short course).
+- **Items 5 + 9 → done. Now 8 of 20 live (1, 3, 5, 6, 7, 9, 10, 12).**
+
 ### v0.4.2 — HP-4b.2/.3 · languages + experience-in-months (UAT 10, 12)
 - **UAT-12** Language proficiency — new `/candidates/languages` API (GET/POST/DELETE, dedup 409, level enum) + a Languages section in the wizard Skills step (quick-add chips for Hindi/English/Punjabi/Pahari/Arabic/…, Basic→Native levels). Backend smoke: 201/409/400 all correct.
 - **UAT-10** Total experience now captured in **months** (e.g. 42), with a live "≈ N yrs" hint. Writes `experience_months` (+ keeps `experience` years in sync); the **matching engine** now reads months (÷12) with a years fallback. Backend smoke: `experienceMonths:42` persists.

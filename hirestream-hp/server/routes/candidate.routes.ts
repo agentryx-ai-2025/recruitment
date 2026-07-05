@@ -367,6 +367,13 @@ router.post("/education", protect, async (req, res, next) => {
     if (!parsed.success) {
       return res.status(400).json({ success: false, error: { code: 400, message: parsed.error.issues[0]?.message ?? "Invalid input", issues: parsed.error.issues } });
     }
+    // UAT-03 Item 5: prevent duplicate education entries (e.g. two "10th Grade").
+    // Dedupe on (type, degree) case-insensitively for this candidate.
+    const norm = (s: any) => String(s ?? "").trim().toLowerCase();
+    const existingEdu = await db.select().from(candidateEducation).where(eq(candidateEducation.candidateId, candidateId));
+    if (existingEdu.some((e: any) => norm(e.type) === norm(parsed.data.type) && norm(e.degree) === norm(parsed.data.degree))) {
+      return res.status(409).json({ success: false, error: { code: 409, message: `"${parsed.data.degree}" is already added under this category.` } });
+    }
     const result = await db.insert(candidateEducation).values(parsed.data as any).returning();
     res.status(201).json({ success: true, data: result[0] });
   } catch (error) {

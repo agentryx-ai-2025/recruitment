@@ -737,7 +737,8 @@ function EducationStep({ onNext, onBack }: { onNext: () => void; onBack: () => v
           university: university || null, isPassed,
         }),
       });
-      if (!res.ok) throw new Error("Failed"); return res.json();
+      if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e?.error?.message || "Failed to add education"); }
+      return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/v1/candidates/education"] });
@@ -746,6 +747,8 @@ function EducationStep({ onNext, onBack }: { onNext: () => void; onBack: () => v
       setBoard(""); setSubject(""); setType("university"); setUniversity(""); setIsPassed(true);
       toast({ title: "Education added" });
     },
+    // UAT-03 Item 5: surface the duplicate-entry (409) message.
+    onError: (e: any) => toast({ title: e.message || "Could not add education", variant: "destructive" }),
   });
 
   const deleteMutation = useMutation({
@@ -838,6 +841,14 @@ function EducationStep({ onNext, onBack }: { onNext: () => void; onBack: () => v
                       </button>
                     ))}
                   </div>
+                  {/* UAT-03 Item 9: differentiate Certification vs Skill Course. */}
+                  {(type === "certification" || type === "course") && (
+                    <p className="text-[11px] text-violet-600/90 bg-violet-100/50 border border-violet-200/60 rounded-lg px-3 py-2">
+                      {type === "certification"
+                        ? "Certification = a formal trade/professional credential — ITI trade cert, NSDC/NCVT, welder/electrician/driver licence, AWS, PMP."
+                        : "Skill Course = a short training or workshop — e.g. industrial safety, 3-month NIELIT, first-aid — not a formal certification."}
+                    </p>
+                  )}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <FormField label={type === "school" ? "Class / Level (e.g. 12th)" : "Degree / Qualification"} required icon={Award}>
                       <Input value={degree} onChange={e => setDegree(e.target.value)}
