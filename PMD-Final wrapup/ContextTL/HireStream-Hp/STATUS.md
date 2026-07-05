@@ -10,6 +10,13 @@ Running tracker. Update every working session, in the same commit as the code ch
 
 ## Shipped
 
+### v0.5.6 — /apply: contact screen + experience-completion fix (profile 50% → 88%)
+Subhash flagged the `/apply` profile as too thin (50%, and it promised "we'll call your phone" but never asked for one). Diagnosis: the 8-check completion metric — `/apply` filled only 4 (name, email, skills, education). Fixes:
+- **New contact screen** (phone required + home town/district) → fills phone + location.
+- **Experience check bug** — it counted `candidate_experience` *rows*, but `/apply` sets `candidates.experience_months`; now the check accepts the months value.
+- Result verified: a completed `/apply` → **88%** (7/8), only `documents` missing. `/apply` is now 8 screens.
+- The last 12% (documents) + the "Complete profile" loop close with **HP-4c "Add more" (#4)** — camera-first doc upload — next.
+
 ### v0.5.5 — fix: stale cross-account cache (fresh account showed another user's data)
 Subhash registered a fresh candidate and the dashboard showed **Arjun's** profile + placement. **Not a server leak** — verified a fresh session's API returns only its own data (empty). Root cause: `queryClient` has `staleTime: Infinity`, and while `login` cleared the cache, **`register` and `logout` did not** — so a prior demo account's cached profile/apps bled into the next session (on SPA-internal navigation, no full reload). Fix: `register` + `logout` now `removeQueries` (all keys except `/auth/me`), mirroring `login`. My simplified dashboard just surfaced this pre-existing bug prominently.
 

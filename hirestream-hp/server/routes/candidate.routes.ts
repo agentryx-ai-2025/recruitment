@@ -636,9 +636,10 @@ router.get("/profile/completion", protect, async (req, res, next) => {
     // 6. At least 1 education record
     const eduCount = await db.select({ c: count() }).from(candidateEducation).where(eq(candidateEducation.candidateId, candidateId));
     checks.push({ name: "education", done: (eduCount[0]?.c ?? 0) > 0 });
-    // 7. At least 1 experience record
+    // 7. Experience — a detailed record OR the total (the simplified /apply flow
+    //    sets candidates.experience_months, not a candidate_experience row).
     const expCount = await db.select({ c: count() }).from(candidateExperience).where(eq(candidateExperience.candidateId, candidateId));
-    checks.push({ name: "experience", done: (expCount[0]?.c ?? 0) > 0 });
+    checks.push({ name: "experience", done: (expCount[0]?.c ?? 0) > 0 || (profile.experienceMonths ?? 0) > 0 || (profile.experience ?? 0) > 0 });
     // 8. At least 1 document uploaded
     const docCount = await db.select({ c: count() }).from(documents).where(eq(documents.candidateId, candidateId));
     checks.push({ name: "documents", done: (docCount[0]?.c ?? 0) > 0 });

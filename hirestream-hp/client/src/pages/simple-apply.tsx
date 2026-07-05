@@ -12,7 +12,7 @@ import {
   QUICK_COUNTRIES, MicField,
 } from "./simple-apply/reference";
 
-const TOTAL = 7;
+const TOTAL = 8;
 
 async function patchProfile(body: any) {
   const res = await fetch("/api/v1/candidates/profile", {
@@ -42,6 +42,8 @@ export default function SimpleApplyPage() {
   const [months, setMonths] = useState(0);
   const [eduKey, setEduKey] = useState<string | null>(null);
   const [countries, setCountries] = useState<string[]>([]);
+  const [phone, setPhone] = useState("");
+  const [homeLocation, setHomeLocation] = useState("");
 
   const { data: profileRes } = useQuery<any>({ queryKey: ["/api/v1/candidates/profile"] });
   const { data: langRes } = useQuery<any>({ queryKey: ["/api/v1/candidates/languages"] });
@@ -59,6 +61,8 @@ export default function SimpleApplyPage() {
     if (p.experienceMonths != null) setMonths(p.experienceMonths);
     else if (p.experience != null) setMonths(p.experience * 12);
     if (Array.isArray(p.preferredCountries)) setCountries(p.preferredCountries);
+    if (p.phone) setPhone(p.phone);
+    if (p.location) setHomeLocation(p.location);
     if (p.skills?.[0]) {
       const t = BLUE_COLLAR_TRADES.find((x) => x.label === p.skills[0]);
       if (t) setTrade(t);
@@ -270,6 +274,20 @@ export default function SimpleApplyPage() {
   };
 
   // ── Screen 6: review + finish ──────────────────────────────────────────
+  // ── Screen 6: contact (phone + home town) ──────────────────────────────
+  const ContactScreen = () => (
+    <QuestionShell step={6} totalSteps={TOTAL} question="How can HPSEDC reach you?"
+      help="We will call or message you on this number when a job opens."
+      onBack={() => go(5)} onNext={() => save({ phone, location: homeLocation || null }, 7)} nextDisabled={phone.replace(/\D/g, "").length < 10} loading={saving}>
+      <label className="block text-sm font-semibold text-slate-600 mb-1.5">Phone number</label>
+      <input type="tel" inputMode="numeric" value={phone} onChange={(e) => setPhone(e.target.value.replace(/[^\d+\s-]/g, ""))}
+        placeholder="e.g. 98765 43210" maxLength={15}
+        className="h-14 w-full rounded-xl border border-blue-200/80 bg-white px-4 text-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all" />
+      <label className="block text-sm font-semibold text-slate-600 mt-5 mb-1.5">Your town / district (in Himachal)</label>
+      <MicField value={homeLocation} onChange={setHomeLocation} placeholder="e.g. Mandi" />
+    </QuestionShell>
+  );
+
   const ReviewScreen = () => {
     const chosenEdu = EDUCATION_LEVELS.find((l) => l.key === eduKey);
     const Row = ({ label, value, onEdit }: { label: string; value: string; onEdit: () => void }) => (
@@ -279,8 +297,8 @@ export default function SimpleApplyPage() {
       </div>
     );
     return (
-      <QuestionShell step={6} totalSteps={TOTAL} question="Check your details" help="Tap the pencil to change anything."
-        onBack={() => go(5)} onNext={() => { toast({ title: "Profile saved" }); setLocation("/"); }} nextLabel="Save my profile" loading={saving}>
+      <QuestionShell step={7} totalSteps={TOTAL} question="Check your details" help="Tap the pencil to change anything."
+        onBack={() => go(6)} onNext={() => { toast({ title: "Profile saved" }); setLocation("/"); }} nextLabel="Save my profile" loading={saving}>
         <div className="rounded-2xl border border-slate-200 bg-white p-5">
           <Row label="Work" value={trade?.label || ""} onEdit={() => go(0)} />
           <Row label="Name" value={fullName} onEdit={() => go(1)} />
@@ -288,6 +306,8 @@ export default function SimpleApplyPage() {
           <Row label="Education" value={chosenEdu?.label || ""} onEdit={() => go(3)} />
           <Row label="Languages" value={languages.map((l: any) => l.language).join(", ")} onEdit={() => go(4)} />
           <Row label="Preferred countries" value={countries.join(", ")} onEdit={() => go(5)} />
+          <Row label="Phone" value={phone} onEdit={() => go(6)} />
+          {homeLocation ? <Row label="Town / district" value={homeLocation} onEdit={() => go(6)} /> : null}
         </div>
         <div className="mt-4 rounded-xl bg-emerald-50/70 border border-emerald-100 p-4 flex items-start gap-2.5">
           <ShieldCheck className="w-4 h-4 text-emerald-600 mt-0.5 flex-shrink-0" />
@@ -297,7 +317,7 @@ export default function SimpleApplyPage() {
     );
   };
 
-  const screens = [TradeGrid, NameScreen, ExperienceScreen, EducationScreen, LanguageScreen, CountryScreen, ReviewScreen];
+  const screens = [TradeGrid, NameScreen, ExperienceScreen, EducationScreen, LanguageScreen, CountryScreen, ContactScreen, ReviewScreen];
   const Current = screens[step];
   return <Current />;
 }
