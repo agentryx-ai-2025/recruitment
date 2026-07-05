@@ -6,6 +6,9 @@
 2. [`02_UAT-03_Issues_and_Fork_Plan.md`](./02_UAT-03_Issues_and_Fork_Plan.md) — the 22-Jun-2026 MD MOM (20 items) with fork-context disposition and the sprint plan.
 3. [`03_Open_Decisions.md`](./03_Open_Decisions.md) — questions Subhash needs to answer before Sprint 1 code work starts.
 4. [`04_Blue_Collar_UX_Principles.md`](./04_Blue_Collar_UX_Principles.md) — Hindi-first, voice, WhatsApp, pictorial job categories — the UX pivot that shapes every screen.
+5. [`05_Enhancement_Roadmap.md`](./05_Enhancement_Roadmap.md) — three value-adds beyond the UAT-03 twenty (agency-side matching, candidate filters, salary-expectation redesign) and how they bundle into HP-4c / HP-5 / UAT-14.
+
+Also see [`STATUS.md`](./STATUS.md) — the live per-item tracker, updated every session.
 
 **One-liner to orient you:**
 
