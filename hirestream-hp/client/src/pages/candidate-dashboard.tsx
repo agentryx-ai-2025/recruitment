@@ -218,14 +218,16 @@ export default function CandidateDashboard() {
                 );
               }
               return (
-                <Button size="sm" onClick={() => setLocation(`/profile?step=${nextStep[first] ?? "1"}`)}
+                // HP-4c: blue-collar is the default — send incomplete candidates
+                // to the simplified /apply flow (detailed wizard is the escape).
+                <Button size="sm" onClick={() => setLocation("/apply")}
                   className="w-full rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold">
-                  <ArrowRight className="w-3.5 h-3.5 mr-1.5" /> {nextLabel[first] ?? "Complete next section"}
+                  <ArrowRight className="w-3.5 h-3.5 mr-1.5" /> Complete your profile
                 </Button>
               );
             })()}
-            {/* Always-visible Edit Profile link */}
-            <Button variant="outline" size="sm" onClick={() => setLocation("/profile")}
+            {/* Always-visible Edit Profile link → simplified flow */}
+            <Button variant="outline" size="sm" onClick={() => setLocation("/apply")}
               className="w-full rounded-lg text-xs font-semibold mt-2 border-slate-300 text-slate-700 hover:bg-slate-50">
               <User className="w-3.5 h-3.5 mr-1.5" /> Edit Profile
             </Button>
@@ -1574,7 +1576,7 @@ function RecommendedView({ recommendations, savedJobIds, setActiveView }: { reco
           <Sparkles className="w-12 h-12 mx-auto mb-3 text-slate-300" />
           <p className="text-slate-500 font-semibold">No recommendations yet</p>
           <p className="text-sm text-slate-400 mt-1 mb-4">Complete your profile to unlock personalized job matches.</p>
-          <Button size="sm" onClick={() => setLocation("/profile")} className="bg-amber-600 hover:bg-amber-700 text-white">
+          <Button size="sm" onClick={() => setLocation("/apply")} className="bg-amber-600 hover:bg-amber-700 text-white">
             <User className="w-4 h-4 mr-1.5" /> Complete Profile
           </Button>
         </motion.div>
@@ -2579,7 +2581,7 @@ function JourneyStrip({ profile, completion, docs, education, experience, applic
 
   const allSteps = [
     { key: "register",   label: "Register",            icon: User,         done: hasProfile,    cta: null },
-    { key: "profile",    label: "Complete profile",    icon: CheckCircle,  done: profileFull,   cta: { label: "Complete", action: () => setLocation("/profile") } },
+    { key: "profile",    label: "Complete profile",    icon: CheckCircle,  done: profileFull,   cta: { label: "Complete", action: () => setLocation("/apply") } },
     { key: "education",  label: "Add education",       icon: GraduationCap, done: hasEducation, cta: { label: "Add",      action: () => setLocation("/profile") } },
     { key: "experience", label: "Add experience",      icon: Briefcase,    done: hasExperience, cta: { label: "Add",      action: () => setLocation("/profile") } },
     { key: "documents",  label: "Upload CV + passport", icon: FileText,    done: hasDocs,       cta: { label: "Upload",   action: () => setActiveView("documents") } },

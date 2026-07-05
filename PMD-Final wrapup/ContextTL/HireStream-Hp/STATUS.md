@@ -10,6 +10,10 @@ Running tracker. Update every working session, in the same commit as the code ch
 
 ## Shipped
 
+### v0.5.2 — /apply as default candidate entry + 3-role demo login
+- **`/apply` is now the default** — the candidate dashboard's primary "Complete/Edit Profile" CTAs point to the blue-collar `/apply` flow (detailed wizard stays as the escape). Granular "add education/experience" + journey deep-links still use the detailed wizard.
+- **3-role one-click demo login** — the demo panel now shows **Candidates · Super Agency · Admin**. "Super Agency" re-purposes the (single-agency-hidden) Agencies tab to show just **HPSEDC** (`hpsedc_agency`), one-click. Verified: tabs = [Candidates, Super Agency, Admin]; HPSEDC dev-login 200.
+
 ### v0.5.1 — demo-login panel gated + HP DB seeded (login fix)
 Subhash reported "can't log in / all 4 roles still show." Root causes + fixes:
 - **Demo panel not gated** (separate surface from the HP-3a register dropdown) → now hides Agencies/Employers tabs when those capabilities are off (Candidates + Admin only).

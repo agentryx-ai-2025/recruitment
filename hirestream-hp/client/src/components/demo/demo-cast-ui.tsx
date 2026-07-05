@@ -4,7 +4,7 @@
  * Gated server-side by `feature.quick_login_enabled` (off in production).
  */
 import { useState } from "react";
-import { DEMO_CAST, DEMO_TAB_LABELS, type DemoTab, type DemoTone } from "@shared/demo-cast";
+import { DEMO_CAST, DEMO_TAB_LABELS, type DemoTab, type DemoTone, type DemoCastMember } from "@shared/demo-cast";
 import { useCapabilities } from "@/hooks/use-capabilities";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Loader2, RotateCcw } from "lucide-react";
@@ -94,27 +94,33 @@ export function DemoCastTabs({
   loadingUser: string | null;
   currentUsername?: string;
 }) {
-  // HP-3/HP-4: hide the Agencies/Employers demo groups when those roles are
-  // disabled (single-agency HP) — mirrors the register-form gating so the auth
-  // page reflects the actual deployment shape.
+  // HP-3/HP-4: single-agency shape. In HP the marketplace "Agencies" group is
+  // re-purposed into a "Super Agency" tab showing just HPSEDC (the mega-agency);
+  // Employers is hidden. Marketplace mode keeps the reference behaviour.
   const { capabilities } = useCapabilities();
+  const singleAgency = !capabilities.agencySelfRegistration;
+  const HPSEDC_SUPER_AGENCY: DemoCastMember = {
+    username: "hpsedc_agency", name: "HPSEDC", subtitle: "Overseas Placement Cell",
+    status: "Super Agency", tone: "green", note: "The single mega-agency — owns all jobs.",
+  };
   const tabs = (Object.keys(DEMO_CAST) as DemoTab[]).filter((t) =>
-    (t !== "agencies" || capabilities.agencySelfRegistration) &&
-    (t !== "employers" || capabilities.employerSelfRegistration));
+    t !== "employers" || capabilities.employerSelfRegistration);
+  const labelFor = (t: DemoTab) => (t === "agencies" && singleAgency ? "Super Agency" : DEMO_TAB_LABELS[t]);
+  const castFor = (t: DemoTab): DemoCastMember[] => (t === "agencies" && singleAgency ? [HPSEDC_SUPER_AGENCY] : DEMO_CAST[t]);
   const defaultTab = tabs.includes("candidates") ? "candidates" : tabs[0];
   return (
     <Tabs defaultValue={defaultTab} className="w-full">
       <TabsList className="grid w-full h-8 p-0.5" style={{ gridTemplateColumns: `repeat(${tabs.length}, minmax(0, 1fr))` }}>
         {tabs.map((t) => (
           <TabsTrigger key={t} value={t} className="text-[11px] px-1 data-[state=active]:bg-white data-[state=active]:shadow-sm">
-            {DEMO_TAB_LABELS[t]}
+            {labelFor(t)}
           </TabsTrigger>
         ))}
       </TabsList>
       {tabs.map((tab) => (
         <TabsContent key={tab} value={tab} className="mt-2">
           <div className={`space-y-1.5 ${tab === "candidates" ? "max-h-72 overflow-y-auto pr-1" : ""}`}>
-            {DEMO_CAST[tab].map((m) => {
+            {castFor(tab).map((m) => {
               const isCurrent = m.username === currentUsername;
               return (
                 <button
