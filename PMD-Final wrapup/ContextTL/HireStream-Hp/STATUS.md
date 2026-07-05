@@ -10,6 +10,11 @@ Running tracker. Update every working session, in the same commit as the code ch
 
 ## Shipped
 
+### v0.4.2 — HP-4b.2/.3 · languages + experience-in-months (UAT 10, 12)
+- **UAT-12** Language proficiency — new `/candidates/languages` API (GET/POST/DELETE, dedup 409, level enum) + a Languages section in the wizard Skills step (quick-add chips for Hindi/English/Punjabi/Pahari/Arabic/…, Basic→Native levels). Backend smoke: 201/409/400 all correct.
+- **UAT-10** Total experience now captured in **months** (e.g. 42), with a live "≈ N yrs" hint. Writes `experience_months` (+ keeps `experience` years in sync); the **matching engine** now reads months (÷12) with a years fallback. Backend smoke: `experienceMonths:42` persists.
+- **Items 10 + 12 → done. Now 6 of 20 live (1, 3, 6, 7, 10, 12).**
+
 ### v0.4.1 — HP-4b.1 · education fields wired (UAT 6, 7)
 Surfaces the HP-4a schema in the profile wizard's Education step.
 - **UAT-7** "University / Affiliating Body" field (higher-ed types), distinct from Institution. Shown in saved records.

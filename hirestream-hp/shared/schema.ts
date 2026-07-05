@@ -734,6 +734,8 @@ export const updateCandidateSchema = createInsertSchema(candidates).omit({
     z.null(),
   ]).optional(),
   experience: z.number().int().min(0, { message: "Experience cannot be negative." }).max(60, { message: "Experience looks too high — please check." }).optional().nullable(),
+  // HP-4b (UAT-03 Item 10): experience in months. Bounded 0..720 (60 years).
+  experienceMonths: z.number().int().min(0, { message: "Experience cannot be negative." }).max(720, { message: "Experience looks too high — please check." }).optional().nullable(),
   // v0.4.36.1: `ielts_band` is a Postgres decimal → drizzle-zod infers
   // z.string(), but the wizard sends a NUMBER. That mismatch 400'd the
   // Personal-Info save (and, with no client onError handler, did it
@@ -817,6 +819,17 @@ export const insertExperienceSchema = createInsertSchema(candidateExperience).om
   // HTIS BUG-004 — negative `years` accepted.
   years: z.number().int().min(0, "Years cannot be negative.").max(70, "Years looks unrealistic.").optional().nullable(),
   country: z.string().trim().max(80).optional().nullable(),
+});
+
+// HP-4b (UAT-03 Item 12): candidate language proficiency.
+export const insertLanguageSchema = createInsertSchema(candidateLanguages).omit({
+  id: true,
+  createdAt: true,
+}).extend({
+  language: z.string().trim().min(1, "Language is required.").max(60),
+  proficiency: z.enum(["elementary", "intermediate", "professional", "native"], {
+    errorMap: () => ({ message: "Pick a proficiency level." }),
+  }),
 });
 
 export const insertDriveSchema = createInsertSchema(recruitmentDrives).omit({

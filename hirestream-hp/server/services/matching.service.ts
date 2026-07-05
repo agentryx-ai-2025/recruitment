@@ -194,7 +194,12 @@ function scoreSkill(candidate: any, job: any, w: number, pol: PolicyPair): Facto
 
 function scoreExperience(candidate: any, job: any, w: number, pol: PolicyPair): FactorResult {
   const required = Number(job.experience ?? 0);
-  const has = Number(candidate.experience ?? 0);
+  // HP-4b (UAT-03 Item 10): prefer the precise months value when present
+  // (÷12 → years to compare against the job's years requirement); fall back to
+  // the legacy years field for pre-migration candidates.
+  const has = candidate.experienceMonths != null
+    ? Number(candidate.experienceMonths) / 12
+    : Number(candidate.experience ?? 0);
   if (!required) {
     // job didn't require experience → job-side missing
     return { score: applyMissingPolicy(w, pol.jobMissing), max: w, detail: "No experience required", policyApplied: pol.jobMissing };

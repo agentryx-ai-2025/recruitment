@@ -5,8 +5,8 @@ import { storage } from "../storage";
 import { logger } from "../config/logger.config";
 import {
   updateCandidateSchema, candidates, applications, jobs, users,
-  candidateEducation, candidateExperience, documents,
-  insertEducationSchema, insertExperienceSchema, placements, interviews,
+  candidateEducation, candidateExperience, candidateLanguages, documents,
+  insertEducationSchema, insertExperienceSchema, insertLanguageSchema, placements, interviews,
 } from "@shared/schema";
 import { eq, and, count, inArray } from "drizzle-orm";
 import { z } from "zod";
@@ -437,6 +437,67 @@ router.delete("/education/:id", protect, async (req, res, next) => {
 
     await db.delete(candidateEducation).where(eq(candidateEducation.id, req.params.id));
     res.json({ success: true, message: "Education record deleted" });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════════
+// LANGUAGES CRUD (UAT-03 Item 12 — first-class language proficiency)
+// ═══════════════════════════════════════════════════════════════════
+
+// List languages
+router.get("/languages", protect, async (req, res, next) => {
+  try {
+    const db = storage.db;
+    if (!db) return res.status(500).json({ success: false, error: { code: 500, message: "Database not available" } });
+    const candidateId = await getCandidateIdFromUser((req.user as any).id);
+    if (!candidateId) return res.json({ success: true, data: [] });
+    const rows = await db.select().from(candidateLanguages).where(eq(candidateLanguages.candidateId, candidateId));
+    res.json({ success: true, data: rows });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Add language
+router.post("/languages", protect, async (req, res, next) => {
+  try {
+    const db = storage.db;
+    if (!db) return res.status(500).json({ success: false, error: { code: 500, message: "Database not available" } });
+    const candidateId = await getCandidateIdFromUser((req.user as any).id);
+    if (!candidateId) return res.status(404).json({ success: false, error: { code: 404, message: "Candidate profile not found" } });
+
+    const parsed = insertLanguageSchema.safeParse({ ...req.body, candidateId });
+    if (!parsed.success) {
+      return res.status(400).json({ success: false, error: { code: 400, message: parsed.error.issues[0]?.message ?? "Invalid input", issues: parsed.error.issues } });
+    }
+    // Prevent duplicate language for the same candidate.
+    const dupe = await db.select().from(candidateLanguages)
+      .where(and(eq(candidateLanguages.candidateId, candidateId), eq(candidateLanguages.language, parsed.data.language)))
+      .limit(1);
+    if (dupe.length) return res.status(409).json({ success: false, error: { code: 409, message: "This language is already added." } });
+
+    const result = await db.insert(candidateLanguages).values(parsed.data as any).returning();
+    res.status(201).json({ success: true, data: result[0] });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Delete language
+router.delete("/languages/:id", protect, async (req, res, next) => {
+  try {
+    const db = storage.db;
+    if (!db) return res.status(500).json({ success: false, error: { code: 500, message: "Database not available" } });
+    const candidateId = await getCandidateIdFromUser((req.user as any).id);
+    if (!candidateId) return res.status(404).json({ success: false, error: { code: 404, message: "Candidate profile not found" } });
+    const existing = await db.select().from(candidateLanguages)
+      .where(and(eq(candidateLanguages.id, req.params.id), eq(candidateLanguages.candidateId, candidateId)))
+      .limit(1);
+    if (existing.length === 0) return res.status(404).json({ success: false, error: { code: 404, message: "Language not found" } });
+    await db.delete(candidateLanguages).where(eq(candidateLanguages.id, req.params.id));
+    res.json({ success: true, message: "Language removed" });
   } catch (error) {
     next(error);
   }

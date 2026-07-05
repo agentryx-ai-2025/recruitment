@@ -1075,10 +1075,94 @@ function ExperienceStep({ onNext, onBack }: { onNext: () => void; onBack: () => 
 }
 
 // ── Step 4: Skills & Preferences ─────────────────────────────────────
+// UAT-03 Item 12: language proficiency — first-class for overseas placement.
+const PROFICIENCY_LEVELS = [
+  { v: "elementary", label: "Basic" },
+  { v: "intermediate", label: "Conversational" },
+  { v: "professional", label: "Fluent" },
+  { v: "native", label: "Native" },
+];
+const COMMON_LANGUAGES = ["Hindi", "English", "Punjabi", "Pahari", "Nepali", "Urdu", "Arabic", "Malayalam"];
+
+function LanguagesSection() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const [language, setLanguage] = useState("");
+  const [proficiency, setProficiency] = useState("intermediate");
+
+  const { data: langRes } = useQuery({
+    queryKey: ["/api/v1/candidates/languages"], queryFn: () => fetchJson("/api/v1/candidates/languages"),
+  });
+  const records = langRes?.data || [];
+
+  const addMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch("/api/v1/candidates/languages", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ language: language.trim(), proficiency }),
+      });
+      if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e?.error?.message || "Failed"); }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/v1/candidates/languages"] });
+      setLanguage(""); setProficiency("intermediate");
+      toast({ title: "Language added" });
+    },
+    onError: (e: any) => toast({ title: e.message || "Could not add language", variant: "destructive" }),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => { await fetch(`/api/v1/candidates/languages/${id}`, { method: "DELETE" }); },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/v1/candidates/languages"] }),
+  });
+
+  return (
+    <motion.div variants={fadeUp} className="bg-gradient-to-br from-sky-50/80 to-cyan-50/40 rounded-xl border border-sky-100/60 p-5">
+      <p className="text-xs font-bold text-sky-600 uppercase tracking-wider mb-3 flex items-center gap-2">
+        <Globe className="w-4 h-4" /> Languages you speak
+      </p>
+      {records.length > 0 && (
+        <div className="flex flex-wrap gap-2 mb-4">
+          {records.map((l: any) => (
+            <span key={l.id} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-sky-100 text-sky-800 border border-sky-200/80">
+              {l.language}
+              <span className="text-sky-500">· {PROFICIENCY_LEVELS.find(p => p.v === l.proficiency)?.label || l.proficiency}</span>
+              <button onClick={() => deleteMutation.mutate(l.id)} className="hover:text-red-500 transition-colors"><X className="w-3 h-3" /></button>
+            </span>
+          ))}
+        </div>
+      )}
+      <div className="flex flex-wrap gap-1.5 mb-3">
+        {COMMON_LANGUAGES.filter(l => !records.some((r: any) => r.language.toLowerCase() === l.toLowerCase())).map(l => (
+          <button key={l} type="button" onClick={() => setLanguage(l)}
+            className={`text-[11px] px-2.5 py-1 rounded-md border transition ${language === l ? "bg-sky-600 text-white border-sky-600" : "bg-white text-slate-600 border-slate-200 hover:border-sky-400"}`}>
+            {l}
+          </button>
+        ))}
+      </div>
+      <div className="flex flex-col sm:flex-row gap-3">
+        <Input value={language} onChange={e => setLanguage(e.target.value)} placeholder="Language (or tap above)" maxLength={60}
+          className="h-11 rounded-xl border-sky-200/80 bg-white flex-1" />
+        <select value={proficiency} onChange={e => setProficiency(e.target.value)}
+          className="h-11 rounded-xl border border-sky-200/80 bg-white px-3 text-sm sm:max-w-[180px]">
+          {PROFICIENCY_LEVELS.map(p => <option key={p.v} value={p.v}>{p.label}</option>)}
+        </select>
+        <Button onClick={() => addMutation.mutate()} disabled={!language.trim() || addMutation.isPending}
+          className="gap-2 rounded-xl bg-gradient-to-r from-sky-600 to-sky-700 hover:from-sky-700 hover:to-sky-800 text-white">
+          {addMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />} Add
+        </Button>
+      </div>
+    </motion.div>
+  );
+}
+
 function SkillsStep({ profile, onNext, onBack }: { profile: any; onNext: () => void; onBack: () => void }) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const [experience, setExperience] = useState(String(profile.experience || 0));
+  // UAT-03 Item 10: total experience captured in MONTHS. Seed from
+  // experienceMonths, else convert the legacy years value (×12).
+  const [experienceMonths, setExperienceMonths] = useState(String(profile.experienceMonths ?? (profile.experience ? profile.experience * 12 : 0)));
   const [selectedSkills, setSelectedSkills] = useState<string[]>(profile.skills || []);
   const [selectedCountries, setSelectedCountries] = useState<string[]>(profile.preferredCountries || []);
   const [skillSearch, setSkillSearch] = useState("");
@@ -1094,7 +1178,8 @@ function SkillsStep({ profile, onNext, onBack }: { profile: any; onNext: () => v
   useEffect(() => {
     if (profile.skills) setSelectedSkills(profile.skills);
     if (profile.preferredCountries) setSelectedCountries(profile.preferredCountries);
-    if (profile.experience != null) setExperience(String(profile.experience));
+    if (profile.experienceMonths != null) setExperienceMonths(String(profile.experienceMonths));
+    else if (profile.experience != null) setExperienceMonths(String(profile.experience * 12));
     if (profile.qualificationLevel) setQualificationLevel(profile.qualificationLevel);
     if (profile.preferredCategories) setPreferredCategories(profile.preferredCategories);
     if (profile.preferredSalaryMin != null) setPreferredSalaryMin(String(profile.preferredSalaryMin));
@@ -1122,7 +1207,10 @@ function SkillsStep({ profile, onNext, onBack }: { profile: any; onNext: () => v
       const res = await fetch("/api/v1/candidates/profile", {
         method: "PATCH", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          experience: parseInt(experience) || 0,
+          // UAT-03 Item 10: send months; keep years in sync for any legacy
+          // reader (matching prefers months when present).
+          experienceMonths: parseInt(experienceMonths) || 0,
+          experience: Math.round((parseInt(experienceMonths) || 0) / 12),
           skills: selectedSkills,
           preferredCountries: selectedCountries,
           // v0.4.33 (Phase 3) — Matching v2 candidate-side fields
@@ -1156,7 +1244,7 @@ function SkillsStep({ profile, onNext, onBack }: { profile: any; onNext: () => v
 
       <ResumeParseWidget
         onApply={(parsed) => {
-          if (parsed.experience) setExperience(String(parsed.experience));
+          if (parsed.experience) setExperienceMonths(String(parsed.experience * 12));
           if (parsed.skills?.length) {
             setSelectedSkills(prev => Array.from(new Set([...prev, ...parsed.skills])));
           }
@@ -1173,21 +1261,26 @@ function SkillsStep({ profile, onNext, onBack }: { profile: any; onNext: () => v
             <Calendar className="w-4 h-4" /> Total Experience
           </p>
           <div className="flex items-center gap-3">
-            <Input type="number" value={experience}
+            <Input type="number" value={experienceMonths}
               onChange={e => {
                 const v = e.target.value;
                 // Reject negatives client-side; coerce to 0 if a user somehow
                 // types "-2" in Safari (where min= isn't enforced on type=number).
-                if (v === "" || /^\d+$/.test(v)) setExperience(v);
-                else setExperience(String(Math.max(0, parseInt(v, 10) || 0)));
+                if (v === "" || /^\d+$/.test(v)) setExperienceMonths(v);
+                else setExperienceMonths(String(Math.max(0, parseInt(v, 10) || 0)));
               }}
-              min={0} max={60} step={1} inputMode="numeric" pattern="[0-9]*"
+              min={0} max={720} step={1} inputMode="numeric" pattern="[0-9]*"
               placeholder="0"
               className="h-12 rounded-xl border-amber-200/80 bg-white max-w-[140px] text-center text-lg font-bold" />
-            <span className="text-sm text-amber-700 font-medium">years</span>
+            <span className="text-sm text-amber-700 font-medium">months
+              {(() => { const m = parseInt(experienceMonths) || 0; return m >= 12 ? ` (≈ ${(m / 12).toFixed(1)} yrs)` : ""; })()}
+            </span>
           </div>
-          <p className="text-xs text-amber-500 mt-2">Experience contributes 30% to your match score</p>
+          <p className="text-xs text-amber-500 mt-2">e.g. 42 months. Experience contributes 30% to your match score</p>
         </motion.div>
+
+        {/* Languages (UAT-03 Item 12) */}
+        <LanguagesSection />
 
         {/* Selected Skills */}
         <motion.div variants={fadeUp}>
