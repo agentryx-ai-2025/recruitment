@@ -10,6 +10,17 @@ Running tracker. Update every working session, in the same commit as the code ch
 
 ## Shipped
 
+### v0.5.0 — HP-4c · blue-collar simplified application flow (the fork's core UX pivot)
+The separate, blue-collar-first route — designed with **Fable 5**, engineered + wired by Opus. Live at **`/apply`**.
+- **7 one-question screens:** pictorial **trade grid** (18 trades) → name → experience (months stepper) → **education as levels** (No schooling→Graduate, not free-text degrees) → languages (tap + Little/Good/Very-good) → destination (flag cards) → review. Govt trust chrome, 56px targets, segmented progress, "Report a fraud agent".
+- **Same schema** — writes skills/preferredCategories, experienceMonths, qualificationLevel + a candidate_education row, candidate_languages, preferredCountries. **Per-screen save** (2G-safe) + prefill on return.
+- **Escape link** → the existing detailed `/profile` wizard for degree-holders (kept as-is).
+- **Optional "Add more"** design in hand (reuses detailed components) — folds into the review screen next.
+- **Matching fix:** added `below_matric` as the lowest `QUAL_ORDER` tier so no-schooling/5th/8th candidates score against it instead of as blank.
+- **Two-gate PASS:** Playwright — trade grid renders, tap Mason advances to name; DB — `skills={Mason}`, `categories={construction}` persisted.
+- **Not yet default:** `/apply` is live but the dashboard's "complete profile" CTAs still point to `/profile`. **Awaiting Subhash's review of the live flow before rewiring the default entry.**
+- Files: `client/src/pages/simple-apply.tsx` + `simple-apply/{reference,QuestionShell}.tsx`.
+
 ### v0.4.4 — HP-4b.5 · Identity mandatory + seed refresh (UAT 4)
 - **UAT-4** Identity section mandatory — the wizard's first step now requires Gender + Father's + Mother's name (marked required) before Continue; passport stays optional (first-timers don't have one). Existing incomplete test profiles aren't a concern (disposable data).
 - **Seed refresh** — `scripts/seed.ts` now sets `experience_months` on every candidate (matching reads it) and seeds `candidate_languages` (Hindi native + English + some Arabic). Validated on the test DB: 26 candidates w/ months, 55 languages.

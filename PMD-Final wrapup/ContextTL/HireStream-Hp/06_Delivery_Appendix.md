@@ -45,6 +45,8 @@ Legend: ✅ delivered · 🟡 partial/foundation · 📐 designed (roadmap).
 | C6 | ✅ UAT-9 Certification vs Skill Course helper (blue-collar examples) | Clear differentiation; ITI/NSDC trade certs land right | v0.4.3 / HP-4b.4 |
 | C7 | ✅ UAT-4 Identity section mandatory (Gender + parents' names gate the wizard) | Emigration-paperwork completeness enforced up front | v0.4.4 / HP-4b.5 |
 | C8 | ✅ Seed refresh — `experience_months` on all candidates + `candidate_languages` (Hindi/English/Arabic) | Fresh demo/test data exercises the new HP-4b features | v0.4.4 / HP-4b.5 |
+| C9 | ✅ **Blue-collar simplified application flow** (`/apply`) — 7 one-question screens, pictorial trades, education-as-levels, designed w/ Fable 5 | The fork's core UX pivot: a form a mason/plumber can actually complete; same schema | v0.5.0 / HP-4c |
+| C10 | ✅ Matching: `below_matric` qualification tier | No-schooling/5th/8th candidates score fairly, not as blank | v0.5.0 / HP-4c |
 
 ## D · Quality, testing & reliability (engineering value)
 
@@ -74,4 +76,4 @@ Legend: ✅ delivered · 🟡 partial/foundation · 📐 designed (roadmap).
 
 ---
 
-_Last updated: 2026-07-05 (session), after HP-4b.5 — 9 of 20 UAT items live._
+_Last updated: 2026-07-05 (session), after HP-4c — 9 of 20 UAT items live + the blue-collar `/apply` flow (the fork's core UX pivot)._

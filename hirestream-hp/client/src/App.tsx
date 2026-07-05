@@ -25,6 +25,7 @@ const AuthPage = lazy(() => import("@/pages/auth-page"));
 const FaqPage = lazy(() => import("@/pages/faq-page"));
 const GrievancePage = lazy(() => import("@/pages/grievance-page"));
 const ProfileWizard = lazy(() => import("@/pages/profile-wizard"));
+const SimpleApply = lazy(() => import("@/pages/simple-apply"));
 const JobDetailPage = lazy(() => import("@/pages/job-detail"));
 const ApplicationDetailPage = lazy(() => import("@/pages/application-detail"));
 const AgencyDetailPage = lazy(() => import("@/pages/agency-detail"));
@@ -110,6 +111,9 @@ function Router() {
         </Route>
         <Route path="/profile">
           <PageLayout><ProfileWizard /></PageLayout>
+        </Route>
+        <Route path="/apply">
+          <PageLayout><SimpleApply /></PageLayout>
         </Route>
         <Route path="/jobs/:id">
           <PageLayout><JobDetailPage /></PageLayout>

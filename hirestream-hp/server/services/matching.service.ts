@@ -211,7 +211,10 @@ function scoreExperience(candidate: any, job: any, w: number, pol: PolicyPair): 
   };
 }
 
-const QUAL_ORDER = ["school", "diploma", "bachelor", "master", "doctorate"] as const;
+// HP-4c: `below_matric` (no schooling / 5th / 8th, from the simplified flow) is
+// the lowest real tier — so low-education candidates score against it instead of
+// being treated as "qualification not set" (blank).
+const QUAL_ORDER = ["below_matric", "school", "diploma", "bachelor", "master", "doctorate"] as const;
 function scoreQualification(candidate: any, job: any, w: number, pol: PolicyPair): FactorResult {
   const req = (job.qualificationRequired || "").toLowerCase();
   const has = (candidate.qualificationLevel || "").toLowerCase();
