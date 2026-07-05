@@ -10,6 +10,16 @@ Running tracker. Update every working session, in the same commit as the code ch
 
 ## Shipped
 
+### v0.5.1 — demo-login panel gated + HP DB seeded (login fix)
+Subhash reported "can't log in / all 4 roles still show." Root causes + fixes:
+- **Demo panel not gated** (separate surface from the HP-3a register dropdown) → now hides Agencies/Employers tabs when those capabilities are off (Candidates + Admin only).
+- **HP DB had no users** (only `hpsedc_agency`) → ran `scripts/seed.ts` on the HP DB (50 users: 26 blue-collar candidates + admin + superadmin + agencies/employers), then restarted so the boot seed re-created the mega-agency + `default_agency_user_id`. Normal login verified 200 (arjun_thakur/test123, demo_admin/test123, hpsedc_agency/test123, superadmin/hpsedc@super2026).
+- **One-click quick-login off in prod** → set `feature.quick_login_enabled=true` on the HP DB **(user-authorized)** — dev-login now 200.
+
+**Follow-ups flagged:**
+- `scripts/seed.ts` is the *reference multi-role* seed — it wrote marketplace (agency/employer) rows to HP, hidden by the single-agency UI. **Build a HP-only seed** (candidates + admin + mega-agency, no marketplace) before go-live.
+- `useDemoLogin` swallows the dev-login error (silent fail on 403) — add a toast.
+
 ### v0.5.0 — HP-4c · blue-collar simplified application flow (the fork's core UX pivot)
 The separate, blue-collar-first route — designed with **Fable 5**, engineered + wired by Opus. Live at **`/apply`**.
 - **7 one-question screens:** pictorial **trade grid** (18 trades) → name → experience (months stepper) → **education as levels** (No schooling→Graduate, not free-text degrees) → languages (tap + Little/Good/Very-good) → destination (flag cards) → review. Govt trust chrome, 56px targets, segmented progress, "Report a fraud agent".
