@@ -10,6 +10,13 @@ Running tracker. Update every working session, in the same commit as the code ch
 
 ## Shipped
 
+### v0.4.1 — HP-4b.1 · education fields wired (UAT 6, 7)
+Surfaces the HP-4a schema in the profile wizard's Education step.
+- **UAT-7** "University / Affiliating Body" field (higher-ed types), distinct from Institution. Shown in saved records.
+- **UAT-6** "Passed / Completed" checkbox (default checked); a "Not passed" badge shows on records where unchecked.
+- API already accepted both (auto-included via `createInsertSchema`). Backend smoke green — `university` + `isPassed:false` persist and read back. Client-only change (no Jest surface).
+- **Items 6 + 7 → done. Now 4 of 20 live (1, 3, 6, 7).**
+
 ### v0.4.0 — HP-2 · fast-win label fixes (UAT 1, 3)
 Live on staging. Pure UI label swaps in `profile-wizard.tsx` (hardcoded strings;
 locale files carry no keys for them, so no i18n change). Field/column names

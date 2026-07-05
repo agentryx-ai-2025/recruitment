@@ -718,6 +718,10 @@ function EducationStep({ onNext, onBack }: { onNext: () => void; onBack: () => v
   const [degree, setDegree] = useState(""); const [institution, setInstitution] = useState("");
   const [board, setBoard] = useState(""); const [subject, setSubject] = useState("");
   const [year, setYear] = useState(""); const [percentage, setPercentage] = useState("");
+  // UAT-03 Item 7: affiliating university/body, distinct from `institution`
+  // (the school/college name). UAT-03 Item 6: whether the qualification was
+  // passed (default true — most entries are completed qualifications).
+  const [university, setUniversity] = useState(""); const [isPassed, setIsPassed] = useState(true);
 
   const { data: eduRes, isLoading } = useQuery({
     queryKey: ["/api/v1/candidates/education"], queryFn: () => fetchJson("/api/v1/candidates/education"),
@@ -730,6 +734,7 @@ function EducationStep({ onNext, onBack }: { onNext: () => void; onBack: () => v
         body: JSON.stringify({
           degree, institution, year: parseInt(year) || null, percentage,
           type, board: board || null, subject: subject || null,
+          university: university || null, isPassed,
         }),
       });
       if (!res.ok) throw new Error("Failed"); return res.json();
@@ -738,7 +743,7 @@ function EducationStep({ onNext, onBack }: { onNext: () => void; onBack: () => v
       queryClient.invalidateQueries({ queryKey: ["/api/v1/candidates/education"] });
       queryClient.invalidateQueries({ queryKey: ["/api/v1/candidates/profile/completion"] });
       setAdding(false); setDegree(""); setInstitution(""); setYear(""); setPercentage("");
-      setBoard(""); setSubject(""); setType("university");
+      setBoard(""); setSubject(""); setType("university"); setUniversity(""); setIsPassed(true);
       toast({ title: "Education added" });
     },
   });
@@ -777,7 +782,7 @@ function EducationStep({ onNext, onBack }: { onNext: () => void; onBack: () => v
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className="font-bold text-sm text-slate-900 truncate">{edu.degree}</p>
-                      <p className="text-xs text-slate-500 truncate">{edu.institution}{edu.board ? ` · ${edu.board}` : ""}{edu.subject ? ` · ${edu.subject}` : ""}</p>
+                      <p className="text-xs text-slate-500 truncate">{edu.institution}{edu.university ? ` · ${edu.university}` : ""}{edu.board ? ` · ${edu.board}` : ""}{edu.subject ? ` · ${edu.subject}` : ""}</p>
                       <div className="flex items-center gap-2 mt-1 flex-wrap">
                         {edu.type && (
                           <Badge variant="outline" className="text-[10px] bg-violet-50 text-violet-700 border-violet-200 px-1.5 py-0 capitalize">
@@ -786,6 +791,7 @@ function EducationStep({ onNext, onBack }: { onNext: () => void; onBack: () => v
                         )}
                         {edu.year && <Badge variant="outline" className="text-[10px] bg-white text-slate-600 border-slate-200 px-1.5 py-0">{edu.year}</Badge>}
                         {edu.percentage && <Badge variant="outline" className="text-[10px] bg-amber-50 text-amber-700 border-amber-200 px-1.5 py-0">{edu.percentage}%</Badge>}
+                        {edu.isPassed === false && <Badge variant="outline" className="text-[10px] bg-orange-50 text-orange-700 border-orange-200 px-1.5 py-0">Not passed</Badge>}
                       </div>
                     </div>
                   </div>
@@ -859,6 +865,16 @@ function EducationStep({ onNext, onBack }: { onNext: () => void; onBack: () => v
                           className="pl-11 h-12 rounded-xl border-violet-200/80 bg-white" />
                       </FormField>
                     )}
+                    {/* UAT-03 Item 7: affiliating University, distinct from the
+                        Institution (college) name above. Shown for higher-ed. */}
+                    {(type === "university" || type === "diploma") && (
+                      <FormField label="University / Affiliating Body" icon={Building}>
+                        <Input value={university} onChange={e => setUniversity(e.target.value)}
+                          placeholder="e.g. HP University, IGNOU (leave blank if same as institution)"
+                          maxLength={150}
+                          className="pl-11 h-12 rounded-xl border-violet-200/80 bg-white" />
+                      </FormField>
+                    )}
                     <FormField label="Year of Passing" icon={Calendar}>
                       <Input type="number" min={1950} max={new Date().getFullYear() + 1} value={year}
                         onChange={e => setYear(e.target.value)} placeholder="2024"
@@ -870,6 +886,14 @@ function EducationStep({ onNext, onBack }: { onNext: () => void; onBack: () => v
                         className="pl-11 h-12 rounded-xl border-violet-200/80 bg-white" />
                     </FormField>
                   </div>
+                  {/* UAT-03 Item 6: has this qualification been passed/completed? */}
+                  <label className="flex items-center gap-2.5 cursor-pointer select-none w-fit">
+                    <input type="checkbox" checked={isPassed} onChange={e => setIsPassed(e.target.checked)}
+                      className="w-4 h-4 rounded border-violet-300 text-violet-600 focus:ring-violet-500/30" />
+                    <span className="text-sm text-slate-700">Passed / Completed
+                      <span className="text-xs text-slate-400 ml-1">(uncheck if pursuing or not cleared)</span>
+                    </span>
+                  </label>
                   <div className="flex gap-3">
                     <Button onClick={() => addMutation.mutate()} disabled={!degree || !institution || addMutation.isPending}
                       className="gap-2 rounded-xl bg-gradient-to-r from-violet-600 to-violet-700 hover:from-violet-700 hover:to-violet-800 text-white shadow-lg shadow-violet-500/25">
