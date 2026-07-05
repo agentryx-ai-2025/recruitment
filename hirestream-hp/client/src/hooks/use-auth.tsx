@@ -59,6 +59,9 @@ function useRegisterMutation() {
       return res.json();
     },
     onSuccess: () => {
+      // Clear any previous user's cached queries (staleTime is Infinity) so a
+      // fresh registration never renders the prior account's profile/apps.
+      queryClient.removeQueries({ predicate: (q) => q.queryKey[0] !== "/api/v1/auth/me" });
       queryClient.invalidateQueries({ queryKey: ["/api/v1/auth/me"] });
     },
   });
@@ -73,6 +76,9 @@ function useLogoutMutation() {
     },
     onSuccess: () => {
       queryClient.setQueryData(["/api/v1/auth/me"], { success: false });
+      // Drop the previous user's cached data so it can't bleed into the next
+      // session (e.g. switching demo accounts without a full reload).
+      queryClient.removeQueries({ predicate: (q) => q.queryKey[0] !== "/api/v1/auth/me" });
     },
   });
 }

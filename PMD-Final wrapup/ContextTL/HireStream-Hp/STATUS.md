@@ -10,6 +10,9 @@ Running tracker. Update every working session, in the same commit as the code ch
 
 ## Shipped
 
+### v0.5.5 — fix: stale cross-account cache (fresh account showed another user's data)
+Subhash registered a fresh candidate and the dashboard showed **Arjun's** profile + placement. **Not a server leak** — verified a fresh session's API returns only its own data (empty). Root cause: `queryClient` has `staleTime: Infinity`, and while `login` cleared the cache, **`register` and `logout` did not** — so a prior demo account's cached profile/apps bled into the next session (on SPA-internal navigation, no full reload). Fix: `register` + `logout` now `removeQueries` (all keys except `/auth/me`), mirroring `login`. My simplified dashboard just surfaced this pre-existing bug prominently.
+
 ### v0.5.4 — simplified blue-collar candidate dashboard (default)
 Designed with **Fable 5**, English copy (Hindi pass later). New `candidate-dashboard-simple.tsx` — the **default** for candidates; the detailed dashboard opens via `?full=1` ("See the full dashboard" link).
 - 4 blocks only: govt **trust band** → **profile** (one fat progress bar + one 56px "Complete your profile" → `/apply`, or a calm "ready ✓") → **My application** (one big pictorial status — Being reviewed / Interview / Selected / Job confirmed — with a 4-dot step strip, not the 6-col funnel; offer-pending → amber "make a decision") → **Help** (File a complaint / Report a fraud agent).
