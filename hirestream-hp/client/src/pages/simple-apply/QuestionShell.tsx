@@ -1,5 +1,6 @@
 import React from "react";
 import { motion } from "framer-motion";
+import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, ArrowRight, Loader2, Landmark, ShieldCheck, AlertTriangle } from "lucide-react";
 
@@ -13,19 +14,20 @@ const fadeUp = {
 // segmented progress bar, big 56px primary action.
 export function QuestionShell({
   step, totalSteps, question, help, children,
-  onBack, onNext, nextLabel = "Next", nextDisabled, loading, onSkip,
+  onBack, onNext, nextLabel, nextDisabled, loading, onSkip,
 }: {
   step: number; totalSteps: number; question: string; help?: string;
   children: React.ReactNode; onBack?: () => void; onNext?: () => void;
   nextLabel?: string; nextDisabled?: boolean; loading?: boolean; onSkip?: () => void;
 }) {
+  const { t } = useTranslation();
   return (
     <div className="min-h-[calc(100vh-4rem)] bg-gradient-to-br from-slate-50 via-white to-blue-50/30 flex flex-col">
       {/* Govt trust bar */}
       <div className="flex items-center justify-center gap-2 py-3 px-4 border-b border-slate-100 bg-white/80">
         <Landmark className="w-4 h-4 text-blue-700" />
         <p className="text-sm font-semibold text-slate-700">
-          HPSEDC <span className="text-slate-400 font-normal">· Government of Himachal Pradesh</span>
+          {t("shell.govBrand")} <span className="text-slate-400 font-normal">· {t("shell.govSubtitle")}</span>
         </p>
       </div>
 
@@ -51,18 +53,18 @@ export function QuestionShell({
                 className="w-full h-14 rounded-xl text-lg font-semibold gap-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-lg shadow-blue-500/25 transition-all"
               >
                 {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : null}
-                {nextLabel} {!loading && <ArrowRight className="w-5 h-5" />}
+                {nextLabel || t("shell.next")} {!loading && <ArrowRight className="w-5 h-5" />}
               </Button>
             )}
             <div className="flex items-center justify-between">
               {onBack ? (
                 <button onClick={onBack} className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-blue-600 py-3 px-2 transition-colors">
-                  <ArrowLeft className="w-4 h-4" /> Back
+                  <ArrowLeft className="w-4 h-4" /> {t("shell.back")}
                 </button>
               ) : <div />}
               {onSkip && (
                 <button onClick={onSkip} className="text-sm text-slate-400 hover:text-slate-600 py-3 px-2 transition-colors">
-                  Skip for now
+                  {t("shell.skip")}
                 </button>
               )}
             </div>
@@ -73,11 +75,11 @@ export function QuestionShell({
       {/* Trust footer */}
       <div className="flex items-center justify-center gap-4 py-3 px-4 border-t border-slate-100 bg-white/80 text-xs">
         <span className="inline-flex items-center gap-1.5 text-emerald-700 font-medium">
-          <ShieldCheck className="w-3.5 h-3.5" /> Verified by HPSEDC
+          <ShieldCheck className="w-3.5 h-3.5" /> {t("shell.verified")}
         </span>
         <span className="text-slate-300">|</span>
         <a href="/grievance?type=fraud" className="inline-flex items-center gap-1.5 text-rose-600 hover:text-rose-700 font-medium">
-          <AlertTriangle className="w-3.5 h-3.5" /> Report a fraud agent
+          <AlertTriangle className="w-3.5 h-3.5" /> {t("shell.reportFraud")}
         </a>
       </div>
     </div>

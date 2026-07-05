@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { Check, X, Plus, Minus, Pencil, ShieldCheck } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
@@ -31,6 +32,7 @@ export default function SimpleApplyPage() {
   const [, setLocation] = useLocation();
   const { user } = useAuth();
   const { toast } = useToast();
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
 
   const [step, setStep] = useState(0);
@@ -79,13 +81,13 @@ export default function SimpleApplyPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/v1/candidates/profile"] });
       if (next != null) go(next);
     } catch (e: any) {
-      toast({ title: e.message || "Could not save", variant: "destructive" });
+      toast({ title: e.message || t("simpleApply.couldNotSave"), variant: "destructive" });
     } finally { setSaving(false); }
   };
 
   // ── Screen 0: trade grid (entry) ───────────────────────────────────────
   const TradeGrid = () => (
-    <QuestionShell step={0} totalSteps={TOTAL} question="What work do you do?" help="Tap the card that matches your work.">
+    <QuestionShell step={0} totalSteps={TOTAL} question={t("simpleApply.qTrade")} help={t("simpleApply.helpTrade")}>
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
         {BLUE_COLLAR_TRADES.map((t) => {
           const Icon = t.icon;
@@ -108,7 +110,7 @@ export default function SimpleApplyPage() {
       </div>
       <p className="text-center mt-6">
         <button onClick={() => setLocation("/apply/pro")} className="text-sm text-blue-600 hover:text-blue-700 underline underline-offset-4 py-3 px-2">
-          Have a degree or professional qualification? Use the detailed form →
+          {t("simpleApply.proLink")}
         </button>
       </p>
     </QuestionShell>
@@ -116,23 +118,23 @@ export default function SimpleApplyPage() {
 
   // ── Screen 1: name ─────────────────────────────────────────────────────
   const NameScreen = () => (
-    <QuestionShell step={1} totalSteps={TOTAL} question="What is your name?"
+    <QuestionShell step={1} totalSteps={TOTAL} question={t("simpleApply.qName")}
       onBack={() => go(0)} onNext={() => save({ fullName }, 2)} nextDisabled={!fullName.trim()} loading={saving}>
-      <MicField value={fullName} onChange={setFullName} placeholder="e.g. Ramesh Kumar" autoFocus />
+      <MicField value={fullName} onChange={setFullName} placeholder={t("simpleApply.phName")} autoFocus />
     </QuestionShell>
   );
 
   // ── Screen 2: experience (months stepper + chips) ──────────────────────
   const ExperienceScreen = () => {
-    const chips = [{ m: 0, l: "New to this" }, { m: 12, l: "1 year" }, { m: 24, l: "2 years" }, { m: 60, l: "5 years" }, { m: 120, l: "10+ years" }];
+    const chips = [{ m: 0, l: t("simpleApply.chipNew") }, { m: 12, l: t("simpleApply.chip1y") }, { m: 24, l: t("simpleApply.chip2y") }, { m: 60, l: t("simpleApply.chip5y") }, { m: 120, l: t("simpleApply.chip10y") }];
     return (
-      <QuestionShell step={2} totalSteps={TOTAL} question={`How long have you worked${trade ? ` as a ${trade.label}` : ""}?`}
-        help="Use the buttons, or pick below." onBack={() => go(1)} onNext={() => save({ experienceMonths: months, experience: Math.round(months / 12) }, 3)} loading={saving}>
+      <QuestionShell step={2} totalSteps={TOTAL} question={trade ? t("simpleApply.qExperience", { trade: trade.label }) : t("simpleApply.qExperienceNoTrade")}
+        help={t("simpleApply.helpExperience")} onBack={() => go(1)} onNext={() => save({ experienceMonths: months, experience: Math.round(months / 12) }, 3)} loading={saving}>
         <div className="flex items-center justify-center gap-4 mb-6">
           <button type="button" onClick={() => setMonths((m) => Math.max(0, m - 6))} className="w-14 h-14 rounded-2xl border border-slate-200 bg-white flex items-center justify-center text-slate-600 active:scale-95"><Minus className="w-6 h-6" /></button>
           <div className="text-center min-w-[7rem]">
             <div className="text-4xl font-bold text-slate-900 tabular-nums">{months}</div>
-            <div className="text-sm text-slate-500">months{months >= 12 ? ` ≈ ${(months / 12).toFixed(1)} yrs` : ""}</div>
+            <div className="text-sm text-slate-500">{t("simpleApply.monthsUnit")}{months >= 12 ? ` ≈ ${(months / 12).toFixed(1)} ${t("simpleApply.yrsShort")}` : ""}</div>
           </div>
           <button type="button" onClick={() => setMonths((m) => Math.min(600, m + 6))} className="w-14 h-14 rounded-2xl border border-slate-200 bg-white flex items-center justify-center text-slate-600 active:scale-95"><Plus className="w-6 h-6" /></button>
         </div>
@@ -165,8 +167,8 @@ export default function SimpleApplyPage() {
       finally { setSaving(false); }
     };
     return (
-      <QuestionShell step={3} totalSteps={TOTAL} question="How far did you study?"
-        help="Tap one. Every level is fine — jobs exist for all of them." onBack={() => go(2)} onNext={saveEdu} nextDisabled={!chosen} loading={saving}>
+      <QuestionShell step={3} totalSteps={TOTAL} question={t("simpleApply.qEducation")}
+        help={t("simpleApply.helpEducation")} onBack={() => go(2)} onNext={saveEdu} nextDisabled={!chosen} loading={saving}>
         <div className="grid grid-cols-2 gap-3">
           {EDUCATION_LEVELS.map((lvl) => {
             const sel = eduKey === lvl.key; const Icon = lvl.icon;
@@ -207,8 +209,8 @@ export default function SimpleApplyPage() {
     };
     const available = QUICK_LANGUAGES.filter((l) => !languages.some((s: any) => s.language.toLowerCase() === l.toLowerCase()));
     return (
-      <QuestionShell step={4} totalSteps={TOTAL} question="Which languages can you speak?"
-        help="Tap a language, then tap how well you speak it." onBack={() => go(3)} onNext={() => go(5)} nextDisabled={languages.length === 0}>
+      <QuestionShell step={4} totalSteps={TOTAL} question={t("simpleApply.qLanguage")}
+        help={t("simpleApply.helpLanguage")} onBack={() => go(3)} onNext={() => go(5)} nextDisabled={languages.length === 0}>
         {languages.length > 0 && (
           <div className="flex flex-wrap gap-2 mb-5">
             {languages.map((l: any) => (
@@ -252,8 +254,8 @@ export default function SimpleApplyPage() {
   const CountryScreen = () => {
     const toggle = (name: string) => setCountries((c) => c.includes(name) ? c.filter((x) => x !== name) : [...c, name]);
     return (
-      <QuestionShell step={5} totalSteps={TOTAL} question="Where do you want to work?"
-        help="Choose one or more countries." onBack={() => go(4)} onNext={() => save({ preferredCountries: countries }, 6)} nextDisabled={countries.length === 0} loading={saving}>
+      <QuestionShell step={5} totalSteps={TOTAL} question={t("simpleApply.qCountry")}
+        help={t("simpleApply.helpCountry")} onBack={() => go(4)} onNext={() => save({ preferredCountries: countries }, 6)} nextDisabled={countries.length === 0} loading={saving}>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
           {QUICK_COUNTRIES.map((c) => {
             const sel = countries.includes(c.name);
@@ -269,7 +271,7 @@ export default function SimpleApplyPage() {
           })}
         </div>
         <button type="button" onClick={() => setCountries(QUICK_COUNTRIES.map((c) => c.name))}
-          className="mt-4 w-full text-sm text-emerald-600 hover:text-emerald-700 py-3 font-semibold">Anywhere in the Gulf is fine →</button>
+          className="mt-4 w-full text-sm text-emerald-600 hover:text-emerald-700 py-3 font-semibold">{t("simpleApply.anywhereGulf")}</button>
       </QuestionShell>
     );
   };
@@ -277,15 +279,15 @@ export default function SimpleApplyPage() {
   // ── Screen 6: review + finish ──────────────────────────────────────────
   // ── Screen 6: contact (phone + home town) ──────────────────────────────
   const ContactScreen = () => (
-    <QuestionShell step={6} totalSteps={TOTAL} question="How can HPSEDC reach you?"
-      help="We will call or message you on this number when a job opens."
+    <QuestionShell step={6} totalSteps={TOTAL} question={t("simpleApply.qContact")}
+      help={t("simpleApply.helpContact")}
       onBack={() => go(5)} onNext={() => save({ phone, location: homeLocation || null }, 7)} nextDisabled={phone.replace(/\D/g, "").length < 10} loading={saving}>
-      <label className="block text-sm font-semibold text-slate-600 mb-1.5">Phone number</label>
+      <label className="block text-sm font-semibold text-slate-600 mb-1.5">{t("simpleApply.labelPhone")}</label>
       <input type="tel" inputMode="numeric" value={phone} onChange={(e) => setPhone(e.target.value.replace(/[^\d+\s-]/g, ""))}
-        placeholder="e.g. 98765 43210" maxLength={15}
+        placeholder={t("simpleApply.phPhone")} maxLength={15}
         className="h-14 w-full rounded-xl border border-blue-200/80 bg-white px-4 text-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all" />
-      <label className="block text-sm font-semibold text-slate-600 mt-5 mb-1.5">Your town / district (in Himachal)</label>
-      <MicField value={homeLocation} onChange={setHomeLocation} placeholder="e.g. Mandi" />
+      <label className="block text-sm font-semibold text-slate-600 mt-5 mb-1.5">{t("simpleApply.labelTown")}</label>
+      <MicField value={homeLocation} onChange={setHomeLocation} placeholder={t("simpleApply.phTown")} />
     </QuestionShell>
   );
 
@@ -298,21 +300,21 @@ export default function SimpleApplyPage() {
       </div>
     );
     return (
-      <QuestionShell step={7} totalSteps={TOTAL} question="Check your details" help="Tap the pencil to change anything."
-        onBack={() => go(6)} onNext={() => { toast({ title: "Profile saved" }); setLocation("/"); }} nextLabel="Save my profile" loading={saving}>
+      <QuestionShell step={7} totalSteps={TOTAL} question={t("simpleApply.qReview")} help={t("simpleApply.helpReview")}
+        onBack={() => go(6)} onNext={() => { toast({ title: t("simpleApply.savedToast") }); setLocation("/"); }} nextLabel={t("simpleApply.saveProfile")} loading={saving}>
         <div className="rounded-2xl border border-slate-200 bg-white p-5">
-          <Row label="Work" value={trade?.label || ""} onEdit={() => go(0)} />
-          <Row label="Name" value={fullName} onEdit={() => go(1)} />
-          <Row label="Experience" value={months >= 12 ? `${(months / 12).toFixed(1)} years` : `${months} months`} onEdit={() => go(2)} />
-          <Row label="Education" value={chosenEdu?.label || ""} onEdit={() => go(3)} />
-          <Row label="Languages" value={languages.map((l: any) => l.language).join(", ")} onEdit={() => go(4)} />
-          <Row label="Preferred countries" value={countries.join(", ")} onEdit={() => go(5)} />
-          <Row label="Phone" value={phone} onEdit={() => go(6)} />
-          {homeLocation ? <Row label="Town / district" value={homeLocation} onEdit={() => go(6)} /> : null}
+          <Row label={t("simpleApply.rowWork")} value={trade?.label || ""} onEdit={() => go(0)} />
+          <Row label={t("simpleApply.rowName")} value={fullName} onEdit={() => go(1)} />
+          <Row label={t("simpleApply.rowExperience")} value={months >= 12 ? t("simpleApply.reviewYears", { y: (months / 12).toFixed(1) }) : t("simpleApply.reviewMonths", { m: months })} onEdit={() => go(2)} />
+          <Row label={t("simpleApply.rowEducation")} value={chosenEdu?.label || ""} onEdit={() => go(3)} />
+          <Row label={t("simpleApply.rowLanguages")} value={languages.map((l: any) => l.language).join(", ")} onEdit={() => go(4)} />
+          <Row label={t("simpleApply.rowCountries")} value={countries.join(", ")} onEdit={() => go(5)} />
+          <Row label={t("simpleApply.rowPhone")} value={phone} onEdit={() => go(6)} />
+          {homeLocation ? <Row label={t("simpleApply.rowTown")} value={homeLocation} onEdit={() => go(6)} /> : null}
         </div>
         <div className="mt-4 rounded-xl bg-emerald-50/70 border border-emerald-100 p-4 flex items-start gap-2.5">
           <ShieldCheck className="w-4 h-4 text-emerald-600 mt-0.5 flex-shrink-0" />
-          <p className="text-xs text-emerald-800">HPSEDC will contact you on your phone when a matching job opens. No fees are charged for registration.</p>
+          <p className="text-xs text-emerald-800">{t("simpleApply.noFeeNote")}</p>
         </div>
       </QuestionShell>
     );
