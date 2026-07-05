@@ -38,6 +38,11 @@ export const candidates = pgTable("candidates", {
   sex: text("sex"),
   location: text("location"),
   experience: integer("experience").default(0),
+  // HP-4a (UAT-03 Item 10): experience captured in MONTHS (e.g. 42). Nullable
+  // + additive so the old `experience` (years) column keeps working during the
+  // cutover; backfilled = experience × 12. New wizard writes months; the
+  // matching-service reads months when present, else falls back to years×12.
+  experienceMonths: integer("experience_months"),
   skills: text("skills").array(),
   preferredCountries: text("preferred_countries").array(),
   profileComplete: boolean("profile_complete").default(false),
@@ -380,6 +385,13 @@ export const candidateEducation = pgTable("candidate_education", {
   type: text("type"),         // school | university | diploma | certification | course
   board: text("board"),       // CBSE / ICSE / HPBSE / Cambridge / IB / etc.
   subject: text("subject"),
+  // HP-4a (UAT-03 Item 7): affiliating university/body, distinct from
+  // `institution` (the school/college name). Nullable — pre-HP rows keep the
+  // combined value in `institution` with `university` null.
+  university: text("university"),
+  // HP-4a (UAT-03 Item 6): did the candidate PASS this qualification? Default
+  // true so existing rows are unaffected; the wizard exposes a checkbox.
+  isPassed: boolean("is_passed").notNull().default(true),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -392,6 +404,21 @@ export const candidateExperience = pgTable("candidate_experience", {
   years: integer("years").default(0),
   country: text("country"),
   description: text("description"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// ── Candidate Languages ─────────────────────────────────────────────
+// HP-4a (UAT-03 Item 12): for blue-collar overseas placement, spoken-language
+// proficiency (Hindi / English / Malayalam / Arabic / …) matters more than
+// resume phrasing, so it's a first-class section — not buried in free text.
+export const candidateLanguages = pgTable("candidate_languages", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  candidateId: varchar("candidate_id").references(() => candidates.id).notNull(),
+  language: text("language").notNull(),         // Hindi | English | Arabic | Malayalam | ...
+  proficiency: text("proficiency").notNull(),   // elementary | intermediate | professional | native
+  canRead: boolean("can_read").default(false),
+  canWrite: boolean("can_write").default(false),
+  canSpeak: boolean("can_speak").default(true),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

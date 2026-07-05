@@ -10,6 +10,19 @@ Running tracker. Update every working session, in the same commit as the code ch
 
 ## Shipped
 
+### HP-4a — profile data-model foundation (schema + migration)
+Additive, backward-compatible. Applied to **both** `hirestream_hp` (surgical
+`ALTER`/`CREATE ... IF NOT EXISTS`) and `hirestream_hp_test` (drizzle push).
+No drops, no data loss; reference DB untouched.
+
+- **UAT-6** `candidate_education.is_passed BOOLEAN NOT NULL DEFAULT true`.
+- **UAT-7** `candidate_education.university` (nullable; `institution` stays = school/college name).
+- **UAT-10** `candidates.experience_months` (nullable; backfilled `= experience×12` — 0 rows, HP has no real candidates yet). Old `experience` (years) kept for safe cutover.
+- **UAT-12** new `candidate_languages` table (language + proficiency + read/write/speak flags).
+- **UAT-9** (cert vs course) needs **no schema** — `candidate_education.type` already has `certification` + `course` values; it's a UI-bucketing task in HP-4b/c.
+
+**Note:** schema/DB foundation only — the wizard/API field wiring is HP-4b. Not version-bumped/deployed yet (no runtime behaviour change; extra DB columns are inert until code uses them).
+
 ### v0.3.0 — HP-3b · single HPSEDC mega-agency
 Builds on the HP-3a flag layer. Still disable-not-delete — no deleted routes.
 
