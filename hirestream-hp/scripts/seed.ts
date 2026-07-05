@@ -2,7 +2,7 @@ import "dotenv/config";
 import { storage } from "../server/storage";
 import {
   users, candidates, jobs, applications, recruitmentAgents, employers,
-  candidateEducation, candidateExperience, documents, savedJobs,
+  candidateEducation, candidateExperience, candidateLanguages, documents, savedJobs,
   recruitmentDrives, driveRegistrations, interviews, placements, notifications, agencyReviews,
   grievances, grievanceComments, faq, announcements, agencyDocuments, employerDocuments, auditLog,
 } from "@shared/schema";
@@ -133,7 +133,7 @@ async function seed() {
   for (const c of CANDS) {
     const [row] = await db.insert(candidates).values({
       userId: uid[c.un], fullName: c.name, email: email(c.un), phone: c.phone,
-      location: `${c.city}, Himachal Pradesh`, experience: c.exp, skills: c.skills,
+      location: `${c.city}, Himachal Pradesh`, experience: c.exp, experienceMonths: c.exp * 12, skills: c.skills,
       preferredCountries: c.pref, profileComplete: c.un !== "meera_iyer",
       photoUrl: `/uploads/hs/candidates/photos/${c.un}.jpg?v=2`,
       sex: c.sex === "M" ? "male" : "female",
@@ -150,7 +150,7 @@ async function seed() {
   // keep demo_candidate as a minimal generic profile so role-fallback login works
   const [demoCandRow] = await db.insert(candidates).values({
     userId: uid.demo_candidate, fullName: "Demo Candidate", email: email("demo_candidate"),
-    location: "Shimla, Himachal Pradesh", experience: 2, skills: ["General"], preferredCountries: ["UAE"], profileComplete: false,
+    location: "Shimla, Himachal Pradesh", experience: 2, experienceMonths: 24, skills: ["General"], preferredCountries: ["UAE"], profileComplete: false,
   }).returning();
   cid.demo_candidate = demoCandRow.id;
 
@@ -176,7 +176,7 @@ async function seed() {
     const c = BG_CANDS[i];
     const [row] = await db.insert(candidates).values({
       userId: uid[c.un], fullName: c.name, email: email(c.un),
-      location: `${c.city}, Himachal Pradesh`, experience: c.exp, skills: c.skills,
+      location: `${c.city}, Himachal Pradesh`, experience: c.exp, experienceMonths: c.exp * 12, skills: c.skills,
       preferredCountries: c.pref, preferredCategories: [c.cat], qualificationLevel: c.qual,
       sex: c.sex === "M" ? "male" : "female",
       passportNumber: `P${6700001 + i}`, ecrStatus: c.ecr, profileComplete: true, openToOutreach: true,
@@ -186,6 +186,22 @@ async function seed() {
     await db.insert(candidateExperience).values({ candidateId: row.id, company: "Local Employer", role: c.skills[0], years: c.exp, country: "India" });
   }
   console.log(`Candidates: ${Object.keys(cid).length} (10 hero + ${BG_CANDS.length} background + demo)`);
+
+  // ── LANGUAGES (UAT-03 Item 12) — Hindi native + English for every candidate;
+  //    a couple get an extra destination-relevant language for demo variety.
+  let langCount = 0;
+  for (const id of Object.values(cid)) {
+    await db.insert(candidateLanguages).values([
+      { candidateId: id, language: "Hindi", proficiency: "native", canRead: true, canWrite: true, canSpeak: true },
+      { candidateId: id, language: "English", proficiency: "intermediate", canRead: true, canWrite: true, canSpeak: true },
+    ]).onConflictDoNothing();
+    langCount += 2;
+  }
+  // A few Gulf-bound candidates pick up basic Arabic.
+  for (const un of ["arjun_thakur", "vikram_negi", "deepak_sharma"]) {
+    if (cid[un]) { await db.insert(candidateLanguages).values({ candidateId: cid[un], language: "Arabic", proficiency: "elementary", canSpeak: true }).onConflictDoNothing(); langCount++; }
+  }
+  console.log(`Languages: ${langCount} seeded`);
 
   // ── EDUCATION + EXPERIENCE ───────────────────────────────────────────
   const edu: any[] = [];

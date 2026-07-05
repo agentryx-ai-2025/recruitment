@@ -10,6 +10,12 @@ Running tracker. Update every working session, in the same commit as the code ch
 
 ## Shipped
 
+### v0.4.4 — HP-4b.5 · Identity mandatory + seed refresh (UAT 4)
+- **UAT-4** Identity section mandatory — the wizard's first step now requires Gender + Father's + Mother's name (marked required) before Continue; passport stays optional (first-timers don't have one). Existing incomplete test profiles aren't a concern (disposable data).
+- **Seed refresh** — `scripts/seed.ts` now sets `experience_months` on every candidate (matching reads it) and seeds `candidate_languages` (Hindi native + English + some Arabic). Validated on the test DB: 26 candidates w/ months, 55 languages.
+- **Item 4 → done. Now 9 of 20 live (1, 3, 4, 5, 6, 7, 9, 10, 12).**
+- Note: `scripts/seed.ts` is still the *reference multi-role* seed (creates employer/agency accounts HP disables) — a single-agency seed adaptation is a follow-up before it's run on live HP.
+
 ### v0.4.3 — HP-4b.4 · dedup education + cert/course differentiation (UAT 5, 9)
 - **UAT-5** Duplicate education blocked — server 409 on same `(type, degree)` (case-insensitive) for a candidate; wizard surfaces the message. Smoke: add "10th" twice → 201 then 409; "12th" still 201.
 - **UAT-9** Certification vs Skill Course — the `type` picker already separates them; added an inline helper explaining the difference with blue-collar examples (ITI/NSDC/NCVT trade cert vs short course).

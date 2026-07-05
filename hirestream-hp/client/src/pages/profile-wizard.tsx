@@ -544,7 +544,7 @@ function BasicInfoStep({ profile, onNext }: { profile: any; onNext: () => void }
           </FormField>
           {/* Gender as per passport — emigration compliance + matching.
               UAT-03 Item 1: label "Sex" → "Gender" (field/column stays `sex`). */}
-          <FormField label="Gender (as per passport)" icon={User} hint="Required for visa & emigration paperwork">
+          <FormField label="Gender (as per passport)" required icon={User} hint="Required for visa & emigration paperwork">
             <select value={sex} onChange={e => setSex(e.target.value)}
               className="pl-11 h-12 w-full rounded-xl border border-blue-200/80 bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all appearance-none">
               <option value="">Select…</option>
@@ -554,11 +554,11 @@ function BasicInfoStep({ profile, onNext }: { profile: any; onNext: () => void }
             </select>
           </FormField>
           {/* v0.4.31 (HPSEDC Item 4): Father / Mother names */}
-          <FormField label="Father's Name" icon={User} hint="As on passport / official records">
+          <FormField label="Father's Name" required icon={User} hint="As on passport / official records">
             <Input value={fatherName} onChange={e => setFatherName(e.target.value)} placeholder="Father's full name" maxLength={100}
               className="pl-11 h-12 rounded-xl border-blue-200/80 bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all" />
           </FormField>
-          <FormField label="Mother's Name" icon={User} hint="As on passport / official records">
+          <FormField label="Mother's Name" required icon={User} hint="As on passport / official records">
             <Input value={motherName} onChange={e => setMotherName(e.target.value)} placeholder="Mother's full name" maxLength={100}
               className="pl-11 h-12 rounded-xl border-blue-200/80 bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all" />
           </FormField>
@@ -701,7 +701,9 @@ function BasicInfoStep({ profile, onNext }: { profile: any; onNext: () => void }
         </div>
       </motion.div>
 
-      <StepNav onNext={() => mutation.mutate()} loading={mutation.isPending} disabled={!fullName || !email} />
+      {/* UAT-03 Item 4: Identity section is mandatory — Gender + Father's +
+          Mother's name are required to continue past this step. */}
+      <StepNav onNext={() => mutation.mutate()} loading={mutation.isPending} disabled={!fullName || !email || !sex || !fatherName.trim() || !motherName.trim()} />
     </motion.div>
   );
 }

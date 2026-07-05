@@ -43,6 +43,8 @@ Legend: ✅ delivered · 🟡 partial/foundation · 📐 designed (roadmap).
 | C4 | ✅ UAT-10 Experience in months (+ live "≈ N yrs" hint); **matching engine reads months** | Precise blue-collar experience; better match scores | v0.4.2 / HP-4b.3 |
 | C5 | ✅ UAT-5 Duplicate-education guard (server 409 + client message) | Data hygiene; no two "10th Grade" rows | v0.4.3 / HP-4b.4 |
 | C6 | ✅ UAT-9 Certification vs Skill Course helper (blue-collar examples) | Clear differentiation; ITI/NSDC trade certs land right | v0.4.3 / HP-4b.4 |
+| C7 | ✅ UAT-4 Identity section mandatory (Gender + parents' names gate the wizard) | Emigration-paperwork completeness enforced up front | v0.4.4 / HP-4b.5 |
+| C8 | ✅ Seed refresh — `experience_months` on all candidates + `candidate_languages` (Hindi/English/Arabic) | Fresh demo/test data exercises the new HP-4b features | v0.4.4 / HP-4b.5 |
 
 ## D · Quality, testing & reliability (engineering value)
 
@@ -72,4 +74,4 @@ Legend: ✅ delivered · 🟡 partial/foundation · 📐 designed (roadmap).
 
 ---
 
-_Last updated: 2026-07-05 (session), after HP-4b.4 — 8 of 20 UAT items live._
+_Last updated: 2026-07-05 (session), after HP-4b.5 — 9 of 20 UAT items live._
