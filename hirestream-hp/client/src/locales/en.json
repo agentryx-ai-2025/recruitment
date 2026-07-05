@@ -368,5 +368,32 @@
   "theme": {
     "switchToLight": "Switch to Light Mode",
     "switchToDark": "Switch to Dark Mode"
+  },
+  "simpleDash": {
+    "trustBand": "HPSEDC · Official portal of the Government of Himachal Pradesh",
+    "greeting": "Namaste, {{name}}",
+    "greetingNoName": "Namaste",
+    "profileProgress": "Your profile",
+    "completeProfile": "Complete your profile",
+    "profileReady": "Your profile is ready",
+    "addDocuments": "Add your documents (optional) — a photo is enough →",
+    "myApplication": "My application",
+    "noApplications": "You haven't applied for any job yet",
+    "browseJobs": "Browse jobs",
+    "needHelp": "Need help? File a complaint",
+    "reportFraud": "Report a fraud agent",
+    "verifiedLine": "Verified by HPSEDC · Government of Himachal Pradesh",
+    "fullDashboard": "See the full dashboard",
+    "offerAction": "You have a job offer — make a decision",
+    "moreApplications_one": "See your {{count}} other application",
+    "moreApplications_other": "See your {{count}} other applications",
+    "steps": { "applied": "Applied", "review": "Review", "interview": "Interview", "selected": "Selected" },
+    "status": {
+      "reviewLabel": "Being reviewed", "reviewLine": "HPSEDC is reviewing your application. This can take a few days.",
+      "interviewLabel": "Interview", "interviewLine": "You have been selected for an interview.", "interviewDate": "Your interview is on {{date}}.",
+      "selectedLabel": "You are selected", "selectedLine": "Congratulations! More details will follow soon.",
+      "placedLabel": "Job confirmed", "placedLine": "Congratulations! Your overseas placement is confirmed.",
+      "closedLabel": "This application did not go ahead", "closedLine": "No problem — apply for other jobs."
+    }
   }
 }

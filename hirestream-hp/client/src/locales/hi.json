@@ -371,5 +371,32 @@
   "theme": {
     "switchToLight": "लाइट मोड पर स्विच करें",
     "switchToDark": "डार्क मोड पर स्विच करें"
+  },
+  "simpleDash": {
+    "trustBand": "HPSEDC · हिमाचल प्रदेश सरकार का आधिकारिक पोर्टल",
+    "greeting": "नमस्ते, {{name}}",
+    "greetingNoName": "नमस्ते",
+    "profileProgress": "आपकी प्रोफ़ाइल",
+    "completeProfile": "अपनी प्रोफ़ाइल पूरी करें",
+    "profileReady": "आपकी प्रोफ़ाइल तैयार है",
+    "addDocuments": "अपने दस्तावेज़ जोड़ें (वैकल्पिक) — एक फ़ोटो काफ़ी है →",
+    "myApplication": "मेरा आवेदन",
+    "noApplications": "आपने अभी तक किसी नौकरी के लिए आवेदन नहीं किया है",
+    "browseJobs": "नौकरियां देखें",
+    "needHelp": "मदद चाहिए? शिकायत दर्ज करें",
+    "reportFraud": "धोखेबाज़ एजेंट की रिपोर्ट करें",
+    "verifiedLine": "HPSEDC द्वारा सत्यापित · हिमाचल प्रदेश सरकार",
+    "fullDashboard": "पूरा डैशबोर्ड देखें",
+    "offerAction": "आपको नौकरी का प्रस्ताव मिला है — निर्णय लें",
+    "moreApplications_one": "आपका {{count}} और आवेदन देखें",
+    "moreApplications_other": "आपके {{count}} और आवेदन देखें",
+    "steps": { "applied": "आवेदन", "review": "जांच", "interview": "इंटरव्यू", "selected": "चयन" },
+    "status": {
+      "reviewLabel": "जांच हो रही है", "reviewLine": "HPSEDC आपका आवेदन देख रहा है। कुछ दिन लग सकते हैं।",
+      "interviewLabel": "इंटरव्यू", "interviewLine": "आपको इंटरव्यू के लिए चुना गया है।", "interviewDate": "आपका इंटरव्यू {{date}} को है।",
+      "selectedLabel": "आप चुने गए हैं", "selectedLine": "बधाई हो! आगे की जानकारी जल्द मिलेगी।",
+      "placedLabel": "नौकरी मिल गई", "placedLine": "बधाई हो! आपकी विदेश में नियुक्ति हो गई है।",
+      "closedLabel": "यह आवेदन आगे नहीं बढ़ा", "closedLine": "कोई बात नहीं — दूसरी नौकरियों के लिए आवेदन करें।"
+    }
   }
 }
