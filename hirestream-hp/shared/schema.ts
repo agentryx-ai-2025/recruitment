@@ -43,6 +43,10 @@ export const candidates = pgTable("candidates", {
   // cutover; backfilled = experience × 12. New wizard writes months; the
   // matching-service reads months when present, else falls back to years×12.
   experienceMonths: integer("experience_months"),
+  // HP-4c: which registration tier the candidate used, and whether they asked
+  // HPSEDC to call them back (the Assisted tier — staff complete the profile).
+  registrationTier: text("registration_tier"),          // assisted | standard | professional
+  wantsCallback: boolean("wants_callback").default(false),
   skills: text("skills").array(),
   preferredCountries: text("preferred_countries").array(),
   profileComplete: boolean("profile_complete").default(false),

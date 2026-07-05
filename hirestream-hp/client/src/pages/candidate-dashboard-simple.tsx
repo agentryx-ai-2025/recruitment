@@ -51,7 +51,12 @@ export default function CandidateDashboardSimple() {
   const completion = completionRes?.data || { percentage: 0, missing: [] };
   const applications = appsRes?.data || [];
   const firstName = (profile.fullName || "").split(" ")[0];
-  const profileDone = completion.percentage >= 100 || ((completion.missing || []).length === 0 && completion.percentage > 0);
+  // Documents are optional for a blue-collar profile (a candidate may not have
+  // them on hand) — the profile is "ready" once the essentials are filled, so
+  // we don't loop them back to /apply for a document they can add later.
+  const OPTIONAL_CHECKS = ["documents"];
+  const missingRequired = (completion.missing || []).filter((m: string) => !OPTIONAL_CHECKS.includes(m));
+  const profileDone = completion.percentage > 0 && missingRequired.length === 0;
   const primary = pickPrimary(applications);
 
   if (isLoading) {
