@@ -50,6 +50,10 @@ Legend: ✅ delivered · 🟡 partial/foundation · 📐 designed (roadmap).
 | C11 | ✅ `/apply` wired as the **default** candidate entry + 3-role one-click demo (Candidates·Super Agency·Admin) | Coherent blue-collar entry; easy demo/testing | v0.5.2 |
 | C12 | ✅ **Simplified blue-collar candidate dashboard** (default; detailed via `?full=1`), designed w/ Fable 5 | A mason/driver instantly sees profile + application status + help | v0.5.4 |
 | C13 | ✅ Admin slim-down (agency CSV export + leaderboard gated) | HPSEDC admin console reads single-agency | v0.5.3 |
+| C14 | ✅ **3-tier registration model** (Assisted · Standard · Professional) + `/start` entry | Meets applicants where they are — self-serve, or HPSEDC-assisted callback | v0.5.9 |
+| C15 | ✅ **Assisted tier + admin callback queue** — request a callback, HPSEDC works the queue | Accessibility win for low-literacy / no-help applicants | v0.5.10 |
+| C16 | ✅ Fixes: input focus-loss, completion loop (documents optional) | Blue-collar flow is usable + doesn't nag | v0.5.7–8 |
+| F4 | 📐 Guided **Professional** flow (Fable-designed, 14 screens, branching education) | Friendly professional registration — integration pending | next |
 
 ## D · Quality, testing & reliability (engineering value)
 

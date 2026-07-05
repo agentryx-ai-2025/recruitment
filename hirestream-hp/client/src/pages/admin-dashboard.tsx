@@ -78,6 +78,13 @@ export default function AdminDashboard() {
     queryKey: ["/api/v1/drives", "pending"],
     queryFn: () => fetchJson("/api/v1/drives?status=pending"),
   });
+  // HP-4c: Assisted-tier callback requests.
+  const { data: callbacksRes } = useQuery({
+    queryKey: ["/api/v1/admin/callback-requests"],
+    queryFn: () => fetchJson("/api/v1/admin/callback-requests"),
+  });
+  const callbacks = callbacksRes?.data || [];
+  const callbackCount = callbacks.length;
 
   const queryClient = useQueryClient();
 
@@ -109,6 +116,7 @@ export default function AdminDashboard() {
     ]},
     { label: "PEOPLE & ORGS", items: [
       { key: "users", label: "Users", icon: Users },
+      { key: "callbacks", label: "Callbacks", icon: Phone, count: callbackCount },
       { key: "agencies", label: "Agencies", icon: Building },
       { key: "employers", label: "Employers", icon: Briefcase },
     ]},
@@ -540,6 +548,7 @@ export default function AdminDashboard() {
         </TabsContent>
 
         <TabsContent value="leaderboard"><AgencyLeaderboardPanel /></TabsContent>
+        <TabsContent value="callbacks"><CallbackRequestsPanel /></TabsContent>
         <TabsContent value="funnel"><FunnelPanel /></TabsContent>
         <TabsContent value="fraud"><FraudWatchlistPanel /></TabsContent>
         <TabsContent value="duplicates"><DuplicatesPanel /></TabsContent>
@@ -567,6 +576,58 @@ export default function AdminDashboard() {
 // ── Agency Leaderboard (HPSEDC operational view) ─────────────────────
 // Ranked by placements with welfare-compliance / time-to-offer / grievance
 // signals. Data is all derived from existing tables.
+// HP-4c: Assisted-tier callback queue — candidates who asked HPSEDC to call
+// them back. Staff call, complete the profile, then mark "Done".
+function CallbackRequestsPanel() {
+  const queryClient = useQueryClient();
+  const { data } = useQuery({
+    queryKey: ["/api/v1/admin/callback-requests"],
+    queryFn: () => fetchJson("/api/v1/admin/callback-requests"),
+  });
+  const rows: any[] = data?.data || [];
+  const markDone = useMutation({
+    mutationFn: async (id: string) => {
+      const r = await fetch(`/api/v1/admin/callback-requests/${id}/done`, { method: "PATCH", credentials: "include" });
+      if (!r.ok) throw new Error("Failed");
+      return r.json();
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/v1/admin/callback-requests"] }),
+  });
+  return (
+    <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
+      <div className="flex items-center gap-2 mb-4">
+        <Phone className="w-5 h-5 text-emerald-600" />
+        <h3 className="text-lg font-semibold text-slate-900">Callback requests</h3>
+        <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">{rows.length} pending</span>
+      </div>
+      <p className="text-sm text-slate-500 mb-4">Candidates who asked HPSEDC to call them back and help complete their registration. Call them, fill their profile, then mark done.</p>
+      {rows.length === 0 ? (
+        <p className="text-slate-400 text-sm py-6 text-center">No pending callback requests.</p>
+      ) : (
+        <div className="space-y-2">
+          {rows.map((c) => (
+            <div key={c.id} className="flex items-center gap-3 p-3 rounded-lg border border-slate-200 hover:border-slate-300">
+              <div className="w-10 h-10 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold shrink-0">{(c.fullName || "?")[0]}</div>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold text-slate-900 truncate">{c.fullName}</p>
+                <p className="text-xs text-slate-500 truncate">
+                  <a href={`tel:${c.phone}`} className="text-blue-600 font-medium">{c.phone}</a>
+                  {c.trade && c.trade !== "—" ? ` · ${c.trade}` : ""}{c.location ? ` · ${c.location}` : ""}
+                </p>
+              </div>
+              <Button size="sm" variant="outline" disabled={markDone.isPending}
+                onClick={() => markDone.mutate(c.id)}
+                className="rounded-lg text-xs border-emerald-300 text-emerald-700 hover:bg-emerald-50">
+                <CheckCircle className="w-3.5 h-3.5 mr-1" /> Done
+              </Button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function AgencyLeaderboardPanel() {
   const { data: res, isLoading } = useQuery({
     queryKey: ["/api/v1/admin/oversight/agency-leaderboard"],

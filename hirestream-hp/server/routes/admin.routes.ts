@@ -7,7 +7,7 @@ import { getAllSettings, updateSetting } from "../services/settings.service";
 import { storage } from "../storage";
 import {
   users, auditLog, notificationTemplates,
-  employers, employerDocuments, recruitmentAgents, agencyDocuments, notifications,
+  employers, employerDocuments, recruitmentAgents, agencyDocuments, notifications, candidates,
 } from "@shared/schema";
 import { eq, and, desc } from "drizzle-orm";
 import { sensitiveLimiter } from "../middleware/rateLimit.middleware";
@@ -24,6 +24,42 @@ router.use((req, res, next) => {
     return res.status(403).json({ success: false, message: "Admin access required" });
   }
   next();
+});
+
+// HP-4c: Assisted-tier callback queue. Candidates who asked HPSEDC to call them
+// back to complete their registration (wants_callback = true).
+router.get("/callback-requests", async (_req, res, next) => {
+  try {
+    const db = storage.db;
+    if (!db) return res.status(500).json({ success: false, error: { code: 500, message: "Database not available" } });
+    const rows = await db.select().from(candidates).where(eq(candidates.wantsCallback, true));
+    const data = rows
+      .map((c: any) => ({
+        id: c.id,
+        fullName: c.fullName || "—",
+        phone: c.phone || "—",
+        trade: Array.isArray(c.skills) && c.skills.length ? c.skills[0] : "—",
+        location: c.location || null,
+        requestedAt: c.createdAt,
+      }))
+      .sort((a: any, b: any) => new Date(a.requestedAt || 0).getTime() - new Date(b.requestedAt || 0).getTime());
+    res.json({ success: true, data });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Mark a callback request handled (staff called + registered the candidate).
+router.patch("/callback-requests/:id/done", async (req, res, next) => {
+  try {
+    const db = storage.db;
+    if (!db) return res.status(500).json({ success: false, error: { code: 500, message: "Database not available" } });
+    const [updated] = await db.update(candidates).set({ wantsCallback: false }).where(eq(candidates.id, req.params.id)).returning();
+    if (!updated) return res.status(404).json({ success: false, error: { code: 404, message: "Candidate not found" } });
+    res.json({ success: true, data: { id: updated.id } });
+  } catch (error) {
+    next(error);
+  }
 });
 
 // GET /api/v1/admin/health

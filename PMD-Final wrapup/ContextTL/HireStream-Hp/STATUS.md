@@ -10,6 +10,15 @@ Running tracker. Update every working session, in the same commit as the code ch
 
 ## Shipped
 
+### v0.5.7–v0.5.10 — focus fix, completion loop, 3-tier registration model
+- **v0.5.7** — fixed `/apply` inputs losing focus after one char (screens rendered as `<Current/>` remounted each keystroke → render by calling the function; state lifted so screens are hook-free).
+- **v0.5.8** — completion loop: a blue-collar profile is "ready" once essentials are filled (documents optional) — stops the "Complete profile" → `/apply` loop at 88%. + tier schema (`registration_tier`, `wants_callback`).
+- **v0.5.9 / v0.5.10 — 3-tier registration model (Assisted · Standard · Professional):**
+  - Entry screen `/start` (3 cards); dashboard "Complete profile" → `/start`.
+  - **Standard** → `/apply`. **Professional** → `/profile` (guided flow next). **Assisted** → name+phone → `wants_callback=true`.
+  - **Admin callback queue** — `GET /admin/callback-requests` + "Callbacks" tab (click-to-call, "Done"). Verified end-to-end.
+  - Guided **Professional** flow designed by Fable 5 (14 screens, branching education) — drafts ready, **integration pending**.
+
 ### v0.5.6 — /apply: contact screen + experience-completion fix (profile 50% → 88%)
 Subhash flagged the `/apply` profile as too thin (50%, and it promised "we'll call your phone" but never asked for one). Diagnosis: the 8-check completion metric — `/apply` filled only 4 (name, email, skills, education). Fixes:
 - **New contact screen** (phone required + home town/district) → fills phone + location.
