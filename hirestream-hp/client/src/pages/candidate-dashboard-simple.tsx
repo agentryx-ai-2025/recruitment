@@ -93,6 +93,12 @@ export default function CandidateDashboardSimple() {
             </Button>
           </>
         )}
+        {/* Documents are optional but reach 100% — offer them once essentials are in. */}
+        {(completion.missing || []).includes("documents") && (
+          <button onClick={() => setLocation("/documents")} className="mt-3 w-full text-sm text-blue-700 hover:text-blue-800 underline underline-offset-2 py-2">
+            Add your documents (optional) — a photo is enough →
+          </button>
+        )}
       </section>
 
       {/* 2 · My application status */}
