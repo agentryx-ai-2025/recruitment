@@ -88,7 +88,7 @@ export default function CandidateDashboardSimple() {
             <div className="w-full h-4 bg-slate-200 rounded-full overflow-hidden" role="progressbar" aria-valuenow={completion.percentage} aria-valuemin={0} aria-valuemax={100}>
               <div className="h-full rounded-full bg-gradient-to-r from-blue-500 to-blue-600 transition-all duration-700" style={{ width: `${completion.percentage}%` }} />
             </div>
-            <Button onClick={() => setLocation("/apply")} className={`${BIG_BTN} mt-4 bg-blue-700 hover:bg-blue-800 text-white`}>
+            <Button onClick={() => setLocation("/start")} className={`${BIG_BTN} mt-4 bg-blue-700 hover:bg-blue-800 text-white`}>
               Complete your profile <ArrowRight className="w-5 h-5 ml-2" />
             </Button>
           </>
