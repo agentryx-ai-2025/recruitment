@@ -10,6 +10,14 @@ Running tracker. Update every working session, in the same commit as the code ch
 
 ## Shipped
 
+### v0.5.4 — simplified blue-collar candidate dashboard (default)
+Designed with **Fable 5**, English copy (Hindi pass later). New `candidate-dashboard-simple.tsx` — the **default** for candidates; the detailed dashboard opens via `?full=1` ("See the full dashboard" link).
+- 4 blocks only: govt **trust band** → **profile** (one fat progress bar + one 56px "Complete your profile" → `/apply`, or a calm "ready ✓") → **My application** (one big pictorial status — Being reviewed / Interview / Selected / Job confirmed — with a 4-dot step strip, not the 6-col funnel; offer-pending → amber "make a decision") → **Help** (File a complaint / Report a fraud agent).
+- Dropped for this audience: 5-stat KPI row, gamified Journey, "How are you doing", recommendations, announcements.
+- Reuses the same 3 query keys (shared cache, no new endpoints). Verified live (arjun_thakur): simple markers present, zero detailed artifacts.
+
+### v0.5.3 — admin slim-down: agency CSV export + leaderboard gated
+
 ### v0.5.2 — /apply as default candidate entry + 3-role demo login
 - **`/apply` is now the default** — the candidate dashboard's primary "Complete/Edit Profile" CTAs point to the blue-collar `/apply` flow (detailed wizard stays as the escape). Granular "add education/experience" + journey deep-links still use the detailed wizard.
 - **3-role one-click demo login** — the demo panel now shows **Candidates · Super Agency · Admin**. "Super Agency" re-purposes the (single-agency-hidden) Agencies tab to show just **HPSEDC** (`hpsedc_agency`), one-click. Verified: tabs = [Candidates, Super Agency, Admin]; HPSEDC dev-login 200.

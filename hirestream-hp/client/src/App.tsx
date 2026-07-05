@@ -17,6 +17,7 @@ import { Loader2 } from "lucide-react";
 // Code-split: dashboards + secondary pages load on demand to shrink initial bundle
 const NotFound = lazy(() => import("@/pages/not-found"));
 const CandidateDashboard = lazy(() => import("@/pages/candidate-dashboard"));
+const CandidateDashboardSimple = lazy(() => import("@/pages/candidate-dashboard-simple"));
 const AgentDashboard = lazy(() => import("@/pages/agent-dashboard"));
 const EmployerDashboard = lazy(() => import("@/pages/employer-dashboard"));
 const AdminDashboard = lazy(() => import("@/pages/admin-dashboard"));
@@ -77,7 +78,13 @@ function DashboardContent() {
       <div className="max-w-[1800px] mx-auto px-4 xl:px-8 2xl:px-12 pt-5">
         <AnnouncementBanner />
       </div>
-      {user.role === "candidate" && <CandidateDashboard />}
+      {/* HP-4c: blue-collar candidates get the simplified dashboard by default;
+          ?full=1 opens the detailed one (its "See full dashboard" escape link). */}
+      {user.role === "candidate" && (
+        new URLSearchParams(typeof window !== "undefined" ? window.location.search : "").get("full") === "1"
+          ? <CandidateDashboard />
+          : <CandidateDashboardSimple />
+      )}
       {user.role === "agent" && <AgentDashboard />}
       {user.role === "employer" && <EmployerDashboard />}
       {user.role === "admin" && <AdminDashboard />}

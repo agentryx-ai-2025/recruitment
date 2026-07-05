@@ -47,6 +47,9 @@ Legend: ✅ delivered · 🟡 partial/foundation · 📐 designed (roadmap).
 | C8 | ✅ Seed refresh — `experience_months` on all candidates + `candidate_languages` (Hindi/English/Arabic) | Fresh demo/test data exercises the new HP-4b features | v0.4.4 / HP-4b.5 |
 | C9 | ✅ **Blue-collar simplified application flow** (`/apply`) — 7 one-question screens, pictorial trades, education-as-levels, designed w/ Fable 5 | The fork's core UX pivot: a form a mason/plumber can actually complete; same schema | v0.5.0 / HP-4c |
 | C10 | ✅ Matching: `below_matric` qualification tier | No-schooling/5th/8th candidates score fairly, not as blank | v0.5.0 / HP-4c |
+| C11 | ✅ `/apply` wired as the **default** candidate entry + 3-role one-click demo (Candidates·Super Agency·Admin) | Coherent blue-collar entry; easy demo/testing | v0.5.2 |
+| C12 | ✅ **Simplified blue-collar candidate dashboard** (default; detailed via `?full=1`), designed w/ Fable 5 | A mason/driver instantly sees profile + application status + help | v0.5.4 |
+| C13 | ✅ Admin slim-down (agency CSV export + leaderboard gated) | HPSEDC admin console reads single-agency | v0.5.3 |
 
 ## D · Quality, testing & reliability (engineering value)
 
