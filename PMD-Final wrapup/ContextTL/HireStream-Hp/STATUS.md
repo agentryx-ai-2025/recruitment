@@ -18,6 +18,12 @@ Running tracker. Update every working session, in the same commit as the code ch
   - **Standard** → `/apply`. **Professional** → `/profile` (guided flow next). **Assisted** → name+phone → `wants_callback=true`.
   - **Admin callback queue** — `GET /admin/callback-requests` + "Callbacks" tab (click-to-call, "Done"). Verified end-to-end.
   - Guided **Professional** flow designed by Fable 5 (14 screens, branching education) — drafts ready, **integration pending**.
+- **v0.9.1 — UAT-03 closure batch 2 (items 17, 8, 18, 20 dispositions).**
+  - **#17** — grievance improved for blue-collar: **voice input** on the description (Web Speech API, Hindi-aware, hidden if unsupported), a **"Someone asked me for money / Fraud"** category, and the dashboard's fraud link (`?type=fraud`) now opens the form pre-set to that category. Verified live.
+  - **#8** — **closed by the rebuild**: Education, Certification and Skill sections were all reworked blue-collar-friendly in `/apply` (education-as-levels) and `/apply/pro` (branching degree→field→institution, certifications with field-specific suggestions, skill chips). No separate change needed; the review item is satisfied.
+  - **#18** (fee) — **DROPPED** per MD decision: no candidate-side fee in this govt programme (the "HPSEDC never asks for money" advisory already covers the messaging).
+  - **#20** (WhatsApp) — **DEFERRED**: external-gated (Meta WhatsApp Business verification ~7–14 days + BSP selection); noted as post-acceptance work, not code.
+  - **UAT-03 now 15/20 closed** + 2 dispositioned (18 dropped, 20 deferred). Remaining code builds: **#14** (salary bands) and **#16+#19** (post-visa support module).
 - **v0.9.0 — UAT-03 closure batch 1 (items 2, 11, 13, 15).**
   - **#2** — candidate-facing "Recommended" → **"Jobs for You"** (a govt body shouldn't appear to *endorse* a specific job; nav + stat card + view heading + gap copy).
   - **#11** — "Brief Description" reworked to blue-collar-friendly guidance: *"What work did you do here? (optional)"* + concrete examples + plain placeholder.

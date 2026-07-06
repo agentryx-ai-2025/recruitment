@@ -7,10 +7,10 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { MessageSquare, Plus, Clock, CheckCircle, AlertCircle, Loader2, Inbox, ShieldCheck } from "lucide-react";
+import { MessageSquare, Plus, Clock, CheckCircle, AlertCircle, Loader2, Inbox, ShieldCheck, Mic } from "lucide-react";
 import { GrievanceThread } from "@/components/shared/GrievanceThread";
 import { FIELD_LIMITS } from "@/lib/reference-data";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 
 async function fetchJson(url: string) {
@@ -27,7 +27,33 @@ export default function GrievancePage() {
   const [category, setCategory] = useState("");
   const [subject, setSubject] = useState("");
   const [description, setDescription] = useState("");
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+
+  // UAT-03 #17: the dashboard's "Report a fraud agent" / "someone asked for
+  // money" link deep-links here with ?type=fraud — open the form pre-set.
+  useEffect(() => {
+    const type = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("type") : null;
+    if (type === "fraud") { setCategory("fraud_report"); setShowForm(true); }
+  }, []);
+
+  // UAT-03 #17: voice input for the description (blue-collar / low-literacy).
+  // Web Speech API, Hindi-aware; appends the transcript. Hidden if unsupported.
+  const [listening, setListening] = useState(false);
+  const recogRef = useRef<any>(null);
+  const speechSupported = typeof window !== "undefined" && !!((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition);
+  const toggleVoice = () => {
+    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SR) return;
+    if (listening) { try { recogRef.current?.stop(); } catch {} setListening(false); return; }
+    const r = new SR();
+    r.lang = i18n.language === "hi" ? "hi-IN" : "en-IN";
+    r.interimResults = false; r.maxAlternatives = 1;
+    r.onresult = (e: any) => { const said = e.results?.[0]?.[0]?.transcript?.trim(); if (said) setDescription((d) => (d ? `${d} ${said}` : said).slice(0, FIELD_LIMITS.grievanceBody)); };
+    r.onend = () => setListening(false);
+    r.onerror = () => setListening(false);
+    recogRef.current = r; setListening(true);
+    try { r.start(); } catch { setListening(false); }
+  };
 
   // The page used to call /grievances/my for everyone — which meant agents
   // and admins (who don't normally submit grievances) saw an empty page even
@@ -176,6 +202,7 @@ export default function GrievancePage() {
               <Select value={category} onValueChange={setCategory}>
                 <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="fraud_report">Someone asked me for money / Fraud</SelectItem>
                   <SelectItem value="agency_complaint">Agency Complaint</SelectItem>
                   <SelectItem value="application_issue">Application Issue</SelectItem>
                   <SelectItem value="technical_problem">Technical Problem</SelectItem>
@@ -193,13 +220,21 @@ export default function GrievancePage() {
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
-              <textarea
-                className="w-full min-h-[120px] p-3 border border-gray-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="Describe your issue in detail..."
-                value={description}
-                maxLength={FIELD_LIMITS.grievanceBody}
-                onChange={(e) => setDescription(e.target.value)}
-              />
+              <div className="relative">
+                <textarea
+                  className={`w-full min-h-[120px] p-3 ${speechSupported ? "pr-14" : ""} border border-gray-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                  placeholder="Describe your issue in detail…"
+                  value={description}
+                  maxLength={FIELD_LIMITS.grievanceBody}
+                  onChange={(e) => setDescription(e.target.value)}
+                />
+                {speechSupported && (
+                  <button type="button" onClick={toggleVoice} title={listening ? "Listening…" : "Tap to speak"} aria-label={listening ? "Listening" : "Tap to speak"}
+                    className={`absolute right-2 top-2 w-10 h-10 rounded-xl text-white flex items-center justify-center shadow-md transition-all ${listening ? "bg-gradient-to-br from-rose-500 to-red-600 animate-pulse" : "bg-gradient-to-br from-blue-500 to-blue-600"}`}>
+                    <Mic className="w-5 h-5" />
+                  </button>
+                )}
+              </div>
               <p className="text-[10px] text-slate-400 text-right mt-0.5">{description.length} / {FIELD_LIMITS.grievanceBody}</p>
             </div>
             <div className="flex gap-2">
