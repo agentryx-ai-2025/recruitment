@@ -31,3 +31,23 @@ export function useCapabilities(): { capabilities: Capabilities; isLoading: bool
     isLoading,
   };
 }
+
+export interface PublicContact {
+  helplinePhone: string;
+  helplineHours: string;
+}
+
+const EMPTY_CONTACT: PublicContact = { helplinePhone: "", helplineHours: "" };
+
+/**
+ * Public HPSEDC contact info (helpline). Reuses the same cached /config/public
+ * query. `helplinePhone` is empty until HPSEDC sets a real number in system
+ * settings — the UI must HIDE the helpline when it is empty (never show a
+ * placeholder number on a government portal).
+ */
+export function useHelpline(): PublicContact {
+  const { data } = useQuery<{ success: boolean; data: { contact?: PublicContact } }>({
+    queryKey: ["/api/v1/config/public"],
+  });
+  return data?.data?.contact ?? EMPTY_CONTACT;
+}

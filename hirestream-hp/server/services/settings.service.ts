@@ -11,7 +11,7 @@ import { logger } from "../config/logger.config";
  * Add new keys to DEFAULTS below; call `getSetting(key)` from any endpoint.
  */
 
-export type SettingCategory = "pipeline" | "rejection" | "access" | "notifications" | "matching" | "lifecycle" | "uploads" | "security" | "capability";
+export type SettingCategory = "pipeline" | "rejection" | "access" | "notifications" | "matching" | "lifecycle" | "uploads" | "security" | "capability" | "contact";
 
 export interface SettingSpec {
   key: string;
@@ -511,6 +511,28 @@ export const SETTING_SPECS: SettingSpec[] = [
     type: "string",
     default: "either",
     options: ["agent_only", "employer_only", "either"],
+  },
+
+  // ── Contact (public) ─────────────────────────────────────────────────
+  // Surfaced unauthenticated via /config/public so the candidate UI can show
+  // an official HPSEDC helpline (Fable-flagged as the top trust signal for a
+  // govt + blue-collar audience). Empty by default — the UI shows the helpline
+  // ONLY when HPSEDC fills a real number, so no fake number is ever displayed.
+  {
+    key: "contact.helpline_phone",
+    category: "contact",
+    label: "HPSEDC helpline number",
+    description: "Public helpline shown to candidates (dashboard + footer) as a tap-to-call link. Leave empty to hide the helpline until a real number is available. E.g. 0177-2620331.",
+    type: "string",
+    default: "",
+  },
+  {
+    key: "contact.helpline_hours",
+    category: "contact",
+    label: "HPSEDC helpline hours",
+    description: "Optional caption under the helpline (e.g. 'Mon–Sat, 10 am – 5 pm'). Shown only when a helpline number is set.",
+    type: "string",
+    default: "",
   },
 ];
 

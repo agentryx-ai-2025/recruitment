@@ -3,7 +3,7 @@ import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { Check, X, Plus, Minus, Pencil, ShieldCheck } from "lucide-react";
+import { Check, X, Plus, Minus, Pencil, ShieldCheck, GraduationCap, ArrowRight } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -50,6 +50,7 @@ export default function SimpleApplyPage() {
   const [phone, setPhone] = useState("");
   const [homeLocation, setHomeLocation] = useState("");
   const [langExpanding, setLangExpanding] = useState<string | null>(null); // lifted from LanguageScreen
+  const [proHintDismissed, setProHintDismissed] = useState(false); // P3: education-screen "switch to Professional" nudge
 
   const { data: profileRes } = useQuery<any>({ queryKey: ["/api/v1/candidates/profile"] });
   const { data: langRes } = useQuery<any>({ queryKey: ["/api/v1/candidates/languages"] });
@@ -110,12 +111,18 @@ export default function SimpleApplyPage() {
             </button>
           );
         })}
-      </div>
-      <p className="text-center mt-6">
-        <button onClick={() => setLocation("/apply/pro")} className="text-sm text-blue-600 hover:text-blue-700 underline underline-offset-4 py-3 px-2">
-          {t("simpleApply.proLink")}
+        {/* P3: the Professional path is a peer option IN the grid (full-width),
+            not a tiny escape link — so a nurse/engineer sees it as a real choice. */}
+        <button type="button" onClick={() => setLocation("/apply/pro")}
+          className="col-span-2 sm:col-span-3 md:col-span-4 flex items-center gap-4 rounded-2xl border border-violet-200 bg-gradient-to-br from-violet-50/70 to-purple-50/40 p-4 text-left hover:border-violet-300 hover:shadow-md active:scale-[0.99] transition-all">
+          <span className="w-12 h-12 rounded-xl bg-gradient-to-br from-violet-500 to-violet-600 text-white flex items-center justify-center shrink-0"><GraduationCap className="w-6 h-6" /></span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-base font-bold text-slate-900 leading-tight">{t("simpleApply.proTileTitle")}</span>
+            <span className="block text-xs text-slate-500 mt-0.5">{t("simpleApply.proTileSub")}</span>
+          </span>
+          <ArrowRight className="w-5 h-5 text-violet-500 shrink-0" />
         </button>
-      </p>
+      </div>
     </QuestionShell>
   );
 
@@ -191,6 +198,17 @@ export default function SimpleApplyPage() {
             );
           })}
         </div>
+        {/* P3b: a diploma/degree holder landed in the blue-collar flow — nudge
+            them to the Professional form (both write the same schema, nothing lost). */}
+        {chosen && ["diploma", "bachelor", "master", "doctorate"].includes(chosen.qualificationLevel) && !proHintDismissed && (
+          <div className="mt-4 rounded-2xl border border-violet-200 bg-gradient-to-br from-violet-50/80 to-purple-50/40 p-4">
+            <p className="text-sm text-slate-700">{t("simpleApply.proHint")}</p>
+            <div className="flex gap-2 mt-3">
+              <button type="button" onClick={() => setLocation("/apply/pro")} className="flex-1 h-11 rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-sm font-semibold active:scale-[0.98] transition">{t("simpleApply.switchToPro")}</button>
+              <button type="button" onClick={() => setProHintDismissed(true)} className="h-11 px-4 rounded-xl border border-slate-200 bg-white text-sm font-semibold text-slate-500">{t("simpleApply.continueHere")}</button>
+            </div>
+          </div>
+        )}
       </QuestionShell>
     );
   };
@@ -319,6 +337,9 @@ export default function SimpleApplyPage() {
           <ShieldCheck className="w-4 h-4 text-emerald-600 mt-0.5 flex-shrink-0" />
           <p className="text-xs text-emerald-800">{t("simpleApply.noFeeNote")}</p>
         </div>
+        {chosenEdu && ["diploma", "bachelor", "master", "doctorate"].includes(chosenEdu.qualificationLevel) && (
+          <button type="button" onClick={() => setLocation("/apply/pro")} className="mt-4 w-full text-center text-sm text-violet-700 hover:text-violet-800 underline underline-offset-2 py-2">{t("simpleApply.reviewProLink")}</button>
+        )}
       </QuestionShell>
     );
   };

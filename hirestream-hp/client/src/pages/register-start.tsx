@@ -41,7 +41,10 @@ export default function RegisterStart() {
   const { data: profileRes } = useQuery<any>({ queryKey: ["/api/v1/candidates/profile"] });
   const profile = profileRes?.data || {};
 
-  const [mode, setMode] = useState<"choose" | "assisted" | "done">("choose");
+  // ?mode=assisted (from the dashboard's "We will call you" shortcut) opens the
+  // callback form directly instead of the chooser.
+  const initialMode = (typeof window !== "undefined" && new URLSearchParams(window.location.search).get("mode") === "assisted") ? "assisted" : "choose";
+  const [mode, setMode] = useState<"choose" | "assisted" | "done">(initialMode);
   const [saving, setSaving] = useState(false);
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");

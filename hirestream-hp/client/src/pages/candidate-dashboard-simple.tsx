@@ -4,14 +4,24 @@
 // keys as candidate-dashboard.tsx (shared cache, no new endpoints). English copy
 // for now (consistent with /apply); a coordinated Hindi pass comes later.
 import React from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { useTranslation } from "react-i18next";
+import { useHelpline } from "@/hooks/use-capabilities";
 import { Button } from "@/components/ui/button";
 import {
   Loader2, CheckCircle, FileSearch, CalendarCheck, Award, Plane,
   ShieldCheck, ShieldAlert, MessageCircleQuestion, Briefcase, ArrowRight, RotateCcw,
+  Phone, PhoneCall, GraduationCap, ChevronRight,
 } from "lucide-react";
+
+// A stable, human-friendly HPSEDC registration number derived from the
+// candidate id (works for uuid or numeric ids). Shown as a govt "receipt".
+function regCodeFor(id: any): string {
+  const s = String(id || "").replace(/[^a-zA-Z0-9]/g, "");
+  return s ? `HP-${s.slice(-6).toUpperCase()}` : "";
+}
+const DEGREE_LEVELS = ["diploma", "bachelor", "master", "doctorate"];
 
 type FriendlyKey = "review" | "interview" | "selected" | "placed" | "closed";
 const FRIENDLY: Record<FriendlyKey, { icon: React.ElementType; circle: string; iconColor: string; step: number; label: string; line: string }> = {
@@ -45,6 +55,8 @@ const BIG_BTN = "w-full h-14 text-lg font-semibold rounded-xl";
 export default function CandidateDashboardSimple() {
   const [, setLocation] = useLocation();
   const { t } = useTranslation();
+  const queryClient = useQueryClient();
+  const helpline = useHelpline();
   const { data: profileRes, isLoading } = useQuery<any>({ queryKey: ["/api/v1/candidates/profile"] });
   const { data: completionRes } = useQuery<any>({ queryKey: ["/api/v1/candidates/profile/completion"] });
   const { data: appsRes } = useQuery<any>({ queryKey: ["/api/v1/candidates/applications"] });
@@ -53,6 +65,25 @@ export default function CandidateDashboardSimple() {
   const completion = completionRes?.data || { percentage: 0, missing: [] };
   const applications = appsRes?.data || [];
   const firstName = (profile.fullName || "").split(" ")[0];
+
+  // Tier-aware profile card (Fable v0.7.0): a first-time user sees the default
+  // path big + two slim alternatives; a returning user continues their chosen
+  // flow; an assisted user sees a "we'll call you" status, not a Complete CTA.
+  const tier: string | null = profile.registrationTier || null;
+  const callbackPending = tier === "assisted" && !!profile.wantsCallback;
+  const hasDegree = DEGREE_LEVELS.includes(profile.qualificationLevel);
+  const regCode = regCodeFor(profile.id);
+  // Record the chosen tier (so a returning user gets "Continue"), then route.
+  const setTierAndGo = async (t: string, path: string) => {
+    try {
+      await fetch("/api/v1/candidates/profile", {
+        method: "PATCH", headers: { "Content-Type": "application/json" }, credentials: "include",
+        body: JSON.stringify({ registrationTier: t }),
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/v1/candidates/profile"] });
+    } catch { /* non-blocking — routing still proceeds */ }
+    setLocation(path);
+  };
   // Documents are optional for a blue-collar profile (a candidate may not have
   // them on hand) — the profile is "ready" once the essentials are filled, so
   // we don't loop them back to /apply for a document they can add later.
@@ -77,9 +108,23 @@ export default function CandidateDashboardSimple() {
       <section className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 sm:p-6">
         <h2 className="text-xl font-bold text-slate-900 mb-1">{firstName ? t("simpleDash.greeting", { name: firstName }) : t("simpleDash.greetingNoName")}</h2>
         {profileDone ? (
-          <div className="flex items-center gap-3 mt-3 bg-emerald-50 border border-emerald-200 rounded-xl p-4">
-            <CheckCircle className="w-8 h-8 text-emerald-600 shrink-0" />
-            <p className="text-lg font-semibold text-emerald-800">{t("simpleDash.profileReady")}</p>
+          <div className="mt-3 space-y-3">
+            <div className="flex items-center gap-3 bg-emerald-50 border border-emerald-200 rounded-xl p-4">
+              <CheckCircle className="w-8 h-8 text-emerald-600 shrink-0" />
+              <p className="text-lg font-semibold text-emerald-800">{t("simpleDash.profileReady")}</p>
+            </div>
+            {regCode && (
+              <div className="rounded-xl border border-slate-200 bg-slate-50/70 px-4 py-3">
+                <p className="text-xs text-slate-500">{t("simpleDash.regNumber")}</p>
+                <p className="text-lg font-bold tracking-wide text-slate-900">{regCode}</p>
+                <p className="text-xs text-slate-400 mt-0.5">{t("simpleDash.regNumberHint")}</p>
+              </div>
+            )}
+            {tier === "standard" && hasDegree && (
+              <button onClick={() => setLocation("/apply/pro")} className="w-full text-left text-sm text-violet-700 hover:text-violet-800 underline underline-offset-2 py-1">
+                {t("simpleDash.addDegreeDetails")}
+              </button>
+            )}
           </div>
         ) : (
           <>
@@ -90,9 +135,45 @@ export default function CandidateDashboardSimple() {
             <div className="w-full h-4 bg-slate-200 rounded-full overflow-hidden" role="progressbar" aria-valuenow={completion.percentage} aria-valuemin={0} aria-valuemax={100}>
               <div className="h-full rounded-full bg-gradient-to-r from-blue-500 to-blue-600 transition-all duration-700" style={{ width: `${completion.percentage}%` }} />
             </div>
-            <Button onClick={() => setLocation("/start")} className={`${BIG_BTN} mt-4 bg-blue-700 hover:bg-blue-800 text-white`}>
-              {t("simpleDash.completeProfile")} <ArrowRight className="w-5 h-5 ml-2" />
-            </Button>
+
+            {callbackPending ? (
+              // State C — assisted: HPSEDC is filling this in; no "Complete" CTA.
+              <div className="mt-4 space-y-2">
+                <div className="flex items-start gap-3 bg-emerald-50 border border-emerald-200 rounded-xl p-4">
+                  <PhoneCall className="w-6 h-6 text-emerald-600 shrink-0" />
+                  <p className="text-base font-semibold text-emerald-800">{profile.phone ? t("simpleDash.callbackPending", { phone: profile.phone }) : t("simpleDash.callbackPendingNoPhone")}</p>
+                </div>
+                <button onClick={() => setLocation("/start")} className="w-full text-sm text-blue-700 hover:text-blue-800 underline underline-offset-2 py-2">{t("simpleDash.fillMyself")}</button>
+              </div>
+            ) : tier === "standard" || tier === "professional" ? (
+              // State B — a path is chosen; continue it, don't re-ask.
+              <>
+                <Button onClick={() => setLocation(tier === "professional" ? "/apply/pro" : "/apply")} className={`${BIG_BTN} mt-4 bg-blue-700 hover:bg-blue-800 text-white`}>
+                  {t("simpleDash.continueProfile")} <ArrowRight className="w-5 h-5 ml-2" />
+                </Button>
+                <button onClick={() => setLocation("/start")} className="mt-2 w-full text-sm text-slate-500 hover:text-blue-700 underline underline-offset-2 py-2">{t("simpleDash.changeRegister")}</button>
+              </>
+            ) : (
+              // State A — first time: one big default, two visible alternatives.
+              <>
+                <Button onClick={() => setTierAndGo("standard", "/apply")} className={`${BIG_BTN} mt-4 bg-blue-700 hover:bg-blue-800 text-white`}>
+                  {t("simpleDash.fillMyDetails")} <ArrowRight className="w-5 h-5 ml-2" />
+                </Button>
+                <p className="text-xs text-slate-500 mt-4 mb-2">{t("simpleDash.otherWays")}</p>
+                <div className="space-y-2">
+                  <button onClick={() => setLocation("/start?mode=assisted")} className="w-full flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50/60 px-4 py-3 text-left hover:border-emerald-300 hover:bg-emerald-50/40 transition-all">
+                    <PhoneCall className="w-5 h-5 text-emerald-600 shrink-0" />
+                    <span className="flex-1 text-sm font-semibold text-slate-800">{t("simpleDash.assistedAlt")}</span>
+                    <ChevronRight className="w-4 h-4 text-slate-400" />
+                  </button>
+                  <button onClick={() => setTierAndGo("professional", "/apply/pro")} className="w-full flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50/60 px-4 py-3 text-left hover:border-violet-300 hover:bg-violet-50/40 transition-all">
+                    <GraduationCap className="w-5 h-5 text-violet-600 shrink-0" />
+                    <span className="flex-1 text-sm font-semibold text-slate-800">{t("simpleDash.proAlt")}</span>
+                    <ChevronRight className="w-4 h-4 text-slate-400" />
+                  </button>
+                </div>
+              </>
+            )}
           </>
         )}
         {/* Documents are optional but reach 100% — offer them once essentials are in. */}
@@ -115,14 +196,28 @@ export default function CandidateDashboardSimple() {
         )}
       </section>
 
-      {/* 3 · Help / grievance */}
+      {/* 3 · Help / safety — in a single govt-agency deployment the helpline +
+          a money-safety advisory are the trust signals; "fraud" is reframed as
+          impersonators asking for money, and demoted from a giant button. */}
       <section className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 sm:p-6 space-y-3">
         <Button onClick={() => setLocation("/grievances")} className={`${BIG_BTN} bg-slate-900 hover:bg-slate-800 text-white`}>
-          <MessageCircleQuestion className="w-6 h-6 mr-2" /> {t("simpleDash.needHelp")}
+          <MessageCircleQuestion className="w-6 h-6 mr-2" /> {t("simpleDash.askHpsedc")}
         </Button>
-        <Button variant="outline" onClick={() => setLocation("/grievances?type=fraud")} className={`${BIG_BTN} border-2 border-red-300 text-red-700 hover:bg-red-50`}>
-          <ShieldAlert className="w-6 h-6 mr-2" /> {t("simpleDash.reportFraud")}
-        </Button>
+        {helpline.helplinePhone && (
+          <a href={`tel:${helpline.helplinePhone.replace(/\s/g, "")}`} className={`${BIG_BTN} flex items-center justify-center border-2 border-blue-200 text-blue-800 hover:bg-blue-50`}>
+            <Phone className="w-5 h-5 mr-2" /> {t("simpleDash.callHelpline", { phone: helpline.helplinePhone })}
+          </a>
+        )}
+        {helpline.helplinePhone && helpline.helplineHours && (
+          <p className="text-center text-xs text-slate-400 -mt-1">{helpline.helplineHours}</p>
+        )}
+        <div className="rounded-xl bg-amber-50 border border-amber-200 p-3.5 flex items-start gap-2.5">
+          <ShieldAlert className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-amber-900">{t("simpleDash.neverAsksMoney")}</p>
+            <button onClick={() => setLocation("/grievances?type=fraud")} className="text-sm text-amber-800 underline underline-offset-2 min-h-[36px] text-left">{t("simpleDash.reportMoney")}</button>
+          </div>
+        </div>
       </section>
 
       {/* 4 · Footer + escape hatch to the detailed dashboard */}
