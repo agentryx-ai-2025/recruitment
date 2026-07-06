@@ -8,12 +8,15 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
+import { useTranslation } from "react-i18next";
+import { useHelpline, useCapabilities } from "@/hooks/use-capabilities";
 import {
   Briefcase, Star, FileText, CheckCircle, AlertCircle, Loader2, Download,
   MapPin, Mail, User, GraduationCap, Building, Search, DollarSign,
   Clock, Shield, ChevronDown, ChevronUp, ArrowUpDown, Sparkles,
   LayoutDashboard, ClipboardList, XCircle, Calendar, ArrowRight,
-  Bookmark, BookmarkCheck, Heart, TrendingUp, Globe, Award, Eye, Route, Trash2, Flag, Zap, Upload, Tag, Plane
+  Bookmark, BookmarkCheck, Heart, TrendingUp, Globe, Award, Eye, Route, Trash2, Flag, Zap, Upload, Tag, Plane,
+  Home, Phone, MessageCircleQuestion, ShieldCheck, ShieldAlert, PanelLeftClose, IdCard, BookUser, FileSearch, CalendarCheck, RotateCcw,
 } from "lucide-react";
 import { ReportJobDialog } from "@/components/shared/report-job-dialog";
 import { PhotoAvatar } from "@/components/shared/PhotoAvatar";
@@ -88,6 +91,13 @@ export default function CandidateDashboard() {
   }, []);
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const { t } = useTranslation();
+  const helpline = useHelpline();
+  const { capabilities } = useCapabilities();
+  // dashMode: explicit user state (set by the toggle) wins; else the persisted
+  // per-user choice; else derived from tier — blue-collar/standard/assisted →
+  // "minimal" (few big buttons), professional → "advanced" (full dashboard).
+  const [dashModeState, setDashModeState] = useState<"minimal" | "advanced" | null>(null);
 
   const { data: profileRes, isLoading } = useQuery({ queryKey: ["/api/v1/candidates/profile"], queryFn: () => fetchJson("/api/v1/candidates/profile") });
   const { data: completionRes } = useQuery({ queryKey: ["/api/v1/candidates/profile/completion"], queryFn: () => fetchJson("/api/v1/candidates/profile/completion") });
@@ -125,7 +135,36 @@ export default function CandidateDashboard() {
     );
   }
 
-  const navItems = [
+  // ── Minimal vs Advanced mode (HP-4c, Fable spec) ──────────────────────
+  const userId = profile.userId || profile.id;
+  const storedMode = (typeof window !== "undefined" && userId) ? localStorage.getItem(`hs.dashMode.${userId}`) : null;
+  const resolvedMode: "minimal" | "advanced" = dashModeState
+    || ((storedMode === "minimal" || storedMode === "advanced") ? storedMode
+      : (profile.registrationTier === "professional" ? "advanced" : "minimal"));
+  const minimal = resolvedMode === "minimal";
+  const setDashMode = (m: "minimal" | "advanced") => {
+    setDashModeState(m);
+    if (typeof window !== "undefined" && userId) localStorage.setItem(`hs.dashMode.${userId}`, m);
+    // never strand the user on a view the target mode hides
+    if (m === "minimal" && !["overview", "jobs", "applications", "documents"].includes(activeView)) setActiveView("overview");
+  };
+  const regCode = (() => { const s = String(userId || "").replace(/[^a-zA-Z0-9]/g, ""); return s ? `HP-${s.slice(-6).toUpperCase()}` : ""; })();
+  // Minimal routes documents to the camera-first /documents page (ID + passport
+  // slots, blue-collar friendly); advanced uses the in-dashboard DocumentsView.
+  const goDocuments = () => (minimal ? setLocation("/documents") : setActiveView("documents"));
+
+  // Document + completion state (documents are now REQUIRED for "ready").
+  const missing: string[] = completion.missing || [];
+  const docChecks = ["idDocument", "passport"];
+  const questionsMissing = missing.filter((m) => !docChecks.includes(m));
+  const docsMissing = missing.filter((m) => docChecks.includes(m));
+  const questionsDone = questionsMissing.length === 0;
+  const ready = missing.length === 0 && completion.percentage >= 100;
+  const hasIdDoc = !missing.includes("idDocument");
+  const hasPassportDoc = !missing.includes("passport");
+
+  // Advanced nav — the full set. Minimal nav — 4 big, verb-first items.
+  const navItemsFull = [
     { key: "overview", label: "Dashboard", icon: LayoutDashboard, count: null, color: "text-blue-600 bg-blue-100" },
     { key: "jobs", label: "Browse Jobs", icon: Briefcase, count: allJobs.length, color: "text-indigo-600 bg-indigo-100" },
     { key: "applications", label: "My Applications", icon: ClipboardList, count: appCount, color: "text-emerald-600 bg-emerald-100" },
@@ -135,11 +174,31 @@ export default function CandidateDashboard() {
     { key: "drives", label: "Recruitment Drives", icon: Calendar, count: null, color: "text-indigo-600 bg-indigo-100" },
     { key: "documents", label: "Documents", icon: FileText, count: docs.length, color: "text-violet-600 bg-violet-100" },
   ];
+  const navItemsMinimal = [
+    { key: "overview", label: t("minDash.navHome"), icon: Home, count: null, color: "text-blue-600 bg-blue-100" },
+    { key: "jobs", label: t("minDash.navJobs"), icon: Briefcase, count: null, color: "text-indigo-600 bg-indigo-100" },
+    { key: "applications", label: t("minDash.navApplication"), icon: ClipboardList, count: appCount, color: "text-emerald-600 bg-emerald-100" },
+    { key: "documents", label: t("minDash.navDocuments"), icon: FileText, count: null, dot: !hasIdDoc || !hasPassportDoc, color: "text-violet-600 bg-violet-100" },
+  ];
+  const navItems = minimal ? navItemsMinimal : navItemsFull;
 
   return (
     <div className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 xl:px-8 2xl:px-12 py-5">
       {/* ── MOBILE NAV (< lg) ─── */}
       <div className="lg:hidden mb-4">
+        {minimal ? (
+          // Big 2-col tiles — 4 items fit without scrolling, phone-friendly.
+          <div className="grid grid-cols-2 gap-2">
+            {navItems.map(item => (
+              <button key={item.key} onClick={() => item.key === "documents" ? setLocation("/documents") : setActiveView(item.key)}
+                className={`relative flex flex-col items-center justify-center gap-1.5 rounded-2xl border min-h-[76px] font-semibold transition-all ${
+                  activeView === item.key ? "bg-blue-600 border-blue-600 text-white shadow" : "bg-white border-slate-200 text-slate-700"}`}>
+                {(item as any).dot && <span className="absolute top-2 right-2 w-2.5 h-2.5 rounded-full bg-red-500" />}
+                <item.icon className="w-6 h-6" /> <span className="text-sm">{item.label}</span>
+              </button>
+            ))}
+          </div>
+        ) : (
         <div className="flex gap-1 overflow-x-auto bg-white rounded-xl border border-slate-200 p-1">
           {navItems.map(item => (
             <button key={item.key} onClick={() => setActiveView(item.key)}
@@ -150,6 +209,7 @@ export default function CandidateDashboard() {
             </button>
           ))}
         </div>
+        )}
       </div>
 
       {/* ── TWO-COLUMN GRID: sidebar 1fr / main 3fr ── */}
@@ -164,11 +224,17 @@ export default function CandidateDashboard() {
                 size="w-10 h-10" rounded="rounded-2xl" textSize="text-sm" className="shadow-md" />
               <div className="min-w-0 flex-1">
                 <p className="font-bold text-slate-900 text-sm leading-snug truncate">{profile.fullName || "Complete Profile"}</p>
-                <p className="text-[11px] text-blue-600 font-medium truncate">@{(profile.username || profile.email || "").split("@")[0]}</p>
-                <p className="text-xs text-slate-500 truncate">{profile.email}</p>
+                {minimal ? (
+                  regCode ? <p className="text-[11px] text-slate-500 truncate">{t("minDash.regNo")} <span className="font-semibold text-slate-700">{regCode}</span></p> : null
+                ) : (
+                  <>
+                    <p className="text-[11px] text-blue-600 font-medium truncate">@{(profile.username || profile.email || "").split("@")[0]}</p>
+                    <p className="text-xs text-slate-500 truncate">{profile.email}</p>
+                  </>
+                )}
               </div>
             </div>
-            <PhotoUploadRow photoUrl={profile.photoUrl} />
+            {!minimal && <PhotoUploadRow photoUrl={profile.photoUrl} />}
 
             {/* Profile Completion */}
             <div className="bg-slate-50 rounded-lg p-3 mb-3">
@@ -185,86 +251,108 @@ export default function CandidateDashboard() {
                   style={{ width: `${completion.percentage}%` }}
                 />
               </div>
-              <div className="flex gap-0.5 mt-2">
-                {completion.checks?.slice(0, 5).map((c: any) => (
-                  <div key={c.name} title={c.label || c.name} className={`flex-1 h-1 rounded-full ${c.done ? "bg-emerald-400" : "bg-slate-200"}`} />
-                ))}
-              </div>
+              {!minimal && (
+                <div className="flex gap-0.5 mt-2">
+                  {completion.checks?.slice(0, 5).map((c: any) => (
+                    <div key={c.name} title={c.label || c.name} className={`flex-1 h-1 rounded-full ${c.done ? "bg-emerald-400" : "bg-slate-200"}`} />
+                  ))}
+                </div>
+              )}
               <p className="text-[11px] text-slate-400 mt-1.5">
-                {completion.percentage < 40 ? "Add details to start applying" : completion.percentage < 60 ? "Complete profile to apply" : completion.percentage < 100 ? "Almost done — keep going!" : "All sections complete"}
+                {ready ? t("simpleDash.profileReady") : (questionsDone && docsMissing.length ? t("minDash.capDocs") : t("minDash.capQuestions"))}
               </p>
             </div>
 
-            {/* Smart CTA — jumps to the first missing section instead of a generic Edit Profile */}
-            {(() => {
-              const missing: string[] = completion.missing || [];
-              const nextLabel: Record<string, string> = {
-                fullName: "Add your name", email: "Add email", phone: "Add phone",
-                location: "Add location", skills: "Add skills",
-                education: "Add education", experience: "Add experience",
-                documents: "Upload documents",
-              };
-              const nextStep: Record<string, string> = {
-                fullName: "1", email: "1", phone: "1", location: "1", skills: "4",
-                education: "2", experience: "3", documents: "5",
-              };
-              const first = missing[0];
-              if (!first) {
-                return (
-                  <Button size="sm" onClick={() => window.open("/api/v1/candidates/profile/pdf", "_blank", "noopener")}
-                    className="w-full rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold">
-                    <CheckCircle className="w-3.5 h-3.5 mr-1.5" /> Review Profile
-                  </Button>
-                );
-              }
-              return (
-                // HP-4c: blue-collar is the default — send incomplete candidates
-                // to the simplified /apply flow (detailed wizard is the escape).
-                <Button size="sm" onClick={() => setLocation("/apply")}
-                  className="w-full rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold">
-                  <ArrowRight className="w-3.5 h-3.5 mr-1.5" /> Complete your profile
-                </Button>
-              );
-            })()}
-            {/* Always-visible Edit Profile link → simplified flow */}
-            <Button variant="outline" size="sm" onClick={() => setLocation("/apply")}
-              className="w-full rounded-lg text-xs font-semibold mt-2 border-slate-300 text-slate-700 hover:bg-slate-50">
-              <User className="w-3.5 h-3.5 mr-1.5" /> Edit Profile
-            </Button>
+            {/* State-driven CTA — documents are now required, so "ready" needs them.
+                (i) questions incomplete → continue the flow; (ii) questions done but
+                docs missing → go to Documents; (iii) ready → review / find a job. */}
+            {ready ? (
+              <Button size="sm" onClick={() => minimal ? setActiveView("jobs") : window.open("/api/v1/candidates/profile/pdf", "_blank", "noopener")}
+                className="w-full rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold">
+                <CheckCircle className="w-3.5 h-3.5 mr-1.5" /> {minimal ? t("minDash.findJob") : "Review Profile"}
+              </Button>
+            ) : (questionsDone && docsMissing.length) ? (
+              <Button size="sm" onClick={goDocuments}
+                className="w-full rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold">
+                <FileText className="w-3.5 h-3.5 mr-1.5" /> {t("minDash.addDocuments")}
+              </Button>
+            ) : (
+              <Button size="sm" onClick={() => setLocation(profile.registrationTier === "professional" ? "/apply/pro" : "/apply")}
+                className="w-full rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold">
+                <ArrowRight className="w-3.5 h-3.5 mr-1.5" /> {t("minDash.continueProfile")}
+              </Button>
+            )}
+            {!minimal && (
+              <Button variant="outline" size="sm" onClick={() => setLocation("/apply")}
+                className="w-full rounded-lg text-xs font-semibold mt-2 border-slate-300 text-slate-700 hover:bg-slate-50">
+                <User className="w-3.5 h-3.5 mr-1.5" /> Edit Profile
+              </Button>
+            )}
           </div>
 
           {/* Navigation */}
           <nav className="bg-white rounded-xl border border-slate-200 p-1.5 shadow-sm">
             {navItems.map(item => (
-              <button
-                key={item.key}
-                onClick={() => setActiveView(item.key)}
-                className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-all ${
-                  activeView === item.key
-                    ? "bg-blue-50 text-blue-700 font-semibold"
-                    : "text-slate-600 hover:bg-slate-50"
-                }`}
-              >
-                <item.icon className="w-4 h-4 flex-shrink-0" />
-                <span className="flex-1 text-left truncate">{item.label}</span>
-                {item.count !== null && item.count > 0 && (
-                  <span className={`text-[11px] font-semibold tabular-nums ${
-                    activeView === item.key ? "text-blue-600" : "text-slate-400"
-                  }`}>{item.count}</span>
-                )}
-              </button>
+              minimal ? (
+                <button key={item.key} onClick={() => item.key === "documents" ? setLocation("/documents") : setActiveView(item.key)}
+                  className={`w-full flex items-center gap-3 px-2.5 my-0.5 rounded-xl min-h-[60px] text-[17px] font-semibold transition-all ${
+                    activeView === item.key ? "bg-blue-600 text-white shadow" : "text-slate-700 hover:bg-slate-50"}`}>
+                  <span className={`w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 ${activeView === item.key ? "bg-white/20 text-white" : item.color}`}>
+                    <item.icon className="w-6 h-6" />
+                  </span>
+                  <span className="flex-1 text-left">{item.label}</span>
+                  {(item as any).dot && <span className="w-3 h-3 rounded-full bg-red-500 flex-shrink-0" />}
+                  {item.count !== null && item.count > 0 && (
+                    <span className={`text-sm font-bold tabular-nums ${activeView === item.key ? "text-white" : "text-slate-400"}`}>{item.count}</span>
+                  )}
+                </button>
+              ) : (
+                <button key={item.key} onClick={() => setActiveView(item.key)}
+                  className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-all ${
+                    activeView === item.key ? "bg-blue-50 text-blue-700 font-semibold" : "text-slate-600 hover:bg-slate-50"}`}>
+                  <item.icon className="w-4 h-4 flex-shrink-0" />
+                  <span className="flex-1 text-left truncate">{item.label}</span>
+                  {item.count !== null && item.count > 0 && (
+                    <span className={`text-[11px] font-semibold tabular-nums ${activeView === item.key ? "text-blue-600" : "text-slate-400"}`}>{item.count}</span>
+                  )}
+                </button>
+              )
             ))}
-            {/* Grievance quick link — goes to global route */}
-            <button
-              onClick={() => setLocation("/grievances")}
-              className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-all text-slate-600 hover:bg-slate-50 border-t border-slate-100 mt-1 pt-2"
-            >
-              <AlertCircle className="w-4 h-4 flex-shrink-0 text-amber-600" />
-              <span className="flex-1 text-left">Raise a Grievance</span>
+            {!minimal && (
+              <button onClick={() => setLocation("/grievances")}
+                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-all text-slate-600 hover:bg-slate-50 border-t border-slate-100 mt-1 pt-2">
+                <AlertCircle className="w-4 h-4 flex-shrink-0 text-amber-600" />
+                <span className="flex-1 text-left">Raise a Grievance</span>
+              </button>
+            )}
+            {/* Mode toggle — the escape hatch between Minimal and Advanced. */}
+            <button onClick={() => setDashMode(minimal ? "advanced" : "minimal")}
+              className="w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm text-slate-500 hover:bg-slate-50 border-t border-slate-100 mt-1 pt-2.5">
+              {minimal ? <LayoutDashboard className="w-4 h-4 flex-shrink-0" /> : <PanelLeftClose className="w-4 h-4 flex-shrink-0" />}
+              <span className="flex-1 text-left">
+                <span className="block font-medium text-slate-600">{minimal ? t("minDash.showAll") : t("minDash.simpleView")}</span>
+                <span className="block text-[11px] text-slate-400">{minimal ? t("minDash.showAllHint") : t("minDash.simpleViewHint")}</span>
+              </span>
             </button>
           </nav>
 
-          {/* Quick Stats */}
+          {/* Minimal — Call / Message HPSEDC (covers everything the 4 buttons don't). */}
+          {minimal && (
+            <div className="bg-white rounded-xl border border-slate-200 p-3 shadow-sm space-y-2">
+              {helpline.helplinePhone && (
+                <a href={`tel:${helpline.helplinePhone.replace(/\s/g, "")}`}
+                  className="w-full flex items-center justify-center gap-2 h-12 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold">
+                  <Phone className="w-5 h-5" /> {t("minDash.callHpsedc")}
+                </a>
+              )}
+              <Button onClick={() => setLocation("/grievances")} className="w-full h-12 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-semibold">
+                <MessageCircleQuestion className="w-5 h-5 mr-2" /> {t("minDash.sendMessage")}
+              </Button>
+            </div>
+          )}
+
+          {/* Quick Stats (advanced only) */}
+          {!minimal && (
           <div className="bg-white rounded-xl border border-slate-200 p-3 shadow-sm">
             <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2 px-1">Quick Stats</p>
             <div className="space-y-0.5">
@@ -274,8 +362,10 @@ export default function CandidateDashboard() {
               <MiniStat label="Documents" value={docs.length} icon={FileText} color="text-purple-600" bg="bg-purple-50" onClick={() => setActiveView("documents")} />
             </div>
           </div>
+          )}
 
-          {/* Education & Experience */}
+          {/* Education & Experience (advanced only) */}
+          {!minimal && (
           <div className="bg-white rounded-xl border border-slate-200 p-3 shadow-sm space-y-3">
             <div>
               <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 px-1 flex items-center gap-1">
@@ -304,13 +394,16 @@ export default function CandidateDashboard() {
               )}
             </div>
           </div>
+          )}
         </aside>
 
         {/* ── MAIN CONTENT ── */}
         <main className="min-w-0">
           <AnimatePresence mode="wait">
-            <motion.div key={activeView} variants={scaleIn} initial="initial" animate="animate" exit="exit">
-              {activeView === "overview" && <OverviewView appCount={appCount} shortlisted={shortlistedCount} docs={docs.length} savedCount={savedJobsList.length} completion={completion} applications={applications} recommendations={recommendations} setActiveView={setActiveView} profile={profile} education={education} experience={experience} />}
+            <motion.div key={activeView + (minimal ? "-min" : "")} variants={scaleIn} initial="initial" animate="animate" exit="exit">
+              {activeView === "overview" && (minimal
+                ? <MinimalOverview profile={profile} completion={completion} applications={applications} setActiveView={setActiveView} setLocation={setLocation} goDocuments={goDocuments} regCode={regCode} helpline={helpline} ready={ready} questionsDone={questionsDone} docsMissing={docsMissing} hasIdDoc={hasIdDoc} hasPassportDoc={hasPassportDoc} t={t} />
+                : <OverviewView appCount={appCount} shortlisted={shortlistedCount} docs={docs.length} savedCount={savedJobsList.length} completion={completion} applications={applications} recommendations={recommendations} setActiveView={setActiveView} profile={profile} education={education} experience={experience} />)}
               {activeView === "jobs" && <JobsView allJobs={allJobs} appliedJobIds={appliedJobIds} savedJobIds={savedJobIds} recommendations={recommendations} completion={completion} />}
               {activeView === "applications" && <ApplicationsView applications={applications} initialIntent={intent} setActiveView={setActiveView} />}
               {activeView === "journey" && <JourneyView profile={profile} applications={applications} completion={completion} docs={docs} education={education} experience={experience} />}
@@ -322,6 +415,164 @@ export default function CandidateDashboard() {
           </AnimatePresence>
         </main>
       </div>
+    </div>
+  );
+}
+
+// ── MINIMAL OVERVIEW (blue-collar) ──────────────────────────────────
+// The simple 3-block content (profile → documents → application → help),
+// rendered inside the shared dashboard frame. Reuses simpleDash i18n keys
+// (already bilingual). Navigation is 100% setActiveView — no query-param
+// routing — so clicks work without a page refresh.
+type MinFriendlyKey = "review" | "interview" | "selected" | "placed" | "closed";
+const MIN_FRIENDLY: Record<MinFriendlyKey, { icon: React.ElementType; circle: string; iconColor: string; step: number }> = {
+  review:    { icon: FileSearch,    circle: "bg-amber-100",   iconColor: "text-amber-600",   step: 2 },
+  interview: { icon: CalendarCheck, circle: "bg-cyan-100",    iconColor: "text-cyan-700",    step: 3 },
+  selected:  { icon: Award,         circle: "bg-emerald-100", iconColor: "text-emerald-700", step: 4 },
+  placed:    { icon: Plane,         circle: "bg-green-100",   iconColor: "text-green-700",   step: 4 },
+  closed:    { icon: RotateCcw,     circle: "bg-slate-100",   iconColor: "text-slate-500",   step: 0 },
+};
+function minFriendlyKey(app: any): MinFriendlyKey {
+  if (app.placement?.status === "offered") return "selected";
+  switch (app.status) {
+    case "submitted": case "reviewed": return "review";
+    case "shortlisted": case "interview_scheduled": return "interview";
+    case "selected": return "selected";
+    case "placed": return "placed";
+    default: return "closed";
+  }
+}
+const MIN_PRIORITY = ["offered", "placed", "selected", "interview_scheduled", "shortlisted", "reviewed", "submitted", "rejected", "withdrawn"];
+
+function MinimalOverview({ profile, completion, applications, setActiveView, setLocation, goDocuments, regCode, helpline, ready, questionsDone, docsMissing, hasIdDoc, hasPassportDoc, t }: any) {
+  const firstName = (profile.fullName || "").split(" ")[0];
+  const BIG = "w-full h-14 text-lg font-semibold rounded-xl";
+  const apps = applications || [];
+  const rank = (a: any) => MIN_PRIORITY.indexOf(a.placement?.status === "offered" ? "offered" : a.status);
+  const primary = apps.length ? [...apps].sort((a, b) => rank(a) - rank(b))[0] : null;
+  const docsNeeded = !hasIdDoc || !hasPassportDoc;
+
+  return (
+    <div className="max-w-xl mx-auto space-y-5">
+      <div className="flex items-center gap-3 bg-blue-50 border border-blue-200 rounded-xl px-4 py-3">
+        <ShieldCheck className="w-6 h-6 text-blue-700 shrink-0" />
+        <p className="text-base font-semibold text-blue-900">{t("simpleDash.trustBand")}</p>
+      </div>
+
+      {/* 1 · Profile */}
+      <section className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 sm:p-6">
+        <h2 className="text-xl font-bold text-slate-900 mb-1">{firstName ? t("simpleDash.greeting", { name: firstName }) : t("simpleDash.greetingNoName")}</h2>
+        {ready ? (
+          <div className="mt-3 space-y-3">
+            <div className="flex items-center gap-3 bg-emerald-50 border border-emerald-200 rounded-xl p-4">
+              <CheckCircle className="w-8 h-8 text-emerald-600 shrink-0" />
+              <p className="text-lg font-semibold text-emerald-800">{t("simpleDash.profileReady")}</p>
+            </div>
+            {regCode && (
+              <div className="rounded-xl border border-slate-200 bg-slate-50/70 px-4 py-3">
+                <p className="text-xs text-slate-500">{t("simpleDash.regNumber")}</p>
+                <p className="text-lg font-bold tracking-wide text-slate-900">{regCode}</p>
+                <p className="text-xs text-slate-400 mt-0.5">{t("simpleDash.regNumberHint")}</p>
+              </div>
+            )}
+          </div>
+        ) : (
+          <>
+            <div className="mt-4 flex items-center justify-between mb-1.5">
+              <p className="text-sm font-medium text-slate-500">{t("simpleDash.profileProgress")}</p>
+              <span className="text-base font-bold text-blue-700 tabular-nums">{completion.percentage}%</span>
+            </div>
+            <div className="w-full h-2.5 bg-slate-200 rounded-full overflow-hidden">
+              <div className="h-full rounded-full bg-gradient-to-r from-blue-500 to-blue-600 transition-all duration-700" style={{ width: `${completion.percentage}%` }} />
+            </div>
+            {questionsDone && docsMissing.length ? (
+              <Button onClick={goDocuments} className={`${BIG} mt-4 bg-blue-700 hover:bg-blue-800 text-white`}>{t("minDash.addDocuments")} <ArrowRight className="w-5 h-5 ml-2" /></Button>
+            ) : (
+              <Button onClick={() => setLocation(profile.registrationTier === "professional" ? "/apply/pro" : "/apply")} className={`${BIG} mt-4 bg-blue-700 hover:bg-blue-800 text-white`}>{t("minDash.continueProfile")} <ArrowRight className="w-5 h-5 ml-2" /></Button>
+            )}
+          </>
+        )}
+      </section>
+
+      {/* 2 · Documents — required step, prominent while ID or passport missing */}
+      {docsNeeded && (
+        <section className="bg-white rounded-2xl border-2 border-amber-200 shadow-sm p-5 sm:p-6">
+          <h2 className="text-xl font-bold text-slate-900 mb-1">{t("minDash.docTitle")}</h2>
+          <p className="text-sm text-slate-500 mb-4">{t("minDash.docSub")}</p>
+          <div className="space-y-2.5">
+            <MinDocRow icon={IdCard} label={t("minDash.docId")} done={hasIdDoc} t={t} />
+            <MinDocRow icon={BookUser} label={t("minDash.docPassport")} done={hasPassportDoc} t={t} />
+          </div>
+          {!hasPassportDoc && <p className="text-xs text-slate-400 mt-3">{t("minDash.noPassportYet")}</p>}
+          <Button onClick={goDocuments} className={`${BIG} mt-4 bg-blue-700 hover:bg-blue-800 text-white`}><Upload className="w-5 h-5 mr-2" /> {t("minDash.addDocsPhoto")}</Button>
+        </section>
+      )}
+
+      {/* 3 · My application */}
+      <section className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 sm:p-6">
+        <h2 className="text-xl font-bold text-slate-900 mb-4">{t("simpleDash.myApplication")}</h2>
+        {primary ? <MinAppStatus app={primary} extra={apps.length - 1} setActiveView={setActiveView} t={t} /> : (
+          <div className="text-center py-2">
+            <Briefcase className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+            <p className="text-lg text-slate-700 mb-4">{t("simpleDash.noApplications")}</p>
+            <Button onClick={() => setActiveView("jobs")} className={`${BIG} bg-blue-700 hover:bg-blue-800 text-white`}>{t("simpleDash.browseJobs")}</Button>
+          </div>
+        )}
+      </section>
+
+      {/* 4 · Help / safety */}
+      <section className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 sm:p-6 space-y-3">
+        <Button onClick={() => setLocation("/grievances")} className={`${BIG} bg-slate-900 hover:bg-slate-800 text-white`}><MessageCircleQuestion className="w-6 h-6 mr-2" /> {t("simpleDash.askHpsedc")}</Button>
+        {helpline.helplinePhone && (
+          <a href={`tel:${helpline.helplinePhone.replace(/\s/g, "")}`} className={`${BIG} flex items-center justify-center border-2 border-blue-200 text-blue-800 hover:bg-blue-50`}><Phone className="w-5 h-5 mr-2" /> {t("simpleDash.callHelpline", { phone: helpline.helplinePhone })}</a>
+        )}
+        <div className="rounded-xl bg-amber-50 border border-amber-200 p-3.5 flex items-start gap-2.5">
+          <ShieldAlert className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-amber-900">{t("simpleDash.neverAsksMoney")}</p>
+            <button onClick={() => setLocation("/grievances?type=fraud")} className="text-sm text-amber-800 underline underline-offset-2 min-h-[36px] text-left">{t("simpleDash.reportMoney")}</button>
+          </div>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function MinDocRow({ icon: Icon, label, done, t }: any) {
+  return (
+    <div className={`flex items-center gap-3 rounded-xl border p-3.5 ${done ? "border-emerald-200 bg-emerald-50/40" : "border-slate-200 bg-white"}`}>
+      <span className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${done ? "bg-emerald-100 text-emerald-600" : "bg-blue-50 text-blue-600"}`}>{done ? <CheckCircle className="w-5 h-5" /> : <Icon className="w-5 h-5" />}</span>
+      <span className="flex-1 text-base font-semibold text-slate-800">{label}</span>
+      <span className={`text-sm font-semibold ${done ? "text-emerald-600" : "text-amber-600"}`}>{done ? t("minDash.received") : t("minDash.needed")}</span>
+    </div>
+  );
+}
+
+function MinAppStatus({ app, extra, setActiveView, t }: any) {
+  const key = minFriendlyKey(app);
+  const f = MIN_FRIENDLY[key];
+  const Icon = f.icon;
+  const offered = app.placement?.status === "offered";
+  return (
+    <div>
+      <div className="flex items-center gap-4">
+        <div className={`w-16 h-16 rounded-2xl flex items-center justify-center shrink-0 ${f.circle}`}><Icon className={`w-9 h-9 ${f.iconColor}`} /></div>
+        <div className="min-w-0">
+          <p className="text-2xl font-bold text-slate-900 leading-tight">{t(`simpleDash.status.${key}Label`)}</p>
+          <p className="text-base text-slate-600 mt-1">{t(`simpleDash.status.${key}Line`)}</p>
+        </div>
+      </div>
+      <p className="text-base font-medium text-slate-700 mt-3 truncate">{app.jobTitle}{app.country ? ` · ${app.country}` : ""}</p>
+      {key !== "closed" && (
+        <div className="mt-4">
+          <div className="flex gap-1.5">{[1, 2, 3, 4].map((s) => <div key={s} className={`h-2.5 flex-1 rounded-full ${s <= f.step ? "bg-emerald-500" : "bg-slate-200"}`} />)}</div>
+          <div className="flex justify-between mt-1.5 text-xs text-slate-500 font-medium">
+            <span>{t("simpleDash.steps.applied")}</span><span>{t("simpleDash.steps.review")}</span><span>{t("simpleDash.steps.interview")}</span><span>{t("simpleDash.steps.selected")}</span>
+          </div>
+        </div>
+      )}
+      {offered && <Button onClick={() => setActiveView("applications")} className="w-full h-14 text-lg font-semibold rounded-xl mt-4 bg-amber-500 hover:bg-amber-600 text-white">{t("simpleDash.offerAction")}</Button>}
+      {extra > 0 && <button onClick={() => setActiveView("applications")} className="mt-4 w-full min-h-[44px] text-base text-blue-700 font-medium underline underline-offset-2">{t("simpleDash.moreApplications", { count: extra })}</button>}
     </div>
   );
 }
@@ -1704,6 +1955,7 @@ function DocumentsView({ docs, profile, intent }: { docs: any[]; profile: any; i
   };
 
   const typeMeta: Record<string, { label: string; color: string }> = {
+    identity_proof: { label: "ID (Aadhaar / Voter ID)", color: "bg-violet-50 text-violet-700 border-violet-200" },
     cv:          { label: "CV / Resume",  color: "bg-blue-50 text-blue-700 border-blue-200" },
     passport:    { label: "Passport",     color: "bg-emerald-50 text-emerald-700 border-emerald-200" },
     certificate: { label: "Certificate",  color: "bg-amber-50 text-amber-700 border-amber-200" },
@@ -1723,6 +1975,7 @@ function DocumentsView({ docs, profile, intent }: { docs: any[]; profile: any; i
           <Select value={docType} onValueChange={setDocType}>
             <SelectTrigger className="h-10 text-xs rounded-xl w-36 border-violet-200"><SelectValue /></SelectTrigger>
             <SelectContent>
+              <SelectItem value="identity_proof">ID (Aadhaar / Voter ID)</SelectItem>
               <SelectItem value="cv">CV / Resume</SelectItem>
               <SelectItem value="passport">Passport</SelectItem>
               <SelectItem value="certificate">Certificate</SelectItem>

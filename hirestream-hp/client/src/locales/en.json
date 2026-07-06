@@ -416,6 +416,32 @@
       "closedLabel": "This application did not go ahead", "closedLine": "No problem — apply for other jobs."
     }
   },
+  "minDash": {
+    "navHome": "My Home",
+    "navJobs": "Find a Job",
+    "navApplication": "My Application",
+    "navDocuments": "My Documents",
+    "showAll": "Show all options",
+    "showAllHint": "Full dashboard",
+    "simpleView": "Simple view",
+    "simpleViewHint": "Bigger buttons, fewer choices",
+    "callHpsedc": "Call HPSEDC",
+    "sendMessage": "Send a Message",
+    "capQuestions": "A few more answers needed",
+    "capDocs": "Almost done — add your documents",
+    "continueProfile": "Continue my profile",
+    "addDocuments": "Add documents",
+    "findJob": "Find a Job",
+    "docTitle": "Your documents",
+    "docSub": "Required to finish. A clear phone photo is enough.",
+    "docId": "ID Card (Aadhaar / Voter ID)",
+    "docPassport": "Passport",
+    "received": "Received",
+    "needed": "Needed",
+    "regNo": "Reg. No.",
+    "noPassportYet": "No passport yet? Upload your ID now — HPSEDC will help you with the passport.",
+    "addDocsPhoto": "Add documents — take a photo"
+  },
   "shell": {
     "govBrand": "HPSEDC",
     "govSubtitle": "Government of Himachal Pradesh",

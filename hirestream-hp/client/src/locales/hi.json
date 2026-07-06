@@ -419,6 +419,32 @@
       "closedLabel": "यह आवेदन आगे नहीं बढ़ा", "closedLine": "कोई बात नहीं — दूसरी नौकरियों के लिए आवेदन करें।"
     }
   },
+  "minDash": {
+    "navHome": "मेरा होम",
+    "navJobs": "नौकरी खोजें",
+    "navApplication": "मेरा आवेदन",
+    "navDocuments": "मेरे दस्तावेज़",
+    "showAll": "सभी विकल्प दिखाएं",
+    "showAllHint": "पूरा डैशबोर्ड",
+    "simpleView": "सरल दृश्य",
+    "simpleViewHint": "बड़े बटन, कम विकल्प",
+    "callHpsedc": "HPSEDC को कॉल करें",
+    "sendMessage": "संदेश भेजें",
+    "capQuestions": "कुछ और जानकारी चाहिए",
+    "capDocs": "बस दस्तावेज़ जोड़ना बाकी है",
+    "continueProfile": "मेरी प्रोफ़ाइल जारी रखें",
+    "addDocuments": "दस्तावेज़ जोड़ें",
+    "findJob": "नौकरी खोजें",
+    "docTitle": "आपके दस्तावेज़",
+    "docSub": "पूरा करने के लिए ज़रूरी। एक साफ़ फ़ोटो काफ़ी है।",
+    "docId": "पहचान पत्र (आधार / वोटर आईडी)",
+    "docPassport": "पासपोर्ट",
+    "received": "मिल गया",
+    "needed": "ज़रूरी",
+    "regNo": "पंजीकरण सं.",
+    "noPassportYet": "अभी पासपोर्ट नहीं है? अभी अपनी पहचान जोड़ें — पासपोर्ट में HPSEDC मदद करेगा।",
+    "addDocsPhoto": "दस्तावेज़ जोड़ें — फ़ोटो लें"
+  },
   "shell": {
     "govBrand": "HPSEDC",
     "govSubtitle": "हिमाचल प्रदेश सरकार",

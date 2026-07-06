@@ -613,7 +613,7 @@ router.get("/profile/completion", protect, async (req, res, next) => {
     const user = req.user as any;
     const candidateId = await getCandidateIdFromUser(user.id);
     if (!candidateId) {
-      return res.json({ success: true, data: { percentage: 0, missing: ["profile", "education", "experience", "documents"] } });
+      return res.json({ success: true, data: { percentage: 0, missing: ["profile", "education", "experience", "idDocument", "passport"] } });
     }
 
     // Fetch candidate profile
@@ -640,9 +640,15 @@ router.get("/profile/completion", protect, async (req, res, next) => {
     //    sets candidates.experience_months, not a candidate_experience row).
     const expCount = await db.select({ c: count() }).from(candidateExperience).where(eq(candidateExperience.candidateId, candidateId));
     checks.push({ name: "experience", done: (expCount[0]?.c ?? 0) > 0 || (profile.experienceMonths ?? 0) > 0 || (profile.experience ?? 0) > 0 });
-    // 8. At least 1 document uploaded
-    const docCount = await db.select({ c: count() }).from(documents).where(eq(documents.candidateId, candidateId));
-    checks.push({ name: "documents", done: (docCount[0]?.c ?? 0) > 0 });
+    // 8 + 9. Documents are REQUIRED for overseas placement (HP-4c, per HPSEDC
+    //    review): an identity proof (Aadhaar / ID) AND a passport. A profile is
+    //    never "ready" (100%) without both — no more "ready" with zero uploads.
+    const docRows = await db.select({ type: documents.type }).from(documents).where(eq(documents.candidateId, candidateId));
+    const docTypes = new Set(docRows.map((d: { type: string | null }) => String(d.type || "").toLowerCase()));
+    const hasIdDoc = ["identity_proof", "id", "aadhaar", "national_id", "voter_id"].some((t) => docTypes.has(t));
+    const hasPassportDoc = docTypes.has("passport");
+    checks.push({ name: "idDocument", done: hasIdDoc });
+    checks.push({ name: "passport", done: hasPassportDoc });
 
     const completed = checks.filter((c) => c.done).length;
     const percentage = Math.round((completed / checks.length) * 100);
