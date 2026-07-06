@@ -10,7 +10,7 @@ import {
   Users, Briefcase, Handshake, Building, Download, Settings,
   UserCheck, BarChart3, Shield, TrendingUp, Activity, AlertTriangle,
   CheckCircle, Clock, FileText, MessageSquare, GraduationCap,
-  Loader2, Mail, Phone, Fingerprint, KeyRound, FolderLock, PlugZap, XCircle, Globe,
+  Loader2, Mail, Phone, Fingerprint, KeyRound, FolderLock, PlugZap, XCircle, Globe, LifeBuoy,
   Printer, Cpu, Network, Layers, Sigma, GitBranch, ScrollText,
   Server, Database, Smartphone, Lock, HardDrive, Boxes, Plug, FileCheck, Square,
 } from "lucide-react";
@@ -117,6 +117,7 @@ export default function AdminDashboard() {
     { label: "PEOPLE & ORGS", items: [
       { key: "users", label: "Users", icon: Users },
       { key: "callbacks", label: "Callbacks", icon: Phone, count: callbackCount },
+      { key: "placement_support", label: "Placement Support", icon: LifeBuoy },
       { key: "agencies", label: "Agencies", icon: Building },
       { key: "employers", label: "Employers", icon: Briefcase },
     ]},
@@ -549,6 +550,7 @@ export default function AdminDashboard() {
 
         <TabsContent value="leaderboard"><AgencyLeaderboardPanel /></TabsContent>
         <TabsContent value="callbacks"><CallbackRequestsPanel /></TabsContent>
+        <TabsContent value="placement_support"><PostPlacementPanel /></TabsContent>
         <TabsContent value="funnel"><FunnelPanel /></TabsContent>
         <TabsContent value="fraud"><FraudWatchlistPanel /></TabsContent>
         <TabsContent value="duplicates"><DuplicatesPanel /></TabsContent>
@@ -578,6 +580,61 @@ export default function AdminDashboard() {
 // signals. Data is all derived from existing tables.
 // HP-4c: Assisted-tier callback queue — candidates who asked HPSEDC to call
 // them back. Staff call, complete the profile, then mark "Done".
+function PostPlacementPanel() {
+  const queryClient = useQueryClient();
+  const { data } = useQuery({
+    queryKey: ["/api/v1/post-placement"],
+    queryFn: () => fetchJson("/api/v1/post-placement"),
+  });
+  const rows: any[] = data?.data || [];
+  const open = rows.filter((r) => r.status === "open" || r.status === "needs_help").length;
+  const setStatus = useMutation({
+    mutationFn: async ({ id, status }: { id: string; status: string }) => {
+      const r = await fetch(`/api/v1/post-placement/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, credentials: "include", body: JSON.stringify({ status }) });
+      if (!r.ok) throw new Error("Failed");
+      return r.json();
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/v1/post-placement"] }),
+  });
+  const catLabel = (c: string) => ({ salary_unpaid: "Salary not paid", contract: "Contract issue", safety: "Safety/harassment", health: "Health", documents: "Documents held", other: "Other", ok: "All well", needs_help: "Needs help" } as any)[c] || c;
+  const chip = (st: string) => {
+    const m: any = { open: "bg-amber-100 text-amber-700", in_progress: "bg-blue-100 text-blue-700", resolved: "bg-emerald-100 text-emerald-700", ok: "bg-emerald-100 text-emerald-700", needs_help: "bg-red-100 text-red-700" };
+    return <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${m[st] || m.open}`}>{st.replace("_", " ")}</span>;
+  };
+  return (
+    <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
+      <div className="flex items-center gap-2 mb-4">
+        <LifeBuoy className="w-5 h-5 text-blue-600" />
+        <h3 className="text-lg font-semibold text-slate-900">Post-placement support</h3>
+        <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">{open} need action</span>
+      </div>
+      <p className="text-sm text-slate-500 mb-4">Issues + monthly check-ins from candidates placed overseas (UAT-03 #16/#19). Call them, then update status.</p>
+      {rows.length === 0 ? (
+        <p className="text-slate-400 text-sm py-6 text-center">No submissions yet.</p>
+      ) : (
+        <div className="space-y-2">
+          {rows.map((r) => (
+            <div key={r.id} className="flex items-center gap-3 p-3 rounded-lg border border-slate-200">
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold shrink-0 ${r.kind === "issue" ? "bg-red-50 text-red-600" : "bg-emerald-50 text-emerald-600"}`}>{(r.candidateName || "?")[0]}</div>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold text-slate-900 truncate">{r.candidateName || "Candidate"} <span className="text-xs font-normal text-slate-400">· {r.kind === "issue" ? "Issue" : "Check-in"} · {catLabel(r.category)}{r.country ? ` · ${r.country}` : ""}</span></p>
+                {r.message && <p className="text-xs text-slate-500 truncate">{r.message}</p>}
+                {r.candidatePhone && <a href={`tel:${r.candidatePhone}`} className="text-xs text-blue-600 font-medium">{r.candidatePhone}</a>}
+              </div>
+              {chip(r.status)}
+              {r.status !== "resolved" && (
+                <Button size="sm" variant="outline" disabled={setStatus.isPending} onClick={() => setStatus.mutate({ id: r.id, status: "resolved" })} className="rounded-lg text-xs border-emerald-300 text-emerald-700 hover:bg-emerald-50">
+                  <CheckCircle className="w-3.5 h-3.5 mr-1" /> Resolve
+                </Button>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function CallbackRequestsPanel() {
   const queryClient = useQueryClient();
   const { data } = useQuery({

@@ -32,6 +32,7 @@ import operatorConsoleRouter from "./routes/admin/operator-console";
 import savedSearchesRouter from "./routes/saved-searches.routes";
 import publicStatusRouter from "./routes/public-status.routes";
 import publicConfigRouter from "./routes/public-config.routes";
+import postPlacementRouter from "./routes/post-placement.routes";
 import { authLimiter } from "./middleware/rateLimit.middleware";
 import { env, cookieSecure } from "./config/env.config";
 // ── Mobile API surface ──────────────────────────────────────────────
@@ -154,6 +155,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/v1/me/saved-searches", savedSearchesRouter);
   app.use("/api/v1/public/status", publicStatusRouter);
   app.use("/api/v1/config", publicConfigRouter);
+  app.use("/api/v1/post-placement", postPlacementRouter);
   app.use("/api/v1/employer", employerRouter);
   app.use("/api/v1/admin/oversight", adminOversightRouter);
   app.use("/api/v1/admin/system-config", systemConfigRouter);

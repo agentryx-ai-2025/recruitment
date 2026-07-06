@@ -436,6 +436,32 @@ export const candidateLanguages = pgTable("candidate_languages", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// ── Post-placement support (UAT-03 #16 + #19) ───────────────────────
+// After a candidate is placed overseas, they can (a) raise a support ISSUE
+// within the 3-month window and (b) file a monthly CHECK-IN ("still there /
+// need help"). HPSEDC works the queue. One table, `kind` distinguishes them.
+export const postPlacementSupport = pgTable("post_placement_support", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  candidateId: varchar("candidate_id").references(() => candidates.id).notNull(),
+  placementId: varchar("placement_id"),
+  kind: text("kind").notNull(),              // 'issue' | 'checkin'
+  category: text("category"),                // issue: salary_unpaid | contract | safety | health | documents | other
+  status: text("status").notNull().default("open"), // issue: open|in_progress|resolved · checkin: ok|needs_help
+  message: text("message"),
+  country: text("country"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+  resolvedAt: timestamp("resolved_at"),
+});
+export const insertPostPlacementSchema = createInsertSchema(postPlacementSupport).omit({
+  id: true, candidateId: true, status: true, createdAt: true, updatedAt: true, resolvedAt: true,
+}).extend({
+  kind: z.enum(["issue", "checkin"]),
+  category: z.string().trim().max(40).optional().nullable(),
+  message: z.string().trim().max(2000).optional().nullable(),
+  country: z.string().trim().max(60).optional().nullable(),
+});
+
 // ── Recruitment Drives ──────────────────────────────────────────────
 export const recruitmentDrives = pgTable("recruitment_drives", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),

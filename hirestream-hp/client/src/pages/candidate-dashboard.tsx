@@ -533,6 +533,8 @@ function MinimalOverview({ profile, completion, applications, setActiveView, set
             <button onClick={() => setLocation("/grievances?type=fraud")} className="text-sm text-amber-800 underline underline-offset-2 min-h-[36px] text-left">{t("simpleDash.reportMoney")}</button>
           </div>
         </div>
+        {/* UAT-03 #16/#19: post-placement support entry */}
+        <button onClick={() => setLocation("/support")} className="w-full text-left text-sm text-blue-700 hover:text-blue-800 underline underline-offset-2 py-1">{t("minDash.supportAfterPlacement")}</button>
       </section>
     </div>
   );

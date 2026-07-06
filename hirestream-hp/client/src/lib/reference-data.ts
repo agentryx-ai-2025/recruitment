@@ -344,3 +344,15 @@ export function salaryBandFor(category: string, country: string): { min: number;
   const round = (n: number) => fine ? Math.round((n * mult) / 5) * 5 : Math.round((n * mult) / 50) * 50;
   return { min: round(base[0]), max: round(base[1]), currency: cur };
 }
+
+// ── UAT-03 #16: official Govt-of-India help for placed overseas workers ──
+// Real, safe channels (no fabricated phone numbers). Shown post-placement.
+export const OVERSEAS_HELP_LINKS = [
+  { label: "MADAD — Consular grievance portal", url: "https://madad.gov.in", note: "File and track a complaint with the Indian mission abroad." },
+  { label: "eMigrate — MEA emigration portal", url: "https://emigrate.gov.in", note: "Emigration, PBGY insurance and registered recruiter info." },
+];
+// Indian mission locator per destination (official pattern; candidate confirms
+// the exact contact on the mission's own site). Kept as a helper string.
+export function indianMissionNote(country: string): string {
+  return `Contact the Indian Embassy/Consulate in ${country || "your destination country"} for on-ground help. Find it via MADAD or the MEA website.`;
+}
