@@ -129,11 +129,11 @@ export default function CandidateDashboardSimple() {
           </div>
         ) : (
           <>
-            <div className="flex items-end justify-between mt-3 mb-2">
-              <p className="text-base text-slate-600">{t("simpleDash.profileProgress")}</p>
-              <span className="text-4xl font-bold text-slate-900 tabular-nums">{completion.percentage}%</span>
+            <div className="mt-4 flex items-center justify-between mb-1.5">
+              <p className="text-sm font-medium text-slate-500">{t("simpleDash.profileProgress")}</p>
+              <span className="text-base font-bold text-blue-700 tabular-nums">{completion.percentage}%</span>
             </div>
-            <div className="w-full h-4 bg-slate-200 rounded-full overflow-hidden" role="progressbar" aria-valuenow={completion.percentage} aria-valuemin={0} aria-valuemax={100}>
+            <div className="w-full h-2.5 bg-slate-200 rounded-full overflow-hidden" role="progressbar" aria-valuenow={completion.percentage} aria-valuemin={0} aria-valuemax={100}>
               <div className="h-full rounded-full bg-gradient-to-r from-blue-500 to-blue-600 transition-all duration-700" style={{ width: `${completion.percentage}%` }} />
             </div>
 
