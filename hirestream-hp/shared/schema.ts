@@ -36,6 +36,12 @@ export const candidates = pgTable("candidates", {
   // for emigration compliance (passport/visa/eMigrate, gender-specific ECR
   // rules) and matching; collected in the candidate profile, not at signup.
   sex: text("sex"),
+  // HP-4c: date of birth + Aadhaar (as on documents). Captured in the "complete"
+  // blue-collar Standard flow so a helper filling from the papers finishes the
+  // whole profile. (users.aadhaarNumber is the auth/Aadhaar-integration field;
+  // this is the profile datum that the candidate PATCH writes, alongside passport.)
+  dateOfBirth: date("date_of_birth"),
+  aadhaarNumber: text("aadhaar_number"),
   location: text("location"),
   experience: integer("experience").default(0),
   // HP-4a (UAT-03 Item 10): experience captured in MONTHS (e.g. 42). Nullable
@@ -763,6 +769,16 @@ export const updateCandidateSchema = createInsertSchema(candidates).omit({
   permanentCity: z.string().trim().max(80).optional().nullable(),
   permanentPinCode: z.string().trim().max(10).optional().nullable(),
   passportNumber: z.string().trim().max(20).optional().nullable(),
+  // HP-4c: DOB must be a real past date (and not absurdly old). Server-checked
+  // so a hand-crafted PATCH can't set a future/garbage birth date.
+  dateOfBirth: z.union([
+    z.string().refine((v) => !v || (new Date(v) < new Date() && new Date(v) > new Date("1940-01-01")), {
+      message: "Enter a valid date of birth.",
+    }),
+    z.null(),
+  ]).optional(),
+  // Aadhaar is optional (skippable) but, when given, must be 12 digits.
+  aadhaarNumber: z.string().trim().regex(/^\d{12}$/, { message: "Aadhaar must be 12 digits." }).optional().nullable(),
   pbbyPolicyNumber: z.string().trim().max(60).optional().nullable(),
   qualificationLevel: z.string().trim().max(40).optional().nullable(),
   preferredSalaryCurrency: z.string().trim().max(10).optional().nullable(),

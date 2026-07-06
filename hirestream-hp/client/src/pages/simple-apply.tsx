@@ -13,7 +13,7 @@ import {
   QUICK_COUNTRIES, MicField,
 } from "./simple-apply/reference";
 
-const TOTAL = 8;
+const TOTAL = 10;
 
 async function patchProfile(body: any) {
   const res = await fetch("/api/v1/candidates/profile", {
@@ -51,6 +51,12 @@ export default function SimpleApplyPage() {
   const [homeLocation, setHomeLocation] = useState("");
   const [langExpanding, setLangExpanding] = useState<string | null>(null); // lifted from LanguageScreen
   const [proHintDismissed, setProHintDismissed] = useState(false); // P3: education-screen "switch to Professional" nudge
+  // HP-4c "complete" Standard flow: document-level identity fields.
+  const [dob, setDob] = useState("");
+  const [aadhaar, setAadhaar] = useState("");
+  const [passportNumber, setPassportNumber] = useState("");
+  const [passportExpiry, setPassportExpiry] = useState("");
+  const today = new Date().toISOString().slice(0, 10);
 
   const { data: profileRes } = useQuery<any>({ queryKey: ["/api/v1/candidates/profile"] });
   const { data: langRes } = useQuery<any>({ queryKey: ["/api/v1/candidates/languages"] });
@@ -70,6 +76,10 @@ export default function SimpleApplyPage() {
     if (Array.isArray(p.preferredCountries)) setCountries(p.preferredCountries);
     if (p.phone) setPhone(p.phone);
     if (p.location) setHomeLocation(p.location);
+    if (p.dateOfBirth) setDob(String(p.dateOfBirth).slice(0, 10));
+    if (p.aadhaarNumber) setAadhaar(p.aadhaarNumber);
+    if (p.passportNumber) setPassportNumber(p.passportNumber);
+    if (p.passportExpiry) setPassportExpiry(String(p.passportExpiry).slice(0, 10));
     if (p.skills?.[0]) {
       const t = BLUE_COLLAR_TRADES.find((x) => x.label === p.skills[0]);
       if (t) setTrade(t);
@@ -312,6 +322,34 @@ export default function SimpleApplyPage() {
     </QuestionShell>
   );
 
+  // ── Screen 7: ID details (DOB required, Aadhaar optional) ──────────────
+  const idInput = "h-14 w-full rounded-xl border border-blue-200/80 bg-white px-4 text-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all";
+  const aadhaarPartial = aadhaar.length > 0 && aadhaar.length !== 12;
+  const IdScreen = () => (
+    <QuestionShell step={7} totalSteps={TOTAL} question={t("simpleApply.qId")} help={t("simpleApply.helpId")}
+      onBack={() => go(6)} onNext={() => save({ dateOfBirth: dob || null, aadhaarNumber: aadhaar.length === 12 ? aadhaar : null }, 8)}
+      nextDisabled={!dob || aadhaarPartial} loading={saving}>
+      <label className="block text-sm font-semibold text-slate-600 mb-1.5">{t("simpleApply.labelDob")}</label>
+      <input type="date" value={dob} max={today} onChange={(e) => setDob(e.target.value)} className={idInput} />
+      <label className="block text-sm font-semibold text-slate-600 mt-5 mb-1.5">{t("simpleApply.labelAadhaar")} <span className="text-slate-400 font-normal">{t("start.optional")}</span></label>
+      <input inputMode="numeric" value={aadhaar} maxLength={12} onChange={(e) => setAadhaar(e.target.value.replace(/\D/g, ""))} placeholder={t("simpleApply.phAadhaar")} className={`${idInput} tracking-widest`} />
+      {aadhaarPartial && <p className="mt-2 text-sm text-amber-600">{t("simpleApply.aadhaarLen")}</p>}
+    </QuestionShell>
+  );
+
+  // ── Screen 8: passport (skippable — many first-timers have none yet) ────
+  const PassportScreen = () => (
+    <QuestionShell step={8} totalSteps={TOTAL} question={t("simpleApply.qPassport")} help={t("simpleApply.helpPassport")}
+      onBack={() => go(7)} onNext={() => save({ passportNumber: passportNumber.trim() || null, passportExpiry: passportExpiry || null }, 9)} onSkip={() => go(9)}
+      nextDisabled={!!passportNumber.trim() && !!passportExpiry && passportExpiry < today} loading={saving}>
+      <label className="block text-sm font-semibold text-slate-600 mb-1.5">{t("simpleApply.labelPassportNum")}</label>
+      <input value={passportNumber} maxLength={20} onChange={(e) => setPassportNumber(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ""))} placeholder={t("simpleApply.phPassport")} className={`${idInput} tracking-widest uppercase`} />
+      <label className="block text-sm font-semibold text-slate-600 mt-5 mb-1.5">{t("simpleApply.labelPassportExpiry")}</label>
+      <input type="date" value={passportExpiry} min={today} onChange={(e) => setPassportExpiry(e.target.value)} className={idInput} />
+      {!!passportExpiry && passportExpiry < today && <p className="mt-2 text-sm text-rose-600">{t("simpleApply.passportExpiryError")}</p>}
+    </QuestionShell>
+  );
+
   const ReviewScreen = () => {
     const chosenEdu = EDUCATION_LEVELS.find((l) => l.key === eduKey);
     const Row = ({ label, value, onEdit }: { label: string; value: string; onEdit: () => void }) => (
@@ -321,8 +359,8 @@ export default function SimpleApplyPage() {
       </div>
     );
     return (
-      <QuestionShell step={7} totalSteps={TOTAL} question={t("simpleApply.qReview")} help={t("simpleApply.helpReview")}
-        onBack={() => go(6)} onNext={() => { toast({ title: t("simpleApply.savedToast") }); setLocation("/"); }} nextLabel={t("simpleApply.saveProfile")} loading={saving}>
+      <QuestionShell step={9} totalSteps={TOTAL} question={t("simpleApply.qReview")} help={t("simpleApply.helpReview")}
+        onBack={() => go(8)} onNext={() => { toast({ title: t("simpleApply.savedToast") }); setLocation("/"); }} nextLabel={t("simpleApply.saveProfile")} loading={saving}>
         <div className="rounded-2xl border border-slate-200 bg-white p-5">
           <Row label={t("simpleApply.rowWork")} value={trade ? t(`choices.trades.${trade.key}.label`) : ""} onEdit={() => go(0)} />
           <Row label={t("simpleApply.rowName")} value={fullName} onEdit={() => go(1)} />
@@ -332,6 +370,9 @@ export default function SimpleApplyPage() {
           <Row label={t("simpleApply.rowCountries")} value={countries.map((c) => tx(`choices.countries.${c}`, c)).join(", ")} onEdit={() => go(5)} />
           <Row label={t("simpleApply.rowPhone")} value={phone} onEdit={() => go(6)} />
           {homeLocation ? <Row label={t("simpleApply.rowTown")} value={homeLocation} onEdit={() => go(6)} /> : null}
+          <Row label={t("simpleApply.rowDob")} value={dob} onEdit={() => go(7)} />
+          {aadhaar ? <Row label={t("simpleApply.rowAadhaar")} value={aadhaar} onEdit={() => go(7)} /> : null}
+          {passportNumber ? <Row label={t("simpleApply.rowPassport")} value={passportNumber} onEdit={() => go(8)} /> : null}
         </div>
         <div className="mt-4 rounded-xl bg-emerald-50/70 border border-emerald-100 p-4 flex items-start gap-2.5">
           <ShieldCheck className="w-4 h-4 text-emerald-600 mt-0.5 flex-shrink-0" />
@@ -348,6 +389,6 @@ export default function SimpleApplyPage() {
   // inline-defined component via <Current/> gives it a new identity every
   // parent re-render, which remounts its inputs and drops focus after one
   // keystroke. Calling it returns JSX that React reconciles in place.
-  const screens = [TradeGrid, NameScreen, ExperienceScreen, EducationScreen, LanguageScreen, CountryScreen, ContactScreen, ReviewScreen];
+  const screens = [TradeGrid, NameScreen, ExperienceScreen, EducationScreen, LanguageScreen, CountryScreen, ContactScreen, IdScreen, PassportScreen, ReviewScreen];
   return <>{screens[step]()}</>;
 }
