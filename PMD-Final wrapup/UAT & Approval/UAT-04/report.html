@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>HireStream-HP — UAT-03 Delivery</title>
+<style>
+  :root{
+    --navy:#0b1e3b; --navy2:#132a52; --blue:#1d4ed8; --blue2:#2563eb;
+    --saffron:#ff7a00; --green:#0f8a3c; --amber:#d97706; --grey:#64748b;
+    --ink:#0f172a; --sub:#475569; --line:#e2e8f0; --bg:#ffffff; --soft:#f8fafc;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;color:var(--ink);
+    font-family:"Segoe UI",Roboto,-apple-system,Helvetica,Arial,sans-serif;
+    font-size:10.5pt; line-height:1.5; -webkit-print-color-adjust:exact; print-color-adjust:exact;}
+  h1,h2,h3,h4{margin:0; line-height:1.2; font-weight:700;}
+  p{margin:0 0 8pt;}
+  a{color:var(--blue);text-decoration:none;}
+  .page{page-break-after:always; padding:16mm 16mm 14mm;}
+  .page:last-child{page-break-after:auto;}
+  .tricolor{height:5px;border-radius:3px;background:linear-gradient(90deg,var(--saffron) 0 33%,#ffffff 33% 66%,var(--green) 66% 100%);}
+
+  /* ---------- COVER ---------- */
+  .cover{position:relative; height:265mm; margin:-16mm -16mm -14mm; padding:26mm 20mm;
+    background:radial-gradient(1200px 600px at 80% -10%, #1b3a6b 0%, var(--navy) 55%), var(--navy);
+    color:#fff; display:flex; flex-direction:column;}
+  .cover .emblem{width:64px;height:64px;border-radius:50%;
+    background:linear-gradient(135deg,var(--blue2),#0ea5e9);
+    display:flex;align-items:center;justify-content:center;font-size:30px;box-shadow:0 8px 30px rgba(37,99,235,.45);}
+  .cover .org{margin-top:14px;font-size:12pt;letter-spacing:.5px;color:#9fc0ff;text-transform:uppercase;font-weight:600;}
+  .cover h1{font-size:40pt;margin-top:auto;letter-spacing:-.5px;}
+  .cover .sub{font-size:16pt;color:#c7d7f5;font-weight:500;margin-top:8px;}
+  .cover .tri{margin:22px 0;width:120px;}
+  .cover .meta{display:flex;gap:34px;flex-wrap:wrap;margin-top:6px;}
+  .cover .meta .k{font-size:8.5pt;text-transform:uppercase;letter-spacing:1px;color:#8fb0e6;}
+  .cover .meta .v{font-size:11pt;color:#fff;font-weight:600;}
+  .cover .foot{margin-top:34px;padding-top:14px;border-top:1px solid rgba(255,255,255,.15);
+    font-size:9pt;color:#a9c2ec;display:flex;justify-content:space-between;}
+  .badge{display:inline-block;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.25);
+    color:#dbe8ff;font-size:9pt;padding:4px 12px;border-radius:999px;font-weight:600;}
+
+  /* ---------- SECTION HEADERS ---------- */
+  .kicker{color:var(--saffron);font-size:9pt;font-weight:700;letter-spacing:2px;text-transform:uppercase;}
+  .h-sec{font-size:22pt;margin:2px 0 4px;color:var(--navy);}
+  .rule{height:3px;width:54px;background:var(--blue);border-radius:2px;margin:8px 0 16px;}
+  .lead{color:var(--sub);font-size:11pt;max-width:150mm;}
+
+  /* ---------- SUMMARY CARDS ---------- */
+  .cards{display:flex;gap:12px;margin:18px 0 6px;}
+  .card{flex:1;border:1px solid var(--line);border-radius:12px;padding:16px;background:var(--soft);}
+  .card .n{font-size:30pt;font-weight:800;line-height:1;}
+  .card .l{color:var(--sub);font-size:9.5pt;margin-top:6px;}
+  .card.ok .n{color:var(--green);} .card.drop .n{color:var(--grey);} .card.defer .n{color:var(--amber);}
+
+  /* ---------- TABLE ---------- */
+  table{width:100%;border-collapse:collapse;margin-top:6px;font-size:9.5pt;}
+  thead th{background:var(--navy);color:#fff;text-align:left;padding:9px 10px;font-weight:600;font-size:9pt;letter-spacing:.3px;}
+  thead th:first-child{border-radius:8px 0 0 0;} thead th:last-child{border-radius:0 8px 0 0;}
+  tbody td{padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top;}
+  tbody tr:nth-child(even){background:var(--soft);}
+  td.num{font-weight:700;color:var(--navy);width:26px;}
+  td.issue{font-weight:600;width:44mm;}
+  .pill{display:inline-block;padding:2px 9px;border-radius:999px;font-size:8pt;font-weight:700;white-space:nowrap;}
+  .pill.ok{background:#dcfce7;color:#166534;} .pill.drop{background:#e2e8f0;color:#475569;} .pill.defer{background:#fef3c7;color:#92400e;}
+
+  /* ---------- GUIDE ---------- */
+  .mode{border:1px solid var(--line);border-left:4px solid var(--blue);border-radius:10px;padding:12px 14px;margin:10px 0;background:#fff;}
+  .mode.violet{border-left-color:#7c3aed;} .mode.green{border-left-color:var(--green);}
+  .mode h4{font-size:11.5pt;color:var(--navy);} .mode p{margin:4px 0 0;color:var(--sub);font-size:10pt;}
+  .shot{margin:14px 0 4px;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:#fff;box-shadow:0 6px 18px rgba(15,23,42,.06);}
+  .shot img{display:block;width:100%;max-height:172mm;object-fit:contain;background:#f1f5f9;}
+  .cap{font-size:8.5pt;color:var(--grey);padding:7px 12px;border-top:1px solid var(--line);background:var(--soft);}
+  .two{display:flex;gap:12px;}
+  .two .shot{flex:1;} .two .shot img{max-height:150mm;}
+  .roles{width:100%;border-collapse:collapse;margin-top:6px;font-size:9.5pt;}
+  .roles td{padding:8px 10px;border-bottom:1px solid var(--line);} .roles td:first-child{font-weight:700;color:var(--navy);width:44mm;}
+  .note{background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:10px 14px;color:#1e3a8a;font-size:9.5pt;margin:12px 0;}
+  ul.check{list-style:none;padding:0;margin:6px 0;}
+  ul.check li{padding:4px 0 4px 24px;position:relative;font-size:10pt;border-bottom:1px dashed var(--line);}
+  ul.check li:before{content:"";position:absolute;left:0;top:6px;width:13px;height:13px;border:2px solid var(--blue);border-radius:3px;}
+  .grid2{display:flex;gap:26px;} .grid2>div{flex:1;}
+  h3.blk{font-size:13pt;color:var(--navy);margin:18px 0 4px;padding-bottom:5px;border-bottom:2px solid var(--line);}
+  .small{font-size:9pt;color:var(--grey);}
+</style>
+</head>
+<body>
+
+<!-- COVER -->
+<div class="page" style="padding:0;">
+  <div class="cover">
+    <div class="emblem"><svg width="34" height="34" viewBox="0 0 24 24"><circle cx="17.5" cy="6" r="2.2" fill="#ffd27a"/><path d="M2.5 20h19L14 7.5l-3.4 5-2.3-3.2L2.5 20z" fill="#ffffff"/></svg></div>
+    <div class="org">An initiative of HPSEDC · Government of Himachal Pradesh</div>
+    <h1>HireStream</h1>
+    <div class="sub">HPSEDC Overseas Placement Portal</div>
+    <div class="tricolor tri"></div>
+    <div style="margin:6px 0 20px;"><span class="badge">UAT-03 · Fixes &amp; User Guide</span></div>
+    <div class="meta">
+      <div><div class="k">Portal</div><div class="v">hirestream-hp.agentryx.dev</div></div>
+      <div><div class="k">Prepared for</div><div class="v">HPSEDC UAT Team</div></div>
+      <div><div class="k">Date</div><div class="v">July 2026</div></div>
+      <div><div class="k">Status</div><div class="v">18 / 20 delivered</div></div>
+    </div>
+    <div class="foot">
+      <span>Fix Report &amp; User / Testing Guide</span>
+      <span>Confidential — for UAT review</span>
+    </div>
+  </div>
+</div>
+
+<!-- SUMMARY + FIX REPORT -->
+<div class="page">
+  <div class="kicker">Part 1 · Delivery Summary</div>
+  <h2 class="h-sec">UAT-03 Fix Report</h2>
+  <div class="rule"></div>
+  <p class="lead">Against the 20-item UAT-03 issue list, <b>18 items are fixed and live</b> on the portal.
+  One is out of scope for this government programme, and one requires an external approval and is scheduled for Phase 2.</p>
+
+  <div class="cards">
+    <div class="card ok"><div class="n">18</div><div class="l">Fixed &amp; live</div></div>
+    <div class="card drop"><div class="n">1</div><div class="l">Out of scope (Fee)</div></div>
+    <div class="card defer"><div class="n">1</div><div class="l">Deferred to Phase 2 (WhatsApp)</div></div>
+  </div>
+
+  <table>
+    <thead><tr><th>#</th><th>Issue</th><th>What was done</th><th>Status</th></tr></thead>
+    <tbody>
+      <tr><td class="num">1</td><td class="issue">Sex → Gender</td><td>Label changed on registration/profile (field unchanged).</td><td><span class="pill ok">Fixed</span></td></tr>
+      <tr><td class="num">2</td><td class="issue">Replace "Recommend"</td><td>Renamed to "Jobs for You" — a govt body shouldn't appear to endorse a job.</td><td><span class="pill ok">Fixed</span></td></tr>
+      <tr><td class="num">3</td><td class="issue">Address → Correspondence Address</td><td>Label updated.</td><td><span class="pill ok">Fixed</span></td></tr>
+      <tr><td class="num">4</td><td class="issue">Identity section mandatory</td><td>Identity required; ID + passport documents now required before "ready".</td><td><span class="pill ok">Fixed</span></td></tr>
+      <tr><td class="num">5</td><td class="issue">Prevent duplicate education</td><td>Server rejects a duplicate education level (409).</td><td><span class="pill ok">Fixed</span></td></tr>
+      <tr><td class="num">6</td><td class="issue">"Passed" flag on education</td><td>Added a Passed / Completed toggle.</td><td><span class="pill ok">Fixed</span></td></tr>
+      <tr><td class="num">7</td><td class="issue">Separate University &amp; Institution</td><td>Two distinct fields (institution + affiliating university).</td><td><span class="pill ok">Fixed</span></td></tr>
+      <tr><td class="num">8</td><td class="issue">Review Edu / Cert / Skill sections</td><td>All three rebuilt blue-collar-friendly in the new application flows.</td><td><span class="pill ok">Fixed</span></td></tr>
+      <tr><td class="num">9</td><td class="issue">Certification vs Certificate Course</td><td>Differentiated (formal certification vs short course).</td><td><span class="pill ok">Fixed</span></td></tr>
+      <tr><td class="num">10</td><td class="issue">Experience in months</td><td>Captured in months (with "≈ N years" hint); matching uses months.</td><td><span class="pill ok">Fixed</span></td></tr>
+      <tr><td class="num">11</td><td class="issue">Improve Brief Description</td><td>Reworked to plain guidance + examples.</td><td><span class="pill ok">Fixed</span></td></tr>
+      <tr><td class="num">12</td><td class="issue">Language proficiency + passport</td><td>First-class language section (Basic → Native); passport captured.</td><td><span class="pill ok">Fixed</span></td></tr>
+      <tr><td class="num">13</td><td class="issue">Rejected country not shown again</td><td>Agency records a visa/country rejection; those jobs hidden from the candidate.</td><td><span class="pill ok">Fixed</span></td></tr>
+      <tr><td class="num">14</td><td class="issue">Salary aligned to job category</td><td>Typical monthly pay band per category × country shown on each job.</td><td><span class="pill ok">Fixed</span></td></tr>
+      <tr><td class="num">15</td><td class="issue">Job-specific required documents</td><td>Each job shows only its country's required documents (have / needed).</td><td><span class="pill ok">Fixed</span></td></tr>
+      <tr><td class="num">16</td><td class="issue">Post-visa 3-month support</td><td>New Support module + official Govt-of-India channels (MADAD / eMigrate).</td><td><span class="pill ok">Fixed</span></td></tr>
+      <tr><td class="num">17</td><td class="issue">Improve Grievance section</td><td>Voice input, "Someone asked me for money / Fraud" category, deep-link.</td><td><span class="pill ok">Fixed</span></td></tr>
+      <tr><td class="num">18</td><td class="issue">Fee section</td><td>No candidate-side fee in this programme — removed from scope.</td><td><span class="pill drop">Out&nbsp;of&nbsp;scope</span></td></tr>
+      <tr><td class="num">19</td><td class="issue">Monthly tracking of visa holders</td><td>Monthly check-in ("I'm fine" / "I need help") in the Support module.</td><td><span class="pill ok">Fixed</span></td></tr>
+      <tr><td class="num">20</td><td class="issue">WhatsApp notifications</td><td>Needs Meta WhatsApp-Business verification + a messaging partner (external).</td><td><span class="pill defer">Phase&nbsp;2</span></td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- GUIDE: ACCESS + 3 MODES -->
+<div class="page">
+  <div class="kicker">Part 2 · User &amp; Testing Guide</div>
+  <h2 class="h-sec">How the portal works</h2>
+  <div class="rule"></div>
+  <p class="lead">The workflow — especially for candidates — has changed a lot. This guide walks through the new
+  candidate experience, the HPSEDC super-agency, and the admin console, with test steps for each.</p>
+
+  <h3 class="blk">Access &amp; roles</h3>
+  <table class="roles">
+    <tr><td>Candidate (Job Seeker)</td><td>Register on the portal (password needs one capital + one special character, e.g. <b>Test@1234</b>). Anyone can register.</td></tr>
+    <tr><td>HPSEDC Agency</td><td>Demo account <b>hpsedc_agency</b> (quick-login). The single super-agency — owns all jobs, candidates &amp; placements.</td></tr>
+    <tr><td>Admin</td><td>Demo account <b>demo_admin</b> (quick-login). Oversight, callbacks, support queue, grievances.</td></tr>
+  </table>
+  <div class="note">The portal is bilingual — use the <b>language toggle</b> in the top bar to switch <b>English ⇄ Hindi</b>.</div>
+
+  <h3 class="blk">Candidate · three ways to register</h3>
+  <p class="small">Applicants range from low-literacy blue-collar workers to degree-holding professionals, so registration offers three modes:</p>
+  <div class="mode"><h4>A · Standard — "Fill it myself (quick form)"</h4><p>For <b>blue-collar</b> workers. A picture-based, one-question-per-screen form (~2 min) with voice input — completable by the worker or a helper (family / Common Service Centre).</p></div>
+  <div class="mode violet"><h4>B · Professional — "I have a degree or professional qualification"</h4><p>For <b>higher-education</b> applicants (nurses, engineers, IT). A guided form capturing education → degree → field → institution, certifications, IELTS &amp; passport.</p></div>
+  <div class="mode green"><h4>C · Assisted — "Ask HPSEDC to call me"</h4><p>The <b>minimum-information</b> path: leave only name + phone; HPSEDC calls back and completes it. <b>Configurable</b> — HPSEDC can switch this option on/off from the backend.</p></div>
+  <div class="shot"><img src="screenshots/02-register-three-tiers.png"><div class="cap">The three registration modes shown to a new candidate.</div></div>
+</div>
+
+<!-- STANDARD + PROFESSIONAL -->
+<div class="page">
+  <h3 class="blk">Standard (blue-collar) &amp; Professional flows</h3>
+  <div class="two">
+    <div class="shot"><img src="screenshots/03-apply-standard-bluecollar.png"><div class="cap">Standard — pictorial, one question per screen.</div></div>
+    <div class="shot"><img src="screenshots/04-apply-professional.png"><div class="cap">Professional — guided, detailed capture.</div></div>
+  </div>
+
+  <h3 class="blk">The dashboard · Minimal ⇄ Advanced</h3>
+  <p class="small">Everyone uses the <b>same dashboard layout</b>. Blue-collar applicants get a Minimal view (few big buttons); professionals get the Advanced view (full menu + stats). A toggle switches between them.</p>
+  <div class="two">
+    <div class="shot"><img src="screenshots/01-candidate-dashboard-3modes.png"><div class="cap">Minimal — blue-collar default.</div></div>
+    <div class="shot"><img src="screenshots/10-dashboard-advanced.png"><div class="cap">Advanced — professional default.</div></div>
+  </div>
+</div>
+
+<!-- DOCUMENTS + READY -->
+<div class="page">
+  <h3 class="blk">Documents are required</h3>
+  <p class="small">A profile is <b>not "ready" until an ID (Aadhaar / Voter ID) and a passport are uploaded</b> — mandatory for overseas placement. Photo or PDF accepted. Once done, the dashboard shows "Your profile is ready" with the HPSEDC registration number.</p>
+  <div class="two">
+    <div class="shot"><img src="screenshots/05-documents-required.png"><div class="cap">Documents — ID + passport required.</div></div>
+    <div class="shot"><img src="screenshots/06-dashboard-ready.png"><div class="cap">Profile ready + registration number.</div></div>
+  </div>
+
+  <h3 class="blk">Find a job → apply → track</h3>
+  <p class="small">Each job shows the <b>typical monthly pay for that category &amp; country</b> and the <b>documents that country requires</b> (Have-it / Upload / Arrange).</p>
+  <div class="shot"><img src="screenshots/07-job-detail-salary-docs.png"><div class="cap">Job detail — salary band + country-specific required documents.</div></div>
+</div>
+
+<!-- MY APP + SUPPORT -->
+<div class="page">
+  <div class="two">
+    <div class="shot"><img src="screenshots/08-my-application-status.png"><div class="cap">My Application — Applied → Review → Interview → Selected.</div></div>
+    <div class="shot"><img src="screenshots/09-post-placement-support.png"><div class="cap">Post-placement support + monthly check-in + MADAD / eMigrate.</div></div>
+  </div>
+
+  <h3 class="blk">HPSEDC · the single super-agency</h3>
+  <p class="small">Instead of many competing agencies, <b>HPSEDC is the one super-agency</b>: all jobs belong to HPSEDC, which manages every candidate and placement and runs the full pipeline
+  <b>Submitted → Reviewed → Shortlisted → Interview → Selected → Placed</b>. At <i>Selected</i> a placement record (visa / travel / welfare) is auto-created; the application becomes <i>Placed</i> when the candidate accepts the offer.</p>
+  <div class="shot"><img src="screenshots/11-agency-candidate-pipeline.png"><div class="cap">Agency view — candidate, compliance (MEA), visa / travel &amp; placement management.</div></div>
+</div>
+
+<!-- ADMIN + CHECKLIST -->
+<div class="page">
+  <h3 class="blk">Admin console</h3>
+  <p class="small">Admin keeps HPSEDC oversight — overview, <b>Callbacks</b> (Assisted-tier requests), <b>Placement Support</b> queue, grievances, reports and settings. Features carried over from the multi-agency product that HPSEDC doesn't need can be hidden in a later pass.</p>
+  <div class="shot"><img src="screenshots/12-admin-dashboard.png"><div class="cap">Admin console — pipeline, demand analytics, callbacks &amp; support queues.</div></div>
+
+  <h3 class="blk">Test checklist</h3>
+  <div class="grid2">
+    <div>
+      <p style="font-weight:700;color:var(--navy);margin:0 0 4px;">Candidate</p>
+      <ul class="check">
+        <li>Register → see the three registration modes</li>
+        <li>Complete Standard (blue-collar)</li>
+        <li>Complete Professional (degree branch)</li>
+        <li>Try Assisted (callback request → Admin)</li>
+        <li>Upload ID + passport → "ready" + reg. number</li>
+        <li>Toggle Minimal ⇄ Advanced dashboard</li>
+        <li>Open a job → salary band + docs → Apply</li>
+        <li>Check My Application status</li>
+        <li>Open Support (raise issue / check-in)</li>
+        <li>Switch English ⇄ Hindi</li>
+      </ul>
+    </div>
+    <div>
+      <p style="font-weight:700;color:var(--navy);margin:0 0 4px;">HPSEDC Agency</p>
+      <ul class="check">
+        <li>All jobs are HPSEDC's; post a new job</li>
+        <li>Move an application Submitted → … → Placed</li>
+        <li>Record a visa/country rejection → jobs hidden</li>
+        <li>Update visa status + travel date</li>
+      </ul>
+      <p style="font-weight:700;color:var(--navy);margin:12px 0 4px;">Admin</p>
+      <ul class="check">
+        <li>Callbacks queue (Assisted requests)</li>
+        <li>Placement Support queue</li>
+        <li>Grievances list</li>
+      </ul>
+    </div>
+  </div>
+  <div class="tricolor" style="margin-top:20px;"></div>
+  <p class="small" style="text-align:center;margin-top:10px;">HireStream-HP · HPSEDC Overseas Placement · Government of Himachal Pradesh</p>
+</div>
+
+</body>
+</html>
