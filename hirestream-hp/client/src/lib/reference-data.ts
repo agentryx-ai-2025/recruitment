@@ -320,3 +320,27 @@ export const UPLOADABLE_DOC_TYPES = new Set(["identity_proof", "passport", "educ
 export function requiredDocsForCountry(country: string): string[] {
   return [...BASE_JOB_DOCUMENTS, ...(COUNTRY_DOC_REQUIREMENTS[country] || [])];
 }
+
+// ── UAT-03 #14: seeded typical MONTHLY salary bands per category × country ──
+// Cold-start backstop so a candidate sees a realistic range and sets an
+// ALIGNED expectation for the category (published-job percentiles refine later).
+// Figures are indicative overseas wages; local currency per country.
+export const SALARY_BAND_CURRENCY: Record<string, string> = {
+  "UAE": "AED", "Saudi Arabia": "SAR", "Qatar": "QAR", "Kuwait": "KWD", "Oman": "OMR", "Bahrain": "BHD",
+};
+const CATEGORY_BASE_AED: Record<string, [number, number]> = {
+  construction: [1200, 2800], transport: [1500, 3500], hospitality: [1200, 2600],
+  healthcare: [3000, 8000], manufacturing: [1300, 3000], security: [1500, 3200],
+  agriculture: [1000, 2200], it: [6000, 15000], engineering: [5000, 14000],
+  sales: [2500, 7000], education: [4000, 10000], other: [1200, 3000],
+};
+const AED_TO_LOCAL: Record<string, number> = {
+  "UAE": 1, "Saudi Arabia": 1.02, "Qatar": 0.99, "Kuwait": 0.083, "Oman": 0.105, "Bahrain": 0.103,
+};
+export function salaryBandFor(category: string, country: string): { min: number; max: number; currency: string } | null {
+  const base = CATEGORY_BASE_AED[category]; const mult = AED_TO_LOCAL[country]; const cur = SALARY_BAND_CURRENCY[country];
+  if (!base || mult == null || !cur) return null;
+  const fine = cur === "KWD" || cur === "OMR" || cur === "BHD";
+  const round = (n: number) => fine ? Math.round((n * mult) / 5) * 5 : Math.round((n * mult) / 50) * 50;
+  return { min: round(base[0]), max: round(base[1]), currency: cur };
+}

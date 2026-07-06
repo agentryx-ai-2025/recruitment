@@ -8,7 +8,7 @@ import {
   ArrowLeft, Briefcase, MapPin, DollarSign, Clock, Shield,
   CheckCircle, Loader2, ArrowRight, Bookmark, BookmarkCheck, Share2, Tag, FileCheck2, Circle,
 } from "lucide-react";
-import { jobCategoryLabel, requiredDocsForCountry, DOC_TYPE_LABELS, UPLOADABLE_DOC_TYPES } from "@/lib/reference-data";
+import { jobCategoryLabel, requiredDocsForCountry, DOC_TYPE_LABELS, UPLOADABLE_DOC_TYPES, salaryBandFor } from "@/lib/reference-data";
 
 async function fetchJson(url: string) {
   const res = await fetch(url);
@@ -149,6 +149,24 @@ export default function JobDetailPage() {
             </div>
           </section>
         )}
+
+        {/* UAT-03 #14: typical monthly pay for this category in this country,
+            so the candidate can gauge whether the offer/their expectation aligns. */}
+        {(() => {
+          const band = salaryBandFor(job.category, job.country);
+          if (!band) return null;
+          const fmt = (n: number) => n.toLocaleString("en-IN");
+          return (
+            <section className="mt-6">
+              <h2 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Typical monthly pay for this role — {job.country}</h2>
+              <div className="inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50/60 px-4 py-2.5">
+                <DollarSign className="w-4 h-4 text-emerald-600" />
+                <span className="text-base font-bold text-emerald-800">{fmt(band.min)} – {fmt(band.max)} {band.currency}<span className="text-xs font-normal text-emerald-600">/month</span></span>
+              </div>
+              <p className="text-[11px] text-slate-400 mt-1.5">Indicative market range for {jobCategoryLabel(job.category) || "this category"} — use it to judge whether an offer is fair.</p>
+            </section>
+          );
+        })()}
 
         {/* UAT-03 #15: only the documents THIS job's country needs — with a
             have/need marker for the ones the candidate can upload in-portal. */}
