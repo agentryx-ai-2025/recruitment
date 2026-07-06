@@ -94,6 +94,7 @@ export default function CandidateDashboard() {
   const { t } = useTranslation();
   const helpline = useHelpline();
   const { capabilities } = useCapabilities();
+  const dashQueryClient = useQueryClient();
   // dashMode: explicit user state (set by the toggle) wins; else the persisted
   // per-user choice; else derived from tier — blue-collar/standard/assisted →
   // "minimal" (few big buttons), professional → "advanced" (full dashboard).
@@ -152,6 +153,15 @@ export default function CandidateDashboard() {
   // Minimal routes documents to the camera-first /documents page (ID + passport
   // slots, blue-collar friendly); advanced uses the in-dashboard DocumentsView.
   const goDocuments = () => (minimal ? setLocation("/documents") : setActiveView("documents"));
+  // First-time tier choice on the dashboard (v0.7.1 requirement): record the
+  // chosen tier, then route to the matching flow.
+  const setTierAndGo = async (tierKey: string, path: string) => {
+    try {
+      await fetch("/api/v1/candidates/profile", { method: "PATCH", headers: { "Content-Type": "application/json" }, credentials: "include", body: JSON.stringify({ registrationTier: tierKey }) });
+      dashQueryClient.invalidateQueries({ queryKey: ["/api/v1/candidates/profile"] });
+    } catch { /* non-blocking */ }
+    setLocation(path);
+  };
 
   // Document + completion state (documents are now REQUIRED for "ready").
   const missing: string[] = completion.missing || [];
@@ -402,7 +412,7 @@ export default function CandidateDashboard() {
           <AnimatePresence mode="wait">
             <motion.div key={activeView + (minimal ? "-min" : "")} variants={scaleIn} initial="initial" animate="animate" exit="exit">
               {activeView === "overview" && (minimal
-                ? <MinimalOverview profile={profile} completion={completion} applications={applications} setActiveView={setActiveView} setLocation={setLocation} goDocuments={goDocuments} regCode={regCode} helpline={helpline} ready={ready} questionsDone={questionsDone} docsMissing={docsMissing} hasIdDoc={hasIdDoc} hasPassportDoc={hasPassportDoc} t={t} />
+                ? <MinimalOverview profile={profile} completion={completion} applications={applications} setActiveView={setActiveView} setLocation={setLocation} goDocuments={goDocuments} setTierAndGo={setTierAndGo} capabilities={capabilities} regCode={regCode} helpline={helpline} ready={ready} questionsDone={questionsDone} docsMissing={docsMissing} hasIdDoc={hasIdDoc} hasPassportDoc={hasPassportDoc} t={t} />
                 : <OverviewView appCount={appCount} shortlisted={shortlistedCount} docs={docs.length} savedCount={savedJobsList.length} completion={completion} applications={applications} recommendations={recommendations} setActiveView={setActiveView} profile={profile} education={education} experience={experience} />)}
               {activeView === "jobs" && <JobsView allJobs={allJobs} appliedJobIds={appliedJobIds} savedJobIds={savedJobIds} recommendations={recommendations} completion={completion} />}
               {activeView === "applications" && <ApplicationsView applications={applications} initialIntent={intent} setActiveView={setActiveView} />}
@@ -444,7 +454,8 @@ function minFriendlyKey(app: any): MinFriendlyKey {
 }
 const MIN_PRIORITY = ["offered", "placed", "selected", "interview_scheduled", "shortlisted", "reviewed", "submitted", "rejected", "withdrawn"];
 
-function MinimalOverview({ profile, completion, applications, setActiveView, setLocation, goDocuments, regCode, helpline, ready, questionsDone, docsMissing, hasIdDoc, hasPassportDoc, t }: any) {
+function MinimalOverview({ profile, completion, applications, setActiveView, setLocation, goDocuments, setTierAndGo, capabilities, regCode, helpline, ready, questionsDone, docsMissing, hasIdDoc, hasPassportDoc, t }: any) {
+  const tier: string | null = profile.registrationTier || null;
   const firstName = (profile.fullName || "").split(" ")[0];
   const BIG = "w-full h-14 text-lg font-semibold rounded-xl";
   const apps = applications || [];
@@ -487,8 +498,27 @@ function MinimalOverview({ profile, completion, applications, setActiveView, set
             </div>
             {questionsDone && docsMissing.length ? (
               <Button onClick={goDocuments} className={`${BIG} mt-4 bg-blue-700 hover:bg-blue-800 text-white`}>{t("minDash.addDocuments")} <ArrowRight className="w-5 h-5 ml-2" /></Button>
+            ) : tier === "standard" || tier === "professional" ? (
+              // A path is already chosen — continue it.
+              <Button onClick={() => setLocation(tier === "professional" ? "/apply/pro" : "/apply")} className={`${BIG} mt-4 bg-blue-700 hover:bg-blue-800 text-white`}>{t("minDash.continueProfile")} <ArrowRight className="w-5 h-5 ml-2" /></Button>
             ) : (
-              <Button onClick={() => setLocation(profile.registrationTier === "professional" ? "/apply/pro" : "/apply")} className={`${BIG} mt-4 bg-blue-700 hover:bg-blue-800 text-white`}>{t("minDash.continueProfile")} <ArrowRight className="w-5 h-5 ml-2" /></Button>
+              // First time (no tier yet): Standard default + Professional + Callback.
+              <>
+                <Button onClick={() => setTierAndGo("standard", "/apply")} className={`${BIG} mt-4 bg-blue-700 hover:bg-blue-800 text-white`}>{t("simpleDash.fillMyDetails")} <ArrowRight className="w-5 h-5 ml-2" /></Button>
+                <p className="text-xs text-slate-500 mt-5 mb-2">{t("simpleDash.otherWays")}</p>
+                <div className="space-y-2.5">
+                  <button onClick={() => setTierAndGo("professional", "/apply/pro")} className="w-full flex items-center gap-3.5 rounded-2xl border border-slate-200 bg-white p-4 text-left hover:border-violet-300 hover:bg-violet-50/40 hover:shadow-sm active:scale-[0.99] transition-all">
+                    <span className="w-11 h-11 rounded-xl bg-violet-50 text-violet-600 flex items-center justify-center shrink-0"><GraduationCap className="w-6 h-6" /></span>
+                    <span className="min-w-0 flex-1"><span className="block text-base font-bold text-slate-900 leading-tight">{t("simpleDash.proCardTitle")}</span><span className="block text-xs text-slate-500 mt-0.5">{t("simpleDash.proCardSub")}</span></span>
+                  </button>
+                  {capabilities?.assistedCallbackEnabled && (
+                    <button onClick={() => setLocation("/start?mode=assisted")} className="w-full flex items-center gap-3.5 rounded-2xl border border-slate-200 bg-white p-4 text-left hover:border-emerald-300 hover:bg-emerald-50/40 hover:shadow-sm active:scale-[0.99] transition-all">
+                      <span className="w-11 h-11 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0"><Phone className="w-6 h-6" /></span>
+                      <span className="min-w-0 flex-1"><span className="block text-base font-bold text-slate-900 leading-tight">{t("simpleDash.callbackCardTitle")}</span><span className="block text-xs text-slate-500 mt-0.5">{t("simpleDash.callbackCardSub")}</span></span>
+                    </button>
+                  )}
+                </div>
+              </>
             )}
           </>
         )}
