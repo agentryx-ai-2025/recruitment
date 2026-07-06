@@ -26,6 +26,7 @@ import { logger } from "../config/logger.config";
 import { getSetting } from "../services/settings.service";
 import { notify } from "../services/notification.service";
 import { buildDeploymentChecklist, readinessSummary } from "../services/deployment.service";
+import { userOwnsApplication, userOwnsCandidate } from "../lib/ownership";
 import { placementDocUpload, verifyUploadedFile, handleUploadErrors, HS_PLACEMENT_DOCS_DIR, UPLOAD_DIR } from "../middleware/upload.middleware";
 import fs from "fs/promises";
 import path from "path";
@@ -37,6 +38,16 @@ router.use(protect);
 router.get("/applications/:id/notes", async (req, res, next) => {
   try {
     if (!storage.db) return res.status(500).json({ success: false });
+    // audit 2026-07-06 (S2): notes are internal staff data. The read path
+    // previously had no role/ownership check, so any authenticated user
+    // (incl. candidates) could read private notes on any application by ID.
+    const user = (req as any).user;
+    if (!["agent", "employer", "admin", "superadmin"].includes(user.role)) {
+      return res.status(403).json({ success: false, message: "Forbidden" });
+    }
+    if (!(await userOwnsApplication(storage.db, user, req.params.id))) {
+      return res.status(403).json({ success: false, message: "You can only view notes on your own applications." });
+    }
     const rows = await storage.db.select({
       id: applicationNotes.id, body: applicationNotes.body, createdAt: applicationNotes.createdAt,
       authorName: users.username, authorRole: users.role,
@@ -54,6 +65,11 @@ router.post("/applications/:id/notes", async (req, res, next) => {
     const user = (req as any).user;
     if (!["agent", "employer", "admin", "superadmin"].includes(user.role)) {
       return res.status(403).json({ success: false, message: "Forbidden" });
+    }
+    // audit 2026-07-06 (S7): only staff who own the application may add notes
+    // (and trigger @mention notifications) on it.
+    if (!(await userOwnsApplication(storage.db, user, req.params.id))) {
+      return res.status(403).json({ success: false, message: "You can only add notes to your own applications." });
     }
     const body = String(req.body?.body ?? "").trim();
     if (!body) return res.status(400).json({ success: false, message: "body required" });
@@ -868,6 +884,12 @@ router.patch("/candidates/:id/compliance", async (req, res, next) => {
     if (!["agent", "employer", "admin", "superadmin"].includes(user.role)) {
       return res.status(403).json({ success: false, message: "Forbidden" });
     }
+    // audit 2026-07-06 (S3): previously any agent/employer could overwrite ANY
+    // candidate's passport/compliance data by ID. Scope to candidates who
+    // applied to the caller's jobs (supervisors bypass).
+    if (!(await userOwnsCandidate(storage.db, user, req.params.id))) {
+      return res.status(403).json({ success: false, message: "You can only update compliance for your own candidates." });
+    }
     const allowed = [
       "passportNumber", "passportExpiry", "ecrStatus",
       "pccStatus", "pccExpiry", "medicalStatus", "medicalDate",
@@ -878,6 +900,15 @@ router.patch("/candidates/:id/compliance", async (req, res, next) => {
     const set: any = {};
     for (const k of allowed) if (k in (req.body ?? {})) set[k] = req.body[k];
     if (Object.keys(set).length === 0) return res.status(400).json({ success: false, message: "No valid fields" });
+
+    // audit 2026-07-06 (S3): validate expiry dates like the candidate self-service
+    // path does — reject non-parseable dates rather than corrupting the field.
+    for (const dateField of ["passportExpiry", "pccExpiry", "medicalDate", "pdoDate"]) {
+      if (dateField in set && set[dateField] != null && set[dateField] !== "") {
+        const d = new Date(set[dateField]);
+        if (isNaN(d.getTime())) return res.status(400).json({ success: false, message: `Invalid date for ${dateField}` });
+      }
+    }
 
     const [row] = await storage.db.update(candidates).set(set).where(eq(candidates.id, req.params.id)).returning();
     res.json({ success: true, data: row });

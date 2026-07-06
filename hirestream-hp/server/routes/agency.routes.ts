@@ -8,6 +8,7 @@ import { insertRecruitmentAgentSchema, recruitmentAgents, candidates, agencyRevi
   candidateEducation, candidateExperience, documents, applications, jobs,
   agencyDocuments, placements, auditLog } from "@shared/schema";
 import { eq, and } from "drizzle-orm";
+import { userOwnsCandidate } from "../lib/ownership";
 import {
   agencyDocUpload, verifyUploadedFile, handleUploadErrors,
   HS_AGENCY_DOCS_DIR, UPLOAD_DIR,
@@ -153,6 +154,15 @@ router.get("/candidates/:id", protect, async (req, res, next) => {
     const [candidate] = await storage.db.select().from(candidates).where(eq(candidates.id, req.params.id)).limit(1);
     if (!candidate) return res.status(404).json({ success: false, message: "Candidate not found" });
 
+    // audit 2026-07-06 (S6): employers are foreign companies. Previously ANY
+    // employer could pull a full candidate profile (incl. documents + passport)
+    // by ID, for candidates who never applied to their jobs. Scope employers to
+    // their own applicants; agents/admins retain full access (they're HPSEDC staff).
+    const actor = req.user as any;
+    if (actor.role === "employer" && !(await userOwnsCandidate(storage.db, actor, candidate.id))) {
+      return res.status(403).json({ success: false, message: "You can only view candidates who applied to your jobs." });
+    }
+
     const education = await storage.db.select().from(candidateEducation).where(eq(candidateEducation.candidateId, candidate.id));
     const experience = await storage.db.select().from(candidateExperience).where(eq(candidateExperience.candidateId, candidate.id));
     const docs = await storage.db.select().from(documents).where(eq(documents.candidateId, candidate.id));
@@ -210,11 +220,21 @@ router.get("/candidates/:id", protect, async (req, res, next) => {
       }
     }
 
+    // S6: minimise PII for employers — no raw identity documents, passport, or
+    // Aadhaar numbers. Agents/admins (HPSEDC staff) see the full file.
+    const isEmployer = actor.role === "employer";
+    const safeCandidate: any = { ...candidate };
+    if (isEmployer) {
+      delete safeCandidate.passportNumber;
+      delete safeCandidate.aadhaarNumber;
+    }
+
     res.json({
       success: true,
       data: {
-        ...candidate,
-        education, experience, documents: docs,
+        ...safeCandidate,
+        education, experience,
+        documents: isEmployer ? [] : docs,
         applications: applicationsList,
       },
     });

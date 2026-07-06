@@ -10,6 +10,7 @@
  */
 
 import { Router } from "express";
+import crypto from "crypto";
 import { storage } from "../storage";
 import { applications, candidates, jobs, placements, otpCodes } from "@shared/schema";
 import { and, eq, gte } from "drizzle-orm";
@@ -19,7 +20,8 @@ import { logger } from "../config/logger.config";
 const router = Router();
 
 function genOtp() {
-  return String(Math.floor(100000 + Math.random() * 900000));
+  // audit 2026-07-06 (S5): crypto-strong OTP rather than Math.random().
+  return String(crypto.randomInt(100000, 1000000));
 }
 
 // Quick in-memory rate limit: 3 requests per phone per 10 min.
@@ -31,6 +33,21 @@ function rateLimited(phone: string): boolean {
   r.count += 1;
   return r.count > 3;
 }
+
+// audit 2026-07-06 (S5): cap failed /check attempts per phone so a single
+// issued OTP can't be brute-forced (6-digit space over a 10-min window).
+// After MAX_VERIFY_FAILS wrong guesses we burn all of that phone's tokens
+// and force a fresh OTP request.
+const MAX_VERIFY_FAILS = 5;
+const verifyFailMap = new Map<string, { count: number; firstAt: number }>();
+function recordVerifyFail(phone: string): number {
+  const now = Date.now();
+  const r = verifyFailMap.get(phone);
+  if (!r || now - r.firstAt > 600_000) { verifyFailMap.set(phone, { count: 1, firstAt: now }); return 1; }
+  r.count += 1;
+  return r.count;
+}
+function clearVerifyFails(phone: string) { verifyFailMap.delete(phone); }
 
 // POST /api/v1/public/status/request-otp  { phone }
 router.post("/request-otp", async (req, res, next) => {
@@ -66,15 +83,30 @@ router.post("/check", async (req, res, next) => {
       return res.status(400).json({ success: false, message: "phone, otp, and reference are all required." });
     }
     const db = storage.db!;
+
+    // S5: too many wrong guesses → lock out until a fresh OTP is requested.
+    const fails = verifyFailMap.get(phone);
+    if (fails && Date.now() - fails.firstAt <= 600_000 && fails.count >= MAX_VERIFY_FAILS) {
+      return res.status(429).json({ success: false, message: "Too many incorrect attempts. Request a new code." });
+    }
+
     const [token] = await db.select().from(otpCodes).where(and(
       eq(otpCodes.email, `status:${phone}`),
       eq(otpCodes.code, otp),
       gte(otpCodes.expiresAt, new Date()),
     )).limit(1);
-    if (!token) return res.status(401).json({ success: false, message: "OTP is invalid or expired." });
+    if (!token) {
+      const n = recordVerifyFail(phone);
+      if (n >= MAX_VERIFY_FAILS) {
+        // Burn all outstanding tokens for this phone on lockout.
+        await db.delete(otpCodes).where(eq(otpCodes.email, `status:${phone}`));
+      }
+      return res.status(401).json({ success: false, message: "OTP is invalid or expired." });
+    }
 
-    // Burn the token so it can't be reused.
+    // Correct OTP — burn the token so it can't be reused, and clear failures.
     await db.delete(otpCodes).where(eq(otpCodes.id, token.id));
+    clearVerifyFails(phone);
 
     // Find the candidate via phone, then the application via reference.
     const phoneTail = phone.replace(/\D/g, "").slice(-10);

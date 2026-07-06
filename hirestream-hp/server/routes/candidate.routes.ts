@@ -8,7 +8,7 @@ import {
   candidateEducation, candidateExperience, candidateLanguages, documents,
   insertEducationSchema, insertExperienceSchema, insertLanguageSchema, placements, interviews,
 } from "@shared/schema";
-import { eq, and, count, inArray } from "drizzle-orm";
+import { eq, and, ne, count, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { notify } from "../services/notification.service";
 
@@ -85,10 +85,21 @@ router.patch("/profile", protect, async (req, res, next) => {
          .where(eq(candidates.userId, userId))
          .returning();
 
-     // If username was provided, also update the users table
+     // If username was provided, also update the users table.
+     // audit 2026-07-06 (S8): previously written with only trim() — bypassing
+     // length/format and uniqueness. Validate + reject duplicates.
      if (req.body.username && typeof req.body.username === "string") {
+       const nextUsername = req.body.username.trim();
+       if (nextUsername.length < 3 || nextUsername.length > 100) {
+         return res.status(400).json({ success: false, message: "Username must be 3–100 characters." });
+       }
+       const clash = await storage.db.select({ id: users.id }).from(users)
+         .where(and(eq(users.username, nextUsername), ne(users.id, userId))).limit(1);
+       if (clash.length > 0) {
+         return res.status(409).json({ success: false, message: "That username is already taken." });
+       }
        await storage.db.update(users)
-         .set({ username: req.body.username.trim() })
+         .set({ username: nextUsername })
          .where(eq(users.id, userId));
      }
 
@@ -186,71 +197,13 @@ router.get("/applications", protect, async (req, res, next) => {
   }
 });
 
-// Update application status (for employers/agents)
-router.put("/applications/:id/status", protect, async (req, res, next) => {
-  try {
-    const userId = (req.user as any)?.id;
-    const userRole = (req.user as any)?.role;
-    if (!userId) return res.status(401).json({ success: false, message: "Unauthorized" });
-
-    if (userRole !== "employer" && userRole !== "agent" && userRole !== "admin") {
-      return res.status(403).json({ success: false, message: "Only employers, agents, or admins can update application status." });
-    }
-
-    const { status } = req.body;
-    const validStatuses = ["submitted", "reviewed", "shortlisted", "interview_scheduled", "selected", "rejected"];
-    if (!validStatuses.includes(status)) {
-      return res.status(400).json({ success: false, message: `Invalid status. Must be one of: ${validStatuses.join(", ")}` });
-    }
-
-    if (!storage.db) return res.status(500).json({ success: false, message: "No db available" });
-
-    const applicationId = req.params.id;
-
-    // Get the application with job info
-    const appResult = await storage.db
-      .select({ application: applications, job: jobs })
-      .from(applications)
-      .innerJoin(jobs, eq(applications.jobId, jobs.id))
-      .where(eq(applications.id, applicationId))
-      .limit(1);
-
-    if (!appResult || appResult.length === 0) {
-      return res.status(404).json({ success: false, message: "Application not found." });
-    }
-
-    // Update the status
-    const updated = await storage.db
-      .update(applications)
-      .set({ status })
-      .where(eq(applications.id, applicationId))
-      .returning();
-
-    // Notify the candidate
-    const candidateRecord = await storage.db.select().from(candidates).where(eq(candidates.id, appResult[0].application.candidateId!)).limit(1);
-    if (candidateRecord.length > 0 && candidateRecord[0].userId) {
-      const statusLabels: Record<string, string> = {
-        reviewed: "Your application has been reviewed",
-        shortlisted: "Congratulations! You've been shortlisted",
-        interview_scheduled: "An interview has been scheduled",
-        selected: "🎉 Congratulations! You've been selected",
-        rejected: "Your application was not selected this time",
-      };
-      notify({
-        userId: candidateRecord[0].userId,
-        type: "application_update",
-        title: `Application Update: ${appResult[0].job.title}`,
-        message: `${statusLabels[status] || status} for "${appResult[0].job.title}" at ${appResult[0].job.company}.`,
-        metadata: { applicationId, jobId: appResult[0].job.id, newStatus: status },
-      }).catch(() => {});
-    }
-
-    res.json({ success: true, data: updated[0] });
-  } catch (err) {
-    logger.error(`Error updating application status: ${err}`);
-    next(err);
-  }
-});
+// NOTE (audit 2026-07-06, S1): the legacy `PUT /applications/:id/status`
+// duplicate lived here. It was role-gated but had NO job-ownership check —
+// any agent/employer could change any application's status by ID (IDOR),
+// and it also bypassed terminal-state locks, backward-transition gates,
+// placement auto-create, and audit logging. Its only client caller was a
+// dead component (ApplicantManager). Removed in favour of the canonical,
+// fully-guarded `PATCH /api/v1/applications/:id/status` in application.routes.ts.
 
 // ═══════════════════════════════════════════════════════════════════
 // PDF PROFILE EXPORT

@@ -17,7 +17,6 @@ import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { AgencyRegisterForm } from "@/components/agent/agency-register-form";
 import { AgencyVerificationForm } from "@/components/agent/AgencyVerificationForm";
 import { JobPoster } from "@/components/agent/job-poster";
-import { ApplicantManager } from "@/components/agent/applicant-manager";
 import { DriveCreationForm } from "@/components/agent/drive-form";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Mail, Phone, GraduationCap, Award, AlertTriangle, Heart, Shield, MessageSquare, FolderLock, Fingerprint, Tag } from "lucide-react";

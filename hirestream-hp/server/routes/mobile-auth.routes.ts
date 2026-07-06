@@ -169,10 +169,31 @@ router.post("/login", validateRequest(loginSchema), async (req, res, next) => {
   }
 });
 
+// Mirror of the web register gate (auth.routes.ts) — roles disabled for
+// self-registration in this deployment must be rejected on mobile too
+// (audit 2026-07-06, S4: mobile omitted this, letting attackers self-register
+// as agent/employer on the single-agency HP portal).
+const SELF_REGISTER_CAPABILITY: Record<string, string> = {
+  employer: "capability.employer_self_registration",
+  agent: "capability.agency_self_registration",
+};
+
 // ── POST /register ──────────────────────────────────────────────────
 router.post("/register", validateRequest(registerSchema), async (req, res, next) => {
   try {
     const { email, password, role, fullName, phone } = req.body;
+
+    // HP-3 (S4): reject self-registration for roles disabled in this deployment.
+    const capKey = SELF_REGISTER_CAPABILITY[role];
+    if (capKey) {
+      const { getSetting } = await import("../services/settings.service");
+      if (!(await getSetting<boolean>(capKey))) {
+        return res.status(403).json({
+          success: false,
+          error: { code: 403, message: "This account type is not open for self-registration on this portal." },
+        });
+      }
+    }
 
     // Check if user exists
     const existing = await storage.getUserByUsername(email);
