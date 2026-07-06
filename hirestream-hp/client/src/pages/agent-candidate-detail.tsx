@@ -96,6 +96,13 @@ export default function AgentCandidateDetailPage() {
           <h2 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Your private tags</h2>
           <PrivateTagsEditor candidateId={c.id} />
         </section>
+
+        {/* UAT-03 #13: countries the candidate was refused for (visa/country). Jobs
+            in these countries are hidden from the candidate's own listings. */}
+        <section className="mt-6">
+          <h2 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Visa / country rejections</h2>
+          <CountryRejectionEditor candidateId={c.id} initial={c.rejectedCountries || []} />
+        </section>
       </motion.div>
 
       <div className="grid lg:grid-cols-2 gap-4 mt-4">
@@ -710,6 +717,52 @@ function PrivateTagsEditor({ candidateId }: { candidateId: string }) {
         </Button>
       </div>
       <p className="text-[10px] text-slate-400 mt-1.5">Private to your agency. Other agencies looking at this candidate won't see your tags.</p>
+    </div>
+  );
+}
+
+// UAT-03 #13: agent control to record/clear a candidate's visa/country rejections.
+function CountryRejectionEditor({ candidateId, initial }: { candidateId: string; initial: string[] }) {
+  const { toast } = useToast();
+  const qc = useQueryClient();
+  const [list, setList] = useState<string[]>(initial || []);
+  const [input, setInput] = useState("");
+  const add = useMutation({
+    mutationFn: async (country: string) => {
+      const r = await fetch(`/api/v1/candidates/${candidateId}/country-rejection`, {
+        method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include",
+        body: JSON.stringify({ country }),
+      });
+      if (!r.ok) throw new Error((await r.json().catch(() => ({})))?.message || "Failed");
+      return r.json();
+    },
+    onSuccess: (d: any) => { setList(d.data.rejectedCountries); setInput(""); toast({ title: "Country rejection saved" }); qc.invalidateQueries({ queryKey: [`/api/v1/agencies/candidates/${candidateId}`] }); },
+    onError: (e: any) => toast({ title: e.message || "Couldn't save", variant: "destructive" }),
+  });
+  const remove = useMutation({
+    mutationFn: async (country: string) => {
+      const r = await fetch(`/api/v1/candidates/${candidateId}/country-rejection?country=${encodeURIComponent(country)}`, { method: "DELETE", credentials: "include" });
+      if (!r.ok) throw new Error("Failed");
+      return r.json();
+    },
+    onSuccess: (d: any) => setList(d.data.rejectedCountries),
+  });
+  return (
+    <div>
+      <p className="text-xs text-slate-500 mb-2">Add a country the candidate was refused a visa for. Jobs in that country stop showing in the candidate's own listings.</p>
+      <div className="flex flex-wrap gap-2 mb-2">
+        {list.length === 0 && <span className="text-sm text-slate-400">None.</span>}
+        {list.map((cty) => (
+          <span key={cty} className="inline-flex items-center gap-1.5 pl-3 pr-1.5 py-1 rounded-lg text-xs font-semibold bg-red-50 text-red-700 border border-red-200">
+            {cty}
+            <button onClick={() => remove.mutate(cty)} className="w-5 h-5 rounded flex items-center justify-center hover:bg-red-100" aria-label={`Remove ${cty}`}>×</button>
+          </span>
+        ))}
+      </div>
+      <div className="flex gap-2">
+        <Input value={input} onChange={(e) => setInput(e.target.value)} placeholder="e.g. Saudi Arabia" className="h-9 text-sm max-w-[220px]" />
+        <Button size="sm" variant="outline" disabled={!input.trim() || add.isPending} onClick={() => add.mutate(input.trim())}>Add</Button>
+      </div>
     </div>
   );
 }

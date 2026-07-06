@@ -169,7 +169,7 @@ export default function CandidateDashboard() {
     { key: "jobs", label: "Browse Jobs", icon: Briefcase, count: allJobs.length, color: "text-indigo-600 bg-indigo-100" },
     { key: "applications", label: "My Applications", icon: ClipboardList, count: appCount, color: "text-emerald-600 bg-emerald-100" },
     { key: "journey", label: "My Journey", icon: Route, count: null, color: "text-cyan-600 bg-cyan-100" },
-    { key: "recommended", label: "Recommended", icon: Sparkles, count: recommendations.length, color: "text-amber-600 bg-amber-100" },
+    { key: "recommended", label: "Jobs for You", icon: Sparkles, count: recommendations.length, color: "text-amber-600 bg-amber-100" },
     { key: "saved", label: "Saved Jobs", icon: Bookmark, count: savedJobsList.length, color: "text-rose-600 bg-rose-100" },
     { key: "drives", label: "Recruitment Drives", icon: Calendar, count: null, color: "text-indigo-600 bg-indigo-100" },
     { key: "documents", label: "Documents", icon: FileText, count: docs.length, color: "text-violet-600 bg-violet-100" },
@@ -733,7 +733,7 @@ function OverviewView({ appCount, shortlisted, docs, savedCount, completion, app
             <StatCard icon={Briefcase} gradient="from-blue-500 to-blue-600" lightBg="bg-blue-50" lightText="text-blue-600" value={appCount} label="Applications" subtitle={appCount === 0 ? "Browse jobs to apply" : `${appCount} submitted`} onClick={() => setActiveView("applications", "all")} />
             <StatCard icon={CheckCircle} gradient="from-emerald-500 to-emerald-600" lightBg="bg-emerald-50" lightText="text-emerald-600" value={shortlisted} label="Shortlisted" subtitle={shortlisted === 0 ? "None yet" : `${shortlisted} progressing`} onClick={() => setActiveView("applications", "in_progress")} />
             <StatCard icon={Award} gradient="from-green-600 to-emerald-700" lightBg="bg-green-50" lightText="text-green-700" value={offersCount} label="Offers" subtitle={offersCount === 0 ? "None pending" : offersCount === 1 ? "Awaiting your response" : `${offersCount} awaiting response`} onClick={() => setActiveView("applications", "offers")} />
-            <StatCard icon={Sparkles} gradient="from-amber-500 to-orange-500" lightBg="bg-amber-50" lightText="text-amber-600" value={recommendations.length} label="Recommended" subtitle={recommendations.length === 0 ? "Complete profile for matches" : "Based on your skills"} onClick={() => setActiveView("recommended")} />
+            <StatCard icon={Sparkles} gradient="from-amber-500 to-orange-500" lightBg="bg-amber-50" lightText="text-amber-600" value={recommendations.length} label="Jobs for You" subtitle={recommendations.length === 0 ? "Complete profile for matches" : "Based on your skills"} onClick={() => setActiveView("recommended")} />
             <StatCard icon={FileText} gradient="from-purple-500 to-purple-600" lightBg="bg-purple-50" lightText="text-purple-600" value={docs} label="Documents" subtitle={docs === 0 ? "Upload CV to apply" : `${docs} uploaded`} onClick={() => setActiveView("documents")} />
           </motion.div>
         );
@@ -797,7 +797,7 @@ function OverviewView({ appCount, shortlisted, docs, savedCount, completion, app
               <div className="w-8 h-8 rounded-lg bg-amber-100 flex items-center justify-center">
                 <Sparkles className="w-4 h-4 text-amber-600" />
               </div>
-              Recommended For You
+              Jobs for You
             </h3>
             <Button variant="ghost" size="sm" className="text-xs text-amber-600 font-semibold hover:bg-amber-50 rounded-lg" onClick={() => setActiveView("recommended")}>
               View All <ArrowRight className="w-3.5 h-3.5 ml-1" />
@@ -1817,7 +1817,7 @@ function RecommendedView({ recommendations, savedJobIds, setActiveView }: { reco
           <Sparkles className="w-5 h-5 text-white" />
         </div>
         <div>
-          <h3 className="text-lg font-bold text-slate-900">Recommended Jobs ({recommendations.length})</h3>
+          <h3 className="text-lg font-bold text-slate-900">Jobs for You ({recommendations.length})</h3>
           <p className="text-xs text-slate-500">Ranked by how well they match your skills, experience, and country preference</p>
         </div>
       </motion.div>
@@ -2663,7 +2663,7 @@ function ProfileGapsCard({ completion }: { completion: any }) {
     phone:      { label: "Add a verified phone number",   impact: "Required for OTP. Gulf / SE Asia jobs prioritize verified numbers.", weight: 95, step: "1" },
     email:      { label: "Add a working email",           impact: "Used for offer letters, visa mails, welfare check-ins.", weight: 90, step: "1" },
     location:   { label: "Add your current city",         impact: "Many employers screen by home district / state.",        weight: 70, step: "1" },
-    skills:     { label: "Tag at least 3 skills",         impact: "Unlocks Recommended Jobs — match scoring needs skills.", weight: 85, step: "4" },
+    skills:     { label: "Tag at least 3 skills",         impact: "Unlocks Jobs for You — match scoring needs skills.", weight: 85, step: "4" },
     education:  { label: "Add your highest education",    impact: "Gulf / EU visas check qualification. Blocks most jobs if empty.", weight: 80, step: "2" },
     experience: { label: "Add at least one work entry",   impact: "Agents deprioritize profiles with zero work history.",   weight: 75, step: "3" },
     documents:  { label: "Upload CV or passport",         impact: "Most agencies reject an application that has no resume on file.", weight: 90, step: "5" },

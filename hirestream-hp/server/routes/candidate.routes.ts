@@ -660,4 +660,35 @@ router.get("/profile/completion", protect, async (req, res, next) => {
   }
 });
 
+// ── UAT-03 #13: country/visa rejection (agent/admin records; hides those jobs) ──
+router.post("/:id/country-rejection", protect, async (req, res, next) => {
+  try {
+    const role = (req.user as any)?.role;
+    if (!["agent", "admin", "superadmin"].includes(role)) return res.status(403).json({ success: false, message: "Forbidden" });
+    const country = String(req.body?.country || "").trim();
+    if (!country) return res.status(400).json({ success: false, message: "country is required" });
+    const db = storage.db;
+    if (!db) return res.status(500).json({ success: false, message: "No db" });
+    const rows = await db.select({ rc: candidates.rejectedCountries }).from(candidates).where(eq(candidates.id, req.params.id)).limit(1);
+    if (!rows.length) return res.status(404).json({ success: false, message: "Candidate not found" });
+    const set = Array.from(new Set([...(rows[0].rc || []), country]));
+    await db.update(candidates).set({ rejectedCountries: set }).where(eq(candidates.id, req.params.id));
+    res.json({ success: true, data: { rejectedCountries: set } });
+  } catch (e) { next(e); }
+});
+router.delete("/:id/country-rejection", protect, async (req, res, next) => {
+  try {
+    const role = (req.user as any)?.role;
+    if (!["agent", "admin", "superadmin"].includes(role)) return res.status(403).json({ success: false, message: "Forbidden" });
+    const country = String((req.query?.country as string) || "").trim();
+    const db = storage.db;
+    if (!db) return res.status(500).json({ success: false, message: "No db" });
+    const rows = await db.select({ rc: candidates.rejectedCountries }).from(candidates).where(eq(candidates.id, req.params.id)).limit(1);
+    if (!rows.length) return res.status(404).json({ success: false, message: "Candidate not found" });
+    const nextList = (rows[0].rc || []).filter((c: string) => c !== country);
+    await db.update(candidates).set({ rejectedCountries: nextList }).where(eq(candidates.id, req.params.id));
+    res.json({ success: true, data: { rejectedCountries: nextList } });
+  } catch (e) { next(e); }
+});
+
 export default router;

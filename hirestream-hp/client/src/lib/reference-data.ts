@@ -278,3 +278,45 @@ export const FIELD_LIMITS = {
   skillsMax: 30,
   tagItem: 40,
 } as const;
+
+// ── UAT-03 #15: documents required per destination country ────────────────
+// Jobs inherit their country's matrix; on a job the candidate sees ONLY the
+// documents that job/country needs (with a have/need marker), not a generic
+// list. Base docs apply to every overseas placement; per-country adds extra.
+export const BASE_JOB_DOCUMENTS = ["identity_proof", "passport", "medical_certificate", "police_clearance"];
+export const COUNTRY_DOC_REQUIREMENTS: Record<string, string[]> = {
+  "UAE": ["educational_certificate"],
+  "Saudi Arabia": ["educational_certificate", "trade_test"],
+  "Qatar": ["educational_certificate"],
+  "Kuwait": ["educational_certificate"],
+  "Oman": [],
+  "Bahrain": [],
+  "UK": ["educational_certificate", "ielts", "cv"],
+  "Germany": ["educational_certificate", "cv"],
+  "Canada": ["educational_certificate", "ielts", "cv"],
+  "Australia": ["educational_certificate", "ielts", "cv"],
+  "Ireland": ["educational_certificate", "ielts", "cv"],
+  "New Zealand": ["educational_certificate", "ielts", "cv"],
+  "Singapore": ["educational_certificate", "cv"],
+  "Japan": ["educational_certificate", "cv"],
+  "USA": ["educational_certificate", "ielts", "cv"],
+};
+export const DOC_TYPE_LABELS: Record<string, string> = {
+  identity_proof: "ID (Aadhaar / Voter ID)",
+  passport: "Passport",
+  medical_certificate: "Medical fitness certificate",
+  police_clearance: "Police clearance (PCC)",
+  educational_certificate: "Education certificate",
+  experience_certificate: "Work experience letter",
+  trade_test: "Trade test result",
+  ielts: "IELTS score",
+  cv: "CV / Resume",
+  certificate: "Certificate",
+  other: "Other document",
+};
+// Types the candidate can upload in-portal now (so we can show have/need);
+// the rest (medical/PCC/trade test/IELTS) they arrange offline.
+export const UPLOADABLE_DOC_TYPES = new Set(["identity_proof", "passport", "educational_certificate", "experience_certificate", "cv", "certificate", "other"]);
+export function requiredDocsForCountry(country: string): string[] {
+  return [...BASE_JOB_DOCUMENTS, ...(COUNTRY_DOC_REQUIREMENTS[country] || [])];
+}

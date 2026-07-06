@@ -53,6 +53,10 @@ export const candidates = pgTable("candidates", {
   // HPSEDC to call them back (the Assisted tier — staff complete the profile).
   registrationTier: text("registration_tier"),          // assisted | standard | professional
   wantsCallback: boolean("wants_callback").default(false),
+  // HP-5 (UAT-03 Item 13): countries this candidate was rejected for (visa/country
+  // refusal — NOT an agency non-shortlist). Jobs in these countries are hidden from
+  // the candidate's listings so they aren't shown a destination they can't go to.
+  rejectedCountries: text("rejected_countries").array(),
   skills: text("skills").array(),
   preferredCountries: text("preferred_countries").array(),
   profileComplete: boolean("profile_complete").default(false),

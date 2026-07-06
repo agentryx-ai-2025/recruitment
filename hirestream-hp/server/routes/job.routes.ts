@@ -7,7 +7,7 @@ import {
   candidates, notifications, savedJobs,
   candidateEducation, candidateExperience, documents,
 } from "@shared/schema";
-import { eq, and, or, ne, ilike, gte, lte, sql, desc, asc, count, inArray } from "drizzle-orm";
+import { eq, and, or, ne, ilike, gte, lte, sql, desc, asc, count, inArray, notInArray } from "drizzle-orm";
 import { notify } from "../services/notification.service";
 
 const router = Router();
@@ -248,6 +248,14 @@ router.get("/", async (req, res, next) => {
       // Logged-in agent/employer browsing general listings (not own) still shouldn't
       // see other agents-only jobs unless they pass the requisition endpoint.
       conditions.push(eq(jobs.visibility, "public"));
+    }
+
+    // UAT-03 #13: hide jobs in countries this candidate was rejected for (visa/
+    // country refusal). They should never be shown a destination they can't go to.
+    if (authedUserRole === "candidate" && authedUserId) {
+      const candRow = await db.select({ rc: candidates.rejectedCountries }).from(candidates).where(eq(candidates.userId, authedUserId)).limit(1);
+      const rejected = (candRow[0]?.rc || []).filter(Boolean);
+      if (rejected.length) conditions.push(notInArray(jobs.country, rejected));
     }
 
     // Ownership filter when viewing own jobs

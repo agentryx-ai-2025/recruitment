@@ -6,9 +6,9 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import {
   ArrowLeft, Briefcase, MapPin, DollarSign, Clock, Shield,
-  CheckCircle, Loader2, ArrowRight, Bookmark, BookmarkCheck, Share2, Tag,
+  CheckCircle, Loader2, ArrowRight, Bookmark, BookmarkCheck, Share2, Tag, FileCheck2, Circle,
 } from "lucide-react";
-import { jobCategoryLabel } from "@/lib/reference-data";
+import { jobCategoryLabel, requiredDocsForCountry, DOC_TYPE_LABELS, UPLOADABLE_DOC_TYPES } from "@/lib/reference-data";
 
 async function fetchJson(url: string) {
   const res = await fetch(url);
@@ -37,6 +37,10 @@ export default function JobDetailPage() {
   const { data: allJobsRes } = useQuery({
     queryKey: ["/api/v1/jobs"],
     queryFn: () => fetchJson("/api/v1/jobs"),
+  });
+  const { data: docsRes } = useQuery({
+    queryKey: ["/api/v1/candidates/documents"],
+    queryFn: () => fetchJson("/api/v1/candidates/documents"),
   });
 
   const job = jobRes?.data;
@@ -145,6 +149,35 @@ export default function JobDetailPage() {
             </div>
           </section>
         )}
+
+        {/* UAT-03 #15: only the documents THIS job's country needs — with a
+            have/need marker for the ones the candidate can upload in-portal. */}
+        {(() => {
+          const required = requiredDocsForCountry(job.country);
+          const myTypes = new Set<string>(((docsRes?.data ?? []) as any[]).map((d) => String(d.type || "").toLowerCase()));
+          const has = (t: string) => t === "identity_proof" ? ["identity_proof", "id", "aadhaar", "national_id", "voter_id"].some((x) => myTypes.has(x)) : myTypes.has(t);
+          return (
+            <section className="mt-6">
+              <h2 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Documents required for this job — {job.country}</h2>
+              <div className="grid sm:grid-cols-2 gap-2">
+                {required.map((t) => {
+                  const uploadable = UPLOADABLE_DOC_TYPES.has(t);
+                  const have = uploadable && has(t);
+                  return (
+                    <div key={t} className={`flex items-center gap-2.5 rounded-lg border px-3 py-2 ${have ? "border-emerald-200 bg-emerald-50/40" : "border-slate-200 bg-white"}`}>
+                      {have ? <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" /> : <Circle className="w-4 h-4 text-slate-300 shrink-0" />}
+                      <span className="text-sm text-slate-700 flex-1">{DOC_TYPE_LABELS[t] || t}</span>
+                      {have ? <span className="text-[11px] font-semibold text-emerald-600">Have it</span>
+                        : uploadable ? <span className="text-[11px] font-semibold text-amber-600">Upload</span>
+                        : <span className="text-[11px] text-slate-400">Arrange</span>}
+                    </div>
+                  );
+                })}
+              </div>
+              <p className="text-[11px] text-slate-400 mt-2">“Arrange” documents (medical, police clearance, trade test, IELTS) are obtained outside the portal — HPSEDC guides you.</p>
+            </section>
+          );
+        })()}
 
         <section className="mt-6 pt-6 border-t border-slate-100 flex items-center justify-between flex-wrap gap-3">
           <p className="text-sm text-slate-500">Posted {job.createdAt ? new Date(job.createdAt).toLocaleDateString("en-IN") : "recently"}</p>

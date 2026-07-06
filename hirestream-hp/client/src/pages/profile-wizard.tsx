@@ -1049,10 +1049,13 @@ function ExperienceStep({ onNext, onBack }: { onNext: () => void; onBack: () => 
                     </FormField>
                   </div>
                   <div>
-                    <Label className="text-sm font-semibold text-slate-700">Brief Description</Label>
+                    {/* UAT-03 Item 11: clearer, blue-collar-friendly guidance
+                        (was a vague "Brief Description" with "Key responsibilities…"). */}
+                    <Label className="text-sm font-semibold text-slate-700">What work did you do here? <span className="text-slate-400 font-normal">(optional)</span></Label>
+                    <p className="text-xs text-slate-500 mt-1">In simple words — for example: “Laid bricks and plastered walls”, “Drove a truck for deliveries”, “Cooked in a hotel kitchen”.</p>
                     <textarea
                       className="w-full mt-2 p-4 border border-emerald-200/80 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 min-h-[80px] transition-all"
-                      value={description} onChange={e => setDescription(e.target.value)} placeholder="Key responsibilities..."
+                      value={description} onChange={e => setDescription(e.target.value)} placeholder="e.g. Laid bricks, plastered walls, mixed cement"
                       maxLength={500}
                     />
                   </div>
