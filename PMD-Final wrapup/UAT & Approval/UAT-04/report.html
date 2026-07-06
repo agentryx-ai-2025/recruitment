@@ -68,7 +68,8 @@
   .mode.violet{border-left-color:#7c3aed;} .mode.green{border-left-color:var(--green);}
   .mode h4{font-size:11.5pt;color:var(--navy);} .mode p{margin:4px 0 0;color:var(--sub);font-size:10pt;}
   .shot{margin:14px 0 4px;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:#fff;box-shadow:0 6px 18px rgba(15,23,42,.06);}
-  .shot img{display:block;width:100%;max-height:172mm;object-fit:contain;background:#f1f5f9;}
+  .shot img{display:block;width:100%;max-height:205mm;object-fit:contain;background:#f1f5f9;}
+  .shot{page-break-inside:avoid;}
   .cap{font-size:8.5pt;color:var(--grey);padding:7px 12px;border-top:1px solid var(--line);background:var(--soft);}
   .two{display:flex;gap:12px;}
   .two .shot{flex:1;} .two .shot img{max-height:150mm;}
@@ -169,19 +170,29 @@
   <div class="mode"><h4>A · Standard — "Fill it myself (quick form)"</h4><p>For <b>blue-collar</b> workers. A picture-based, one-question-per-screen form (~2 min) with voice input — completable by the worker or a helper (family / Common Service Centre).</p></div>
   <div class="mode violet"><h4>B · Professional — "I have a degree or professional qualification"</h4><p>For <b>higher-education</b> applicants (nurses, engineers, IT). A guided form capturing education → degree → field → institution, certifications, IELTS &amp; passport.</p></div>
   <div class="mode green"><h4>C · Assisted — "Ask HPSEDC to call me"</h4><p>The <b>minimum-information</b> path: leave only name + phone; HPSEDC calls back and completes it. <b>Configurable</b> — HPSEDC can switch this option on/off from the backend.</p></div>
+</div>
+
+<!-- 3 MODES SCREENSHOT -->
+<div class="page">
+  <h3 class="blk">The three registration modes on screen</h3>
+  <p class="small">A new candidate is asked how they would like to register:</p>
   <div class="shot"><img src="screenshots/02-register-three-tiers.png"><div class="cap">The three registration modes shown to a new candidate.</div></div>
 </div>
 
 <!-- STANDARD + PROFESSIONAL -->
 <div class="page">
   <h3 class="blk">Standard (blue-collar) &amp; Professional flows</h3>
+  <p class="small">Standard is pictorial and one-question-per-screen; Professional is a guided, detailed capture.</p>
   <div class="two">
     <div class="shot"><img src="screenshots/03-apply-standard-bluecollar.png"><div class="cap">Standard — pictorial, one question per screen.</div></div>
     <div class="shot"><img src="screenshots/04-apply-professional.png"><div class="cap">Professional — guided, detailed capture.</div></div>
   </div>
+</div>
 
+<!-- DASHBOARD TOGGLE -->
+<div class="page">
   <h3 class="blk">The dashboard · Minimal ⇄ Advanced</h3>
-  <p class="small">Everyone uses the <b>same dashboard layout</b>. Blue-collar applicants get a Minimal view (few big buttons); professionals get the Advanced view (full menu + stats). A toggle switches between them.</p>
+  <p class="small">Everyone uses the <b>same dashboard layout</b>. Blue-collar applicants get a <b>Minimal</b> view (few big buttons); professionals get the <b>Advanced</b> view (full menu + stats). A toggle switches between them.</p>
   <div class="two">
     <div class="shot"><img src="screenshots/01-candidate-dashboard-3modes.png"><div class="cap">Minimal — blue-collar default.</div></div>
     <div class="shot"><img src="screenshots/10-dashboard-advanced.png"><div class="cap">Advanced — professional default.</div></div>
@@ -196,7 +207,10 @@
     <div class="shot"><img src="screenshots/05-documents-required.png"><div class="cap">Documents — ID + passport required.</div></div>
     <div class="shot"><img src="screenshots/06-dashboard-ready.png"><div class="cap">Profile ready + registration number.</div></div>
   </div>
+</div>
 
+<!-- JOB DETAIL -->
+<div class="page">
   <h3 class="blk">Find a job → apply → track</h3>
   <p class="small">Each job shows the <b>typical monthly pay for that category &amp; country</b> and the <b>documents that country requires</b> (Have-it / Upload / Arrange).</p>
   <div class="shot"><img src="screenshots/07-job-detail-salary-docs.png"><div class="cap">Job detail — salary band + country-specific required documents.</div></div>
@@ -204,24 +218,33 @@
 
 <!-- MY APP + SUPPORT -->
 <div class="page">
+  <h3 class="blk">Application status &amp; post-placement support</h3>
+  <p class="small">The applicant tracks progress on "My Application"; once placed, the Support module handles issues + monthly check-ins.</p>
   <div class="two">
     <div class="shot"><img src="screenshots/08-my-application-status.png"><div class="cap">My Application — Applied → Review → Interview → Selected.</div></div>
-    <div class="shot"><img src="screenshots/09-post-placement-support.png"><div class="cap">Post-placement support + monthly check-in + MADAD / eMigrate.</div></div>
+    <div class="shot"><img src="screenshots/09-post-placement-support.png"><div class="cap">Post-placement support + check-in + MADAD / eMigrate.</div></div>
   </div>
+</div>
 
+<!-- SUPER AGENCY -->
+<div class="page">
   <h3 class="blk">HPSEDC · the single super-agency</h3>
   <p class="small">Instead of many competing agencies, <b>HPSEDC is the one super-agency</b>: all jobs belong to HPSEDC, which manages every candidate and placement and runs the full pipeline
   <b>Submitted → Reviewed → Shortlisted → Interview → Selected → Placed</b>. At <i>Selected</i> a placement record (visa / travel / welfare) is auto-created; the application becomes <i>Placed</i> when the candidate accepts the offer.</p>
   <div class="shot"><img src="screenshots/11-agency-candidate-pipeline.png"><div class="cap">Agency view — candidate, compliance (MEA), visa / travel &amp; placement management.</div></div>
 </div>
 
-<!-- ADMIN + CHECKLIST -->
+<!-- ADMIN -->
 <div class="page">
   <h3 class="blk">Admin console</h3>
   <p class="small">Admin keeps HPSEDC oversight — overview, <b>Callbacks</b> (Assisted-tier requests), <b>Placement Support</b> queue, grievances, reports and settings. Features carried over from the multi-agency product that HPSEDC doesn't need can be hidden in a later pass.</p>
   <div class="shot"><img src="screenshots/12-admin-dashboard.png"><div class="cap">Admin console — pipeline, demand analytics, callbacks &amp; support queues.</div></div>
+</div>
 
-  <h3 class="blk">Test checklist</h3>
+<!-- CHECKLIST -->
+<div class="page">
+  <div class="kicker">Part 2 · User &amp; Testing Guide</div>
+  <h3 class="blk" style="margin-top:2px;">Test checklist</h3>
   <div class="grid2">
     <div>
       <p style="font-weight:700;color:var(--navy);margin:0 0 4px;">Candidate</p>
