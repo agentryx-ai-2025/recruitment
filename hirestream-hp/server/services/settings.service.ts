@@ -162,6 +162,18 @@ export const SETTING_SPECS: SettingSpec[] = [
     type: "string",
     default: "",
   },
+  {
+    // HP-4c: the 3rd registration tier (Assisted / callback). HPSEDC may not
+    // want to offer a callback queue — this flag hides the option everywhere
+    // (dashboard + /start) when off. When on, the option is presented as a
+    // slower fallback that nudges the candidate to self-fill with help.
+    key: "capability.assisted_callback_enabled",
+    category: "capability",
+    label: "Offer the 'HPSEDC will call me' registration option",
+    description: "When ON, candidates who can't self-register can leave name+phone for an HPSEDC callback (the Assisted tier). Turn OFF to hide it entirely and require self-service (Standard/Professional).",
+    type: "boolean",
+    default: true,
+  },
 
   // ── Notifications ────────────────────────────────────────────────────
   {

@@ -8,10 +8,11 @@ const router = Router();
 // non-sensitive capability booleans — never secrets or internal settings.
 router.get("/public", async (_req, res) => {
   try {
-    const [employerSelfReg, agencySelfReg, agencyMode, helplinePhone, helplineHours] = await Promise.all([
+    const [employerSelfReg, agencySelfReg, agencyMode, assistedCallback, helplinePhone, helplineHours] = await Promise.all([
       getSetting<boolean>("capability.employer_self_registration"),
       getSetting<boolean>("capability.agency_self_registration"),
       getSetting<string>("capability.agency_mode"),
+      getSetting<boolean>("capability.assisted_callback_enabled"),
       getSetting<string>("contact.helpline_phone"),
       getSetting<string>("contact.helpline_hours"),
     ]);
@@ -22,6 +23,8 @@ router.get("/public", async (_req, res) => {
           employerSelfRegistration: !!employerSelfReg,
           agencySelfRegistration: !!agencySelfReg,
           agencyMode: agencyMode || "single",
+          // default true when unset so an un-seeded deploy still offers callback
+          assistedCallbackEnabled: assistedCallback !== false,
         },
         // Public contact info — the candidate UI shows the helpline only when
         // a real number is set, so no placeholder number is ever displayed.

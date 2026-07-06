@@ -13,12 +13,14 @@ export interface Capabilities {
   employerSelfRegistration: boolean;
   agencySelfRegistration: boolean;
   agencyMode: "single" | "marketplace";
+  assistedCallbackEnabled: boolean;
 }
 
 const SAFE_DEFAULT: Capabilities = {
   employerSelfRegistration: false,
   agencySelfRegistration: false,
   agencyMode: "single",
+  assistedCallbackEnabled: true,
 };
 
 export function useCapabilities(): { capabilities: Capabilities; isLoading: boolean } {

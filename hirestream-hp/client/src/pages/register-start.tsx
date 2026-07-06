@@ -6,6 +6,7 @@ import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
+import { useCapabilities } from "@/hooks/use-capabilities";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -38,6 +39,8 @@ export default function RegisterStart() {
   const { user } = useAuth();
   const { toast } = useToast();
   const { t } = useTranslation();
+  const { capabilities } = useCapabilities();
+  const callbackEnabled = capabilities.assistedCallbackEnabled;
   const { data: profileRes } = useQuery<any>({ queryKey: ["/api/v1/candidates/profile"] });
   const profile = profileRes?.data || {};
 
@@ -45,6 +48,9 @@ export default function RegisterStart() {
   // callback form directly instead of the chooser.
   const initialMode = (typeof window !== "undefined" && new URLSearchParams(window.location.search).get("mode") === "assisted") ? "assisted" : "choose";
   const [mode, setMode] = useState<"choose" | "assisted" | "done">(initialMode);
+  // If HPSEDC has disabled the callback tier, never show the assisted form even
+  // via a stale ?mode=assisted link — fall back to the chooser.
+  const effectiveMode = mode === "assisted" && !callbackEnabled ? "choose" : mode;
   const [saving, setSaving] = useState(false);
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
@@ -80,7 +86,7 @@ export default function RegisterStart() {
       <TrustBand />
       <div className="flex-1 w-full max-w-xl mx-auto px-4 py-8">
 
-        {mode === "choose" && (
+        {effectiveMode === "choose" && (
           <>
             <h1 className="text-2xl md:text-3xl font-bold text-slate-900 mb-2">{t("start.heading")}</h1>
             <p className="text-base text-slate-500 mb-6">{t("start.sub")}</p>
@@ -107,21 +113,24 @@ export default function RegisterStart() {
                 <ArrowRight className="w-5 h-5 text-slate-400 shrink-0" />
               </button>
 
-              {/* Assisted — callback */}
-              <button type="button" disabled={saving} onClick={() => setMode("assisted")}
-                className="w-full flex items-center gap-4 rounded-2xl border border-slate-200 bg-white p-5 text-left hover:border-emerald-300 hover:bg-emerald-50/40 hover:shadow-md transition-all active:scale-[0.99]">
-                <span className="w-14 h-14 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0"><PhoneCall className="w-7 h-7" /></span>
-                <span className="min-w-0 flex-1">
-                  <span className="block text-lg font-bold text-slate-900">{t("start.assistedTitle")}</span>
-                  <span className="block text-sm text-slate-500 mt-0.5">{t("start.assistedDesc")}</span>
-                </span>
-                <ArrowRight className="w-5 h-5 text-slate-400 shrink-0" />
-              </button>
+              {/* Assisted — callback. Gated: HPSEDC can disable this tier, and
+                  it's framed as the slower fallback (copy nudges self-fill). */}
+              {callbackEnabled && (
+                <button type="button" disabled={saving} onClick={() => setMode("assisted")}
+                  className="w-full flex items-center gap-4 rounded-2xl border border-slate-200 bg-white p-5 text-left hover:border-emerald-300 hover:bg-emerald-50/40 hover:shadow-md transition-all active:scale-[0.99]">
+                  <span className="w-14 h-14 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0"><PhoneCall className="w-7 h-7" /></span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-lg font-bold text-slate-900">{t("start.assistedTitle")}</span>
+                    <span className="block text-sm text-slate-500 mt-0.5">{t("start.assistedDesc")}</span>
+                  </span>
+                  <ArrowRight className="w-5 h-5 text-slate-400 shrink-0" />
+                </button>
+              )}
             </div>
           </>
         )}
 
-        {mode === "assisted" && (
+        {effectiveMode === "assisted" && (
           <>
             <h1 className="text-2xl md:text-3xl font-bold text-slate-900 mb-2">{t("start.assistedHeading")}</h1>
             <p className="text-base text-slate-500 mb-6">{t("start.assistedSub")}</p>
@@ -146,7 +155,7 @@ export default function RegisterStart() {
           </>
         )}
 
-        {mode === "done" && (
+        {effectiveMode === "done" && (
           <div className="text-center py-6">
             <div className="w-20 h-20 rounded-full bg-emerald-100 flex items-center justify-center mx-auto mb-5"><CheckCircle2 className="w-11 h-11 text-emerald-600" /></div>
             <h1 className="text-2xl font-bold text-slate-900 mb-2">{t("start.thankYou", { name: name.split(" ")[0] })}</h1>

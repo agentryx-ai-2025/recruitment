@@ -7,7 +7,7 @@ import React from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { useTranslation } from "react-i18next";
-import { useHelpline } from "@/hooks/use-capabilities";
+import { useHelpline, useCapabilities } from "@/hooks/use-capabilities";
 import { Button } from "@/components/ui/button";
 import {
   Loader2, CheckCircle, FileSearch, CalendarCheck, Award, Plane,
@@ -57,6 +57,7 @@ export default function CandidateDashboardSimple() {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const helpline = useHelpline();
+  const { capabilities } = useCapabilities();
   const { data: profileRes, isLoading } = useQuery<any>({ queryKey: ["/api/v1/candidates/profile"] });
   const { data: completionRes } = useQuery<any>({ queryKey: ["/api/v1/candidates/profile/completion"] });
   const { data: appsRes } = useQuery<any>({ queryKey: ["/api/v1/candidates/applications"] });
@@ -154,23 +155,34 @@ export default function CandidateDashboardSimple() {
                 <button onClick={() => setLocation("/start")} className="mt-2 w-full text-sm text-slate-500 hover:text-blue-700 underline underline-offset-2 py-2">{t("simpleDash.changeRegister")}</button>
               </>
             ) : (
-              // State A — first time: one big default, two visible alternatives.
+              // State A — first time: Standard is the default; Professional and
+              // (if enabled) the callback are real, equal-weight option cards.
               <>
                 <Button onClick={() => setTierAndGo("standard", "/apply")} className={`${BIG_BTN} mt-4 bg-blue-700 hover:bg-blue-800 text-white`}>
                   {t("simpleDash.fillMyDetails")} <ArrowRight className="w-5 h-5 ml-2" />
                 </Button>
-                <p className="text-xs text-slate-500 mt-4 mb-2">{t("simpleDash.otherWays")}</p>
-                <div className="space-y-2">
-                  <button onClick={() => setLocation("/start?mode=assisted")} className="w-full flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50/60 px-4 py-3 text-left hover:border-emerald-300 hover:bg-emerald-50/40 transition-all">
-                    <PhoneCall className="w-5 h-5 text-emerald-600 shrink-0" />
-                    <span className="flex-1 text-sm font-semibold text-slate-800">{t("simpleDash.assistedAlt")}</span>
-                    <ChevronRight className="w-4 h-4 text-slate-400" />
+                <p className="text-xs text-slate-500 mt-5 mb-2">{t("simpleDash.otherWays")}</p>
+                <div className="space-y-2.5">
+                  {/* Professional — a real, equal-weight option (not a tiny link) */}
+                  <button onClick={() => setTierAndGo("professional", "/apply/pro")} className="w-full flex items-center gap-3.5 rounded-2xl border border-slate-200 bg-white p-4 text-left hover:border-violet-300 hover:bg-violet-50/40 hover:shadow-sm active:scale-[0.99] transition-all">
+                    <span className="w-11 h-11 rounded-xl bg-violet-50 text-violet-600 flex items-center justify-center shrink-0"><GraduationCap className="w-6 h-6" /></span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-base font-bold text-slate-900 leading-tight">{t("simpleDash.proCardTitle")}</span>
+                      <span className="block text-xs text-slate-500 mt-0.5">{t("simpleDash.proCardSub")}</span>
+                    </span>
+                    <ChevronRight className="w-5 h-5 text-slate-300 shrink-0" />
                   </button>
-                  <button onClick={() => setTierAndGo("professional", "/apply/pro")} className="w-full flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50/60 px-4 py-3 text-left hover:border-violet-300 hover:bg-violet-50/40 transition-all">
-                    <GraduationCap className="w-5 h-5 text-violet-600 shrink-0" />
-                    <span className="flex-1 text-sm font-semibold text-slate-800">{t("simpleDash.proAlt")}</span>
-                    <ChevronRight className="w-4 h-4 text-slate-400" />
-                  </button>
+                  {/* Callback — configurable (capability flag) + framed as slower */}
+                  {capabilities.assistedCallbackEnabled && (
+                    <button onClick={() => setLocation("/start?mode=assisted")} className="w-full flex items-center gap-3.5 rounded-2xl border border-slate-200 bg-white p-4 text-left hover:border-emerald-300 hover:bg-emerald-50/40 hover:shadow-sm active:scale-[0.99] transition-all">
+                      <span className="w-11 h-11 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0"><PhoneCall className="w-6 h-6" /></span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-base font-bold text-slate-900 leading-tight">{t("simpleDash.callbackCardTitle")}</span>
+                        <span className="block text-xs text-slate-500 mt-0.5">{t("simpleDash.callbackCardSub")}</span>
+                      </span>
+                      <ChevronRight className="w-5 h-5 text-slate-300 shrink-0" />
+                    </button>
+                  )}
                 </div>
               </>
             )}
