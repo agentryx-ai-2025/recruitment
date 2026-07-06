@@ -124,7 +124,8 @@ export default function SimpleApplyPage() {
 
   // ── Screen 0: trade grid (entry) ───────────────────────────────────────
   const TradeGrid = () => (
-    <QuestionShell step={0} totalSteps={TOTAL} question={t("simpleApply.qTrade")} help={t("simpleApply.helpTrade")}>
+    <QuestionShell step={0} totalSteps={TOTAL} question={t("simpleApply.qTrade")} help={t("simpleApply.helpTrade")}
+      onBack={() => setLocation("/start")} backLabel={t("simpleApply.changeType")}>
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
         {BLUE_COLLAR_TRADES.map((opt) => {
           const Icon = opt.icon;

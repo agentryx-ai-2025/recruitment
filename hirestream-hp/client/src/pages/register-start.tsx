@@ -41,6 +41,8 @@ export default function RegisterStart() {
   const { t } = useTranslation();
   const { capabilities } = useCapabilities();
   const callbackEnabled = capabilities.assistedCallbackEnabled;
+  const standardEnabled = capabilities.standardRegistrationEnabled;
+  const professionalEnabled = capabilities.professionalRegistrationEnabled;
   const { data: profileRes } = useQuery<any>({ queryKey: ["/api/v1/candidates/profile"] });
   const profile = profileRes?.data || {};
 
@@ -91,7 +93,8 @@ export default function RegisterStart() {
             <h1 className="text-2xl md:text-3xl font-bold text-slate-900 mb-2">{t("start.heading")}</h1>
             <p className="text-base text-slate-500 mb-6">{t("start.sub")}</p>
             <div className="space-y-3">
-              {/* Standard — blue-collar */}
+              {/* Standard — blue-collar (admin-toggleable) */}
+              {standardEnabled && (
               <button type="button" disabled={saving} onClick={() => chooseTier("standard")}
                 className="w-full flex items-center gap-4 rounded-2xl border border-slate-200 bg-white p-5 text-left hover:border-blue-300 hover:bg-blue-50/40 hover:shadow-md transition-all active:scale-[0.99]">
                 <span className="w-14 h-14 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0"><HardHat className="w-7 h-7" /></span>
@@ -101,8 +104,10 @@ export default function RegisterStart() {
                 </span>
                 <ArrowRight className="w-5 h-5 text-slate-400 shrink-0" />
               </button>
+              )}
 
-              {/* Professional */}
+              {/* Professional (admin-toggleable) */}
+              {professionalEnabled && (
               <button type="button" disabled={saving} onClick={() => chooseTier("professional")}
                 className="w-full flex items-center gap-4 rounded-2xl border border-slate-200 bg-white p-5 text-left hover:border-violet-300 hover:bg-violet-50/40 hover:shadow-md transition-all active:scale-[0.99]">
                 <span className="w-14 h-14 rounded-2xl bg-violet-50 text-violet-600 flex items-center justify-center shrink-0"><GraduationCap className="w-7 h-7" /></span>
@@ -112,6 +117,7 @@ export default function RegisterStart() {
                 </span>
                 <ArrowRight className="w-5 h-5 text-slate-400 shrink-0" />
               </button>
+              )}
 
               {/* Assisted — callback. Gated: HPSEDC can disable this tier, and
                   it's framed as the slower fallback (copy nudges self-fill). */}

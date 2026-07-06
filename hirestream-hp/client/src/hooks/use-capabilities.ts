@@ -14,6 +14,8 @@ export interface Capabilities {
   agencySelfRegistration: boolean;
   agencyMode: "single" | "marketplace";
   assistedCallbackEnabled: boolean;
+  standardRegistrationEnabled: boolean;
+  professionalRegistrationEnabled: boolean;
 }
 
 const SAFE_DEFAULT: Capabilities = {
@@ -21,6 +23,8 @@ const SAFE_DEFAULT: Capabilities = {
   agencySelfRegistration: false,
   agencyMode: "single",
   assistedCallbackEnabled: true,
+  standardRegistrationEnabled: true,
+  professionalRegistrationEnabled: true,
 };
 
 export function useCapabilities(): { capabilities: Capabilities; isLoading: boolean } {

@@ -174,6 +174,25 @@ export const SETTING_SPECS: SettingSpec[] = [
     type: "boolean",
     default: true,
   },
+  {
+    // The two self-service registration routes. Each can be turned off from
+    // admin — the card is then hidden on the dashboard AND /start. At least one
+    // route should stay enabled or candidates can't self-register.
+    key: "capability.standard_registration_enabled",
+    category: "capability",
+    label: "Offer the Standard (blue-collar) registration route",
+    description: "The simple picture-based /apply flow. Turn OFF to hide the 'Fill it myself' option.",
+    type: "boolean",
+    default: true,
+  },
+  {
+    key: "capability.professional_registration_enabled",
+    category: "capability",
+    label: "Offer the Professional (degree/diploma) registration route",
+    description: "The guided /apply/pro flow for degree-holders. Turn OFF to hide the 'I have a degree' option.",
+    type: "boolean",
+    default: true,
+  },
 
   // ── Notifications ────────────────────────────────────────────────────
   {

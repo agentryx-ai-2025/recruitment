@@ -298,6 +298,12 @@ export default function CandidateDashboard() {
                 <User className="w-3.5 h-3.5 mr-1.5" /> Edit Profile
               </Button>
             )}
+            {/* Change registration route — visible once a tier is chosen and the profile isn't complete. */}
+            {!ready && (profile.registrationTier === "standard" || profile.registrationTier === "professional") && (
+              <button onClick={() => setLocation("/start")} className="w-full text-center text-[11px] text-slate-500 hover:text-blue-700 underline underline-offset-2 mt-2 py-1">
+                {t("simpleDash.changeRegister")}
+              </button>
+            )}
           </div>
 
           {/* Navigation */}
@@ -499,27 +505,43 @@ function MinimalOverview({ profile, completion, applications, setActiveView, set
             {questionsDone && docsMissing.length ? (
               <Button onClick={goDocuments} className={`${BIG} mt-4 bg-blue-700 hover:bg-blue-800 text-white`}>{t("minDash.addDocuments")} <ArrowRight className="w-5 h-5 ml-2" /></Button>
             ) : tier === "standard" || tier === "professional" ? (
-              // A path is already chosen — continue it.
-              <Button onClick={() => setLocation(tier === "professional" ? "/apply/pro" : "/apply")} className={`${BIG} mt-4 bg-blue-700 hover:bg-blue-800 text-white`}>{t("minDash.continueProfile")} <ArrowRight className="w-5 h-5 ml-2" /></Button>
-            ) : (
-              // First time (no tier yet): Standard default + Professional + Callback.
+              // A path is already chosen — continue it, or switch route.
               <>
-                <Button onClick={() => setTierAndGo("standard", "/apply")} className={`${BIG} mt-4 bg-blue-700 hover:bg-blue-800 text-white`}>{t("simpleDash.fillMyDetails")} <ArrowRight className="w-5 h-5 ml-2" /></Button>
-                <p className="text-xs text-slate-500 mt-5 mb-2">{t("simpleDash.otherWays")}</p>
-                <div className="space-y-2.5">
-                  <button onClick={() => setTierAndGo("professional", "/apply/pro")} className="w-full flex items-center gap-3.5 rounded-2xl border border-slate-200 bg-white p-4 text-left hover:border-violet-300 hover:bg-violet-50/40 hover:shadow-sm active:scale-[0.99] transition-all">
-                    <span className="w-11 h-11 rounded-xl bg-violet-50 text-violet-600 flex items-center justify-center shrink-0"><GraduationCap className="w-6 h-6" /></span>
-                    <span className="min-w-0 flex-1"><span className="block text-base font-bold text-slate-900 leading-tight">{t("simpleDash.proCardTitle")}</span><span className="block text-xs text-slate-500 mt-0.5">{t("simpleDash.proCardSub")}</span></span>
-                  </button>
-                  {capabilities?.assistedCallbackEnabled && (
-                    <button onClick={() => setLocation("/start?mode=assisted")} className="w-full flex items-center gap-3.5 rounded-2xl border border-slate-200 bg-white p-4 text-left hover:border-emerald-300 hover:bg-emerald-50/40 hover:shadow-sm active:scale-[0.99] transition-all">
-                      <span className="w-11 h-11 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0"><Phone className="w-6 h-6" /></span>
-                      <span className="min-w-0 flex-1"><span className="block text-base font-bold text-slate-900 leading-tight">{t("simpleDash.callbackCardTitle")}</span><span className="block text-xs text-slate-500 mt-0.5">{t("simpleDash.callbackCardSub")}</span></span>
-                    </button>
-                  )}
-                </div>
+                <Button onClick={() => setLocation(tier === "professional" ? "/apply/pro" : "/apply")} className={`${BIG} mt-4 bg-blue-700 hover:bg-blue-800 text-white`}>{t("minDash.continueProfile")} <ArrowRight className="w-5 h-5 ml-2" /></Button>
+                <button onClick={() => setLocation("/start")} className="mt-2 w-full text-sm text-slate-500 hover:text-blue-700 underline underline-offset-2 py-2">{t("simpleDash.changeRegister")}</button>
               </>
-            )}
+            ) : (() => {
+              // First time (no tier yet): show only the registration routes admin
+              // has enabled. The first enabled route is the big default.
+              const stdOn = capabilities?.standardRegistrationEnabled !== false;
+              const proOn = capabilities?.professionalRegistrationEnabled !== false;
+              const cbOn = capabilities?.assistedCallbackEnabled !== false;
+              const proCard = (
+                <button key="pro" onClick={() => setTierAndGo("professional", "/apply/pro")} className="w-full flex items-center gap-3.5 rounded-2xl border border-slate-200 bg-white p-4 text-left hover:border-violet-300 hover:bg-violet-50/40 hover:shadow-sm active:scale-[0.99] transition-all">
+                  <span className="w-11 h-11 rounded-xl bg-violet-50 text-violet-600 flex items-center justify-center shrink-0"><GraduationCap className="w-6 h-6" /></span>
+                  <span className="min-w-0 flex-1"><span className="block text-base font-bold text-slate-900 leading-tight">{t("simpleDash.proCardTitle")}</span><span className="block text-xs text-slate-500 mt-0.5">{t("simpleDash.proCardSub")}</span></span>
+                </button>
+              );
+              const cbCard = (
+                <button key="cb" onClick={() => setLocation("/start?mode=assisted")} className="w-full flex items-center gap-3.5 rounded-2xl border border-slate-200 bg-white p-4 text-left hover:border-emerald-300 hover:bg-emerald-50/40 hover:shadow-sm active:scale-[0.99] transition-all">
+                  <span className="w-11 h-11 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0"><Phone className="w-6 h-6" /></span>
+                  <span className="min-w-0 flex-1"><span className="block text-base font-bold text-slate-900 leading-tight">{t("simpleDash.callbackCardTitle")}</span><span className="block text-xs text-slate-500 mt-0.5">{t("simpleDash.callbackCardSub")}</span></span>
+                </button>
+              );
+              let primary: any = null; const secondary: any[] = [];
+              if (stdOn) { primary = <Button onClick={() => setTierAndGo("standard", "/apply")} className={`${BIG} mt-4 bg-blue-700 hover:bg-blue-800 text-white`}>{t("simpleDash.fillMyDetails")} <ArrowRight className="w-5 h-5 ml-2" /></Button>; if (proOn) secondary.push(proCard); if (cbOn) secondary.push(cbCard); }
+              else if (proOn) { primary = <Button onClick={() => setTierAndGo("professional", "/apply/pro")} className={`${BIG} mt-4 bg-blue-700 hover:bg-blue-800 text-white`}>{t("simpleDash.proCardTitle")} <ArrowRight className="w-5 h-5 ml-2" /></Button>; if (cbOn) secondary.push(cbCard); }
+              else if (cbOn) { primary = <Button onClick={() => setLocation("/start?mode=assisted")} className={`${BIG} mt-4 bg-emerald-600 hover:bg-emerald-700 text-white`}>{t("simpleDash.callbackCardTitle")} <ArrowRight className="w-5 h-5 ml-2" /></Button>; }
+              return (
+                <>
+                  {primary}
+                  {secondary.length > 0 && (<>
+                    <p className="text-xs text-slate-500 mt-5 mb-2">{t("simpleDash.otherWays")}</p>
+                    <div className="space-y-2.5">{secondary}</div>
+                  </>)}
+                </>
+              );
+            })()}
           </>
         )}
       </section>

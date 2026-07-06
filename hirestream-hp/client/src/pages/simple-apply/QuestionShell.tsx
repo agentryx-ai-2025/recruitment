@@ -14,10 +14,10 @@ const fadeUp = {
 // segmented progress bar, big 56px primary action.
 export function QuestionShell({
   step, totalSteps, question, help, children,
-  onBack, onNext, nextLabel, nextDisabled, loading, onSkip,
+  onBack, backLabel, onNext, nextLabel, nextDisabled, loading, onSkip,
 }: {
   step: number; totalSteps: number; question: string; help?: string;
-  children: React.ReactNode; onBack?: () => void; onNext?: () => void;
+  children: React.ReactNode; onBack?: () => void; backLabel?: string; onNext?: () => void;
   nextLabel?: string; nextDisabled?: boolean; loading?: boolean; onSkip?: () => void;
 }) {
   const { t } = useTranslation();
@@ -59,7 +59,7 @@ export function QuestionShell({
             <div className="flex items-center justify-between">
               {onBack ? (
                 <button onClick={onBack} className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-blue-600 py-3 px-2 transition-colors">
-                  <ArrowLeft className="w-4 h-4" /> {t("shell.back")}
+                  <ArrowLeft className="w-4 h-4" /> {backLabel || t("shell.back")}
                 </button>
               ) : <div />}
               {onSkip && (

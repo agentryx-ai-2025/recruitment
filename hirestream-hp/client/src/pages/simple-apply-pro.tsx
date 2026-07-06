@@ -161,7 +161,7 @@ export default function SimpleApplyProPage() {
   // ── 0 name ─────────────────────────────────────────────────────────
   const NameScreen = () => (
     <QuestionShell step={0} totalSteps={TOTAL} question={t("simpleApply.qName")} help={t("pro.nameHelp")}
-      onNext={() => save({ fullName }, 1)} nextDisabled={!fullName.trim()} loading={saving}>
+      onBack={() => setLocation("/start")} backLabel={t("simpleApply.changeType")} onNext={() => save({ fullName }, 1)} nextDisabled={!fullName.trim()} loading={saving}>
       <MicField value={fullName} onChange={setFullName} placeholder={t("pro.namePh")} autoFocus />
     </QuestionShell>
   );
