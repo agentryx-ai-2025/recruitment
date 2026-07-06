@@ -341,15 +341,18 @@ export default function CandidateDashboard() {
                 <span className="flex-1 text-left">Raise a Grievance</span>
               </button>
             )}
-            {/* Mode toggle — the escape hatch between Minimal and Advanced. */}
-            <button onClick={() => setDashMode(minimal ? "advanced" : "minimal")}
-              className="w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm text-slate-500 hover:bg-slate-50 border-t border-slate-100 mt-1 pt-2.5">
-              {minimal ? <LayoutDashboard className="w-4 h-4 flex-shrink-0" /> : <PanelLeftClose className="w-4 h-4 flex-shrink-0" />}
-              <span className="flex-1 text-left">
-                <span className="block font-medium text-slate-600">{minimal ? t("minDash.showAll") : t("minDash.simpleView")}</span>
-                <span className="block text-[11px] text-slate-400">{minimal ? t("minDash.showAllHint") : t("minDash.simpleViewHint")}</span>
-              </span>
-            </button>
+            {/* View switcher — clearly shows the CURRENT mode + a switch action. */}
+            <div className="border-t border-slate-100 mt-1.5 pt-2.5 px-1">
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-2">{t("minDash.viewLabel")}</p>
+              <div className="flex items-center gap-1.5 px-2 py-1 text-xs text-slate-500">
+                <span className="w-2 h-2 rounded-full bg-emerald-500" /> {minimal ? t("minDash.viewNowSimple") : t("minDash.viewNowFull")}
+              </div>
+              <button onClick={() => setDashMode(minimal ? "advanced" : "minimal")}
+                className="w-full flex items-center justify-center gap-2 h-9 mt-0.5 rounded-lg border border-blue-200 bg-blue-50/40 text-sm font-semibold text-blue-700 hover:bg-blue-50 transition-all">
+                {minimal ? <LayoutDashboard className="w-4 h-4" /> : <PanelLeftClose className="w-4 h-4" />}
+                {minimal ? t("minDash.switchToFull") : t("minDash.switchToSimple")}
+              </button>
+            </div>
           </nav>
 
           {/* Minimal — Call / Message HPSEDC (covers everything the 4 buttons don't). */}
