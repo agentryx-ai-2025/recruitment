@@ -423,7 +423,9 @@
     "back": "Back",
     "skip": "Skip for now",
     "verified": "Verified by HPSEDC",
-    "reportFraud": "Report a fraud agent"
+    "reportFraud": "Report a fraud agent",
+    "voiceTap": "Tap to speak",
+    "voiceListening": "Listening…"
   },
   "simpleApply": {
     "qTrade": "What work do you do?",

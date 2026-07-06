@@ -1,4 +1,5 @@
-import React from "react";
+import React, { useState, useEffect, useRef } from "react";
+import { useTranslation } from "react-i18next";
 import {
   BrickWall, Car, Flame, Zap, Wrench, ChefHat, Hammer, PaintRoller,
   ShieldCheck, Sparkles, HeartHandshake, Factory, HardHat, Scissors,
@@ -66,23 +67,62 @@ export const QUICK_COUNTRIES: { name: string; flag: string }[] = [
   { name: "Kuwait", flag: "🇰🇼" }, { name: "Oman", flag: "🇴🇲" }, { name: "Bahrain", flag: "🇧🇭" },
 ];
 
-// Text field with a mic affordance (visual only — SpeechRecognition wired later).
+// Text field with WORKING voice input via the Web Speech API. Language-aware:
+// listens in Hindi (hi-IN) when the page is in Hindi, else Indian English —
+// the single most useful affordance for a low-literacy blue-collar user. The
+// mic only appears when the browser actually supports SpeechRecognition (Chrome/
+// Edge; needs HTTPS + mic permission), so it's never a dead button.
 export function MicField({ value, onChange, placeholder, autoFocus }: {
   value: string; onChange: (v: string) => void; placeholder?: string; autoFocus?: boolean;
 }) {
+  const { t, i18n } = useTranslation();
+  const [supported, setSupported] = useState(false);
+  const [listening, setListening] = useState(false);
+  const recogRef = useRef<any>(null);
+
+  useEffect(() => {
+    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    setSupported(!!SR);
+    return () => { try { recogRef.current?.stop(); } catch { /* noop */ } };
+  }, []);
+
+  const toggle = () => {
+    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SR) return;
+    if (listening) { try { recogRef.current?.stop(); } catch { /* noop */ } setListening(false); return; }
+    const r = new SR();
+    r.lang = i18n.language === "hi" ? "hi-IN" : "en-IN";
+    r.interimResults = false;
+    r.maxAlternatives = 1;
+    r.onresult = (e: any) => {
+      const said = e.results?.[0]?.[0]?.transcript?.trim();
+      if (said) onChange(value ? `${value} ${said}`.trim().slice(0, 100) : said.slice(0, 100));
+    };
+    r.onend = () => setListening(false);
+    r.onerror = () => setListening(false);
+    recogRef.current = r;
+    setListening(true);
+    try { r.start(); } catch { setListening(false); }
+  };
+
   return (
     <div className="relative">
       <Input
         value={value} onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder} autoFocus={autoFocus} maxLength={100}
-        className="h-14 rounded-xl border-blue-200/80 bg-white pr-16 text-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all"
+        className={`h-14 rounded-xl border-blue-200/80 bg-white text-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all ${supported ? "pr-16" : "pr-4"}`}
       />
-      <button
-        type="button" title="Voice input (coming soon)" aria-label="Voice input (coming soon)"
-        className="absolute right-2 top-1/2 -translate-y-1/2 w-11 h-11 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 text-white flex items-center justify-center shadow-md shadow-blue-500/25 active:scale-95 transition-all"
-      >
-        <Mic className="w-5 h-5" />
-      </button>
+      {supported && (
+        <button
+          type="button" onClick={toggle}
+          title={listening ? t("shell.voiceListening") : t("shell.voiceTap")}
+          aria-label={listening ? t("shell.voiceListening") : t("shell.voiceTap")}
+          className={`absolute right-2 top-1/2 -translate-y-1/2 w-11 h-11 rounded-xl text-white flex items-center justify-center shadow-md active:scale-95 transition-all ${
+            listening ? "bg-gradient-to-br from-rose-500 to-red-600 shadow-red-500/30 animate-pulse" : "bg-gradient-to-br from-blue-500 to-blue-600 shadow-blue-500/25"}`}
+        >
+          <Mic className="w-5 h-5" />
+        </button>
+      )}
     </div>
   );
 }

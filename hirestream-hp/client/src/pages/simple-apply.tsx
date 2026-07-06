@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -85,6 +85,29 @@ export default function SimpleApplyPage() {
       if (t) setTrade(t);
     }
   }, [profileRes]);
+
+  // Resume where they left off. Each screen auto-saves on Next, so we can derive
+  // the furthest-answered screen from the saved profile (+ languages) and jump
+  // there instead of restarting at the trade grid every visit. Runs once, after
+  // both queries settle; guarded so it never fights manual Back/Next navigation.
+  const resumedRef = useRef(false);
+  useEffect(() => {
+    const p = profileRes?.data;
+    if (!p || langRes === undefined || resumedRef.current) return;
+    resumedRef.current = true;
+    const langs = langRes?.data || [];
+    let s = 0;
+    if (p.skills?.[0] && BLUE_COLLAR_TRADES.some((x) => x.label === p.skills[0])) s = 1;
+    if (s === 1 && (p.fullName || "").trim()) s = 2;
+    if (s === 2 && (p.experienceMonths != null || p.experience != null)) s = 3;
+    if (s === 3 && p.qualificationLevel) s = 4;
+    if (s === 4 && langs.length > 0) s = 5;
+    if (s === 5 && Array.isArray(p.preferredCountries) && p.preferredCountries.length) s = 6;
+    if (s === 6 && (p.phone || "").trim()) s = 7;
+    if (s === 7 && p.dateOfBirth) s = 8;                      // passport (8) is skippable
+    if (s === 8 && (p.passportNumber || p.passportExpiry)) s = 9;
+    if (s > 0) setStep(s);
+  }, [profileRes, langRes]);
 
   const go = (n: number) => setStep(Math.max(0, Math.min(TOTAL - 1, n)));
 

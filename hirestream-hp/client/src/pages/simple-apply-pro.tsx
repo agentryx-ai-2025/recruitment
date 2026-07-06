@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
@@ -114,6 +114,29 @@ export default function SimpleApplyProPage() {
       else if (p.qualificationLevel === "school") setEduLevel("senior");
     }
   }, [profileRes]);
+
+  // Resume where they left off (each screen auto-saves on Next). Derived from the
+  // saved profile + education/language rows; jumps past completed sections rather
+  // than restarting at screen 0. Runs once, guarded against manual navigation.
+  const resumedRef = useRef(false);
+  useEffect(() => {
+    const p = profileRes?.data;
+    if (!p || langRes === undefined || eduRes === undefined || resumedRef.current) return;
+    resumedRef.current = true;
+    const langs = langRes?.data || [];
+    const quals = (eduRes?.data || []).filter((r: any) => r.type !== "certification");
+    let s = 0;
+    if ((p.fullName || "").trim()) s = 1;
+    if (s === 1 && (p.phone || "").trim()) s = 2;
+    if (s === 2 && p.qualificationLevel && quals.length > 0) s = 6;   // education section done
+    if (s === 6 && Array.isArray(p.skills) && p.skills.length > 0) s = 9;
+    if (s === 9 && langs.length > 0) s = 10;
+    if (s === 10 && Array.isArray(p.preferredCountries) && p.preferredCountries.length) {
+      s = p.preferredCountries.some((c: string) => IELTS_COUNTRIES.has(c)) ? 11 : 12;
+    }
+    if ((s === 11 || s === 12) && (p.passportNumber || p.passportExpiry)) s = 13;
+    if (s > 0) setStep(s);
+  }, [profileRes, langRes, eduRes]);
 
   const go = (n: number) => setStep(Math.max(0, Math.min(TOTAL - 1, n)));
   const hasIeltsCountry = countries.some((c) => IELTS_COUNTRIES.has(c));
