@@ -33,6 +33,9 @@ export default function SimpleApplyPage() {
   const { user } = useAuth();
   const { toast } = useToast();
   const { t } = useTranslation();
+  // Dynamic-key lookup with a raw-string fallback (for values a candidate may
+  // hold that aren't in the fixed choice lists, e.g. a language added via /apply/pro).
+  const tx = (key: string, fallback: string): string => t(key, { defaultValue: fallback }) as string;
   const queryClient = useQueryClient();
 
   const [step, setStep] = useState(0);
@@ -89,12 +92,12 @@ export default function SimpleApplyPage() {
   const TradeGrid = () => (
     <QuestionShell step={0} totalSteps={TOTAL} question={t("simpleApply.qTrade")} help={t("simpleApply.helpTrade")}>
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-        {BLUE_COLLAR_TRADES.map((t) => {
-          const Icon = t.icon;
-          const picked = trade?.key === t.key;
+        {BLUE_COLLAR_TRADES.map((opt) => {
+          const Icon = opt.icon;
+          const picked = trade?.key === opt.key;
           return (
-            <button key={t.key} type="button" disabled={saving}
-              onClick={async () => { setTrade(t); await save({ skills: [t.label], preferredCategories: [t.category] }, 1); }}
+            <button key={opt.key} type="button" disabled={saving}
+              onClick={async () => { setTrade(opt); await save({ skills: [opt.label], preferredCategories: [opt.category] }, 1); }}
               className={`relative flex flex-col items-center text-center gap-2 rounded-2xl border p-4 min-h-[7rem] transition-all active:scale-[0.97] ${
                 picked ? "border-blue-400 bg-gradient-to-br from-blue-50 to-indigo-50/60 ring-2 ring-blue-300 shadow-lg shadow-blue-500/10"
                        : "border-slate-200 bg-white hover:border-blue-300 hover:bg-blue-50/40 hover:shadow-md"}`}>
@@ -102,8 +105,8 @@ export default function SimpleApplyPage() {
               <span className={`w-12 h-12 rounded-xl flex items-center justify-center ${picked ? "bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-md" : "bg-blue-50 text-blue-600"}`}>
                 <Icon className="w-6 h-6" />
               </span>
-              <span className="text-base font-bold text-slate-900 leading-tight">{t.label}</span>
-              <span className="text-xs text-slate-500 leading-tight">{t.sub}</span>
+              <span className="text-base font-bold text-slate-900 leading-tight">{t(`choices.trades.${opt.key}.label`)}</span>
+              <span className="text-xs text-slate-500 leading-tight">{t(`choices.trades.${opt.key}.sub`)}</span>
             </button>
           );
         })}
@@ -128,7 +131,7 @@ export default function SimpleApplyPage() {
   const ExperienceScreen = () => {
     const chips = [{ m: 0, l: t("simpleApply.chipNew") }, { m: 12, l: t("simpleApply.chip1y") }, { m: 24, l: t("simpleApply.chip2y") }, { m: 60, l: t("simpleApply.chip5y") }, { m: 120, l: t("simpleApply.chip10y") }];
     return (
-      <QuestionShell step={2} totalSteps={TOTAL} question={trade ? t("simpleApply.qExperience", { trade: trade.label }) : t("simpleApply.qExperienceNoTrade")}
+      <QuestionShell step={2} totalSteps={TOTAL} question={trade ? t("simpleApply.qExperience", { trade: t(`choices.trades.${trade.key}.label`) }) : t("simpleApply.qExperienceNoTrade")}
         help={t("simpleApply.helpExperience")} onBack={() => go(1)} onNext={() => save({ experienceMonths: months, experience: Math.round(months / 12) }, 3)} loading={saving}>
         <div className="flex items-center justify-center gap-4 mb-6">
           <button type="button" onClick={() => setMonths((m) => Math.max(0, m - 6))} className="w-14 h-14 rounded-2xl border border-slate-200 bg-white flex items-center justify-center text-slate-600 active:scale-95"><Minus className="w-6 h-6" /></button>
@@ -180,8 +183,8 @@ export default function SimpleApplyPage() {
                   {Icon ? <Icon className="w-6 h-6" /> : <span className="text-base">{lvl.glyph}</span>}
                 </span>
                 <span className="min-w-0">
-                  <span className="block text-base font-bold text-slate-900 leading-tight">{lvl.label}</span>
-                  <span className="block text-xs text-slate-500 mt-0.5">{lvl.sub}</span>
+                  <span className="block text-base font-bold text-slate-900 leading-tight">{t(`choices.edu.${lvl.key}.label`)}</span>
+                  <span className="block text-xs text-slate-500 mt-0.5">{t(`choices.edu.${lvl.key}.sub`)}</span>
                 </span>
                 {sel && <span className="absolute top-2 right-2 w-5 h-5 rounded-full bg-violet-600 text-white flex items-center justify-center"><Check className="w-3 h-3" strokeWidth={3} /></span>}
               </button>
@@ -215,7 +218,7 @@ export default function SimpleApplyPage() {
           <div className="flex flex-wrap gap-2 mb-5">
             {languages.map((l: any) => (
               <span key={l.id} className="inline-flex items-center gap-2 pl-4 pr-2 py-2.5 rounded-xl text-sm font-semibold bg-sky-100 text-sky-800 border border-sky-200/80">
-                {l.language}<span className="text-sky-500 font-normal">· {SIMPLE_LEVELS.find((p) => p.v === l.proficiency)?.label || l.proficiency}</span>
+                {tx(`choices.langs.${l.language}`, l.language)}<span className="text-sky-500 font-normal">· {tx(`choices.prof.${l.proficiency}`, l.proficiency)}</span>
                 <button onClick={() => removeLang(l.id)} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-sky-200 hover:text-red-500"><X className="w-4 h-4" /></button>
               </span>
             ))}
@@ -227,7 +230,7 @@ export default function SimpleApplyPage() {
             return (
               <div key={lang} className={`rounded-2xl border transition-all ${open ? "border-sky-300 bg-gradient-to-br from-sky-50/80 to-cyan-50/40 shadow-md" : "border-slate-200 bg-white"}`}>
                 <button type="button" onClick={() => setExpanding(open ? null : lang)} className="w-full flex items-center justify-between px-5 py-4 min-h-[3.5rem]">
-                  <span className="text-base font-semibold text-slate-800">{lang}</span>
+                  <span className="text-base font-semibold text-slate-800">{tx(`choices.langs.${lang}`, lang)}</span>
                   <span className={`w-8 h-8 rounded-lg flex items-center justify-center ${open ? "bg-sky-600 text-white" : "bg-slate-100 text-slate-400"}`}><Plus className={`w-4 h-4 transition-transform ${open ? "rotate-45" : ""}`} /></span>
                 </button>
                 <AnimatePresence>
@@ -236,7 +239,7 @@ export default function SimpleApplyPage() {
                       <div className="grid grid-cols-3 gap-2 p-4 pt-0">
                         {SIMPLE_LEVELS.map((lv) => (
                           <button key={lv.v} type="button" onClick={() => addLang(lang, lv.v)}
-                            className="rounded-xl border border-sky-200/80 bg-white py-3.5 min-h-[3.5rem] text-sm font-semibold text-slate-700 hover:bg-sky-600 hover:text-white hover:border-sky-600 active:scale-95 transition-all">{lv.label}</button>
+                            className="rounded-xl border border-sky-200/80 bg-white py-3.5 min-h-[3.5rem] text-sm font-semibold text-slate-700 hover:bg-sky-600 hover:text-white hover:border-sky-600 active:scale-95 transition-all">{t(`choices.prof.${lv.v}`)}</button>
                         ))}
                       </div>
                     </motion.div>
@@ -265,7 +268,7 @@ export default function SimpleApplyPage() {
                   sel ? "border-emerald-400 bg-gradient-to-br from-emerald-50/80 to-teal-50/40 ring-2 ring-emerald-300 shadow-lg" : "border-slate-200 bg-white hover:border-emerald-300"}`}>
                 {sel && <span className="absolute top-2 right-2 w-5 h-5 rounded-full bg-emerald-600 text-white flex items-center justify-center"><Check className="w-3 h-3" strokeWidth={3} /></span>}
                 <span className="text-3xl">{c.flag}</span>
-                <span className="text-sm font-bold text-slate-900">{c.name}</span>
+                <span className="text-sm font-bold text-slate-900">{tx(`choices.countries.${c.name}`, c.name)}</span>
               </button>
             );
           })}
@@ -303,12 +306,12 @@ export default function SimpleApplyPage() {
       <QuestionShell step={7} totalSteps={TOTAL} question={t("simpleApply.qReview")} help={t("simpleApply.helpReview")}
         onBack={() => go(6)} onNext={() => { toast({ title: t("simpleApply.savedToast") }); setLocation("/"); }} nextLabel={t("simpleApply.saveProfile")} loading={saving}>
         <div className="rounded-2xl border border-slate-200 bg-white p-5">
-          <Row label={t("simpleApply.rowWork")} value={trade?.label || ""} onEdit={() => go(0)} />
+          <Row label={t("simpleApply.rowWork")} value={trade ? t(`choices.trades.${trade.key}.label`) : ""} onEdit={() => go(0)} />
           <Row label={t("simpleApply.rowName")} value={fullName} onEdit={() => go(1)} />
           <Row label={t("simpleApply.rowExperience")} value={months >= 12 ? t("simpleApply.reviewYears", { y: (months / 12).toFixed(1) }) : t("simpleApply.reviewMonths", { m: months })} onEdit={() => go(2)} />
-          <Row label={t("simpleApply.rowEducation")} value={chosenEdu?.label || ""} onEdit={() => go(3)} />
-          <Row label={t("simpleApply.rowLanguages")} value={languages.map((l: any) => l.language).join(", ")} onEdit={() => go(4)} />
-          <Row label={t("simpleApply.rowCountries")} value={countries.join(", ")} onEdit={() => go(5)} />
+          <Row label={t("simpleApply.rowEducation")} value={chosenEdu ? t(`choices.edu.${chosenEdu.key}.label`) : ""} onEdit={() => go(3)} />
+          <Row label={t("simpleApply.rowLanguages")} value={languages.map((l: any) => tx(`choices.langs.${l.language}`, l.language)).join(", ")} onEdit={() => go(4)} />
+          <Row label={t("simpleApply.rowCountries")} value={countries.map((c) => tx(`choices.countries.${c}`, c)).join(", ")} onEdit={() => go(5)} />
           <Row label={t("simpleApply.rowPhone")} value={phone} onEdit={() => go(6)} />
           {homeLocation ? <Row label={t("simpleApply.rowTown")} value={homeLocation} onEdit={() => go(6)} /> : null}
         </div>

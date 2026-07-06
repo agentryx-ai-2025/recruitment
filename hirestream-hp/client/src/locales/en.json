@@ -450,5 +450,40 @@
     "reviewYears": "{{y}} years",
     "reviewMonths": "{{m}} months",
     "noFeeNote": "HPSEDC will contact you on your phone when a matching job opens. No fees are charged for registration."
+  },
+  "choices": {
+    "trades": {
+      "mason": { "label": "Mason", "sub": "Brick and stone work" },
+      "driver": { "label": "Driver", "sub": "Car, taxi, truck, bus" },
+      "welder": { "label": "Welder", "sub": "Gas and arc welding" },
+      "electrician": { "label": "Electrician", "sub": "Wiring and repair" },
+      "plumber": { "label": "Plumber", "sub": "Pipes and fittings" },
+      "cook": { "label": "Cook", "sub": "Home, hotel, or mess" },
+      "carpenter": { "label": "Carpenter", "sub": "Wood and furniture work" },
+      "painter": { "label": "Painter", "sub": "House and site painting" },
+      "security": { "label": "Security Guard", "sub": "Building or site security" },
+      "cleaner": { "label": "Cleaner", "sub": "Housekeeping and cleaning" },
+      "caregiver": { "label": "Care Giver", "sub": "Care for elders or sick" },
+      "factory": { "label": "Factory Worker", "sub": "Machine and line work" },
+      "helper": { "label": "Construction Helper", "sub": "Site helper work" },
+      "tailor": { "label": "Tailor", "sub": "Stitching and garments" },
+      "steward": { "label": "Hotel Steward", "sub": "Waiter and hotel service" },
+      "agriculture": { "label": "Farm Worker", "sub": "Farming and orchard work" },
+      "delivery": { "label": "Delivery Worker", "sub": "Parcel and food delivery" },
+      "other": { "label": "Other Work", "sub": "Tell us what you do" }
+    },
+    "edu": {
+      "none": { "label": "No schooling", "sub": "That is okay" },
+      "primary": { "label": "5th class", "sub": "Primary school" },
+      "middle": { "label": "8th class", "sub": "Middle school" },
+      "matric": { "label": "10th class", "sub": "Matric" },
+      "senior": { "label": "12th class", "sub": "Plus two" },
+      "iti": { "label": "ITI / Trade training", "sub": "Trade certificate" },
+      "diploma": { "label": "Diploma", "sub": "Polytechnic" },
+      "graduate": { "label": "College degree", "sub": "BA, B.Com, B.Sc…" }
+    },
+    "prof": { "elementary": "Little", "intermediate": "Good", "professional": "Very good" },
+    "countries": { "UAE": "UAE", "Saudi Arabia": "Saudi Arabia", "Qatar": "Qatar", "Kuwait": "Kuwait", "Oman": "Oman", "Bahrain": "Bahrain" },
+    "langs": { "Hindi": "Hindi", "English": "English", "Punjabi": "Punjabi", "Pahari": "Pahari", "Nepali": "Nepali", "Urdu": "Urdu", "Arabic": "Arabic" }
   }
 }
