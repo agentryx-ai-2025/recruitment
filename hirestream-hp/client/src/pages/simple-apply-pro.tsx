@@ -125,6 +125,13 @@ export default function SimpleApplyProPage() {
     resumedRef.current = true;
     const langs = langRes?.data || [];
     const quals = (eduRes?.data || []).filter((r: any) => r.type !== "certification");
+    // Restore the profession (fieldKey) so the Skills + Certificate suggestions
+    // repopulate when the user returns — otherwise those panels look empty.
+    if (!fieldKey) {
+      const subj = quals.map((r: any) => r.subject).find(Boolean);
+      const m = PRO_FIELDS.find((f) => f.label === subj) || PRO_FIELDS.find((f) => f.category === p.preferredCategories?.[0]);
+      if (m) setFieldKey(m.key);
+    }
     let s = 0;
     if ((p.fullName || "").trim()) s = 1;
     if (s === 1 && (p.phone || "").trim()) s = 2;
@@ -392,23 +399,56 @@ export default function SimpleApplyProPage() {
     const field = PRO_FIELDS.find((f) => f.key === fieldKey);
     const primary = SKILL_CATEGORIES.find((c) => c.category === field?.skillCategory)?.skills ?? [];
     const rest = SKILL_CATEGORIES.filter((c) => c.category !== field?.skillCategory).flatMap((c) => c.skills);
-    const toggle = (s: string) => setSkills((cur) => cur.includes(s) ? cur.filter((x) => x !== s) : cur.length >= FIELD_LIMITS.skillsMax ? cur : [...cur, s]);
-    const addCustom = () => { const s = customSkill.trim(); if (s && !skills.includes(s) && skills.length < FIELD_LIMITS.skillsMax) setSkills((c) => [...c, s]); setCustomSkill(""); };
+    const noField = primary.length === 0; // resumed without a field, or a custom field — show all
+    const toggle = (s: string) => setSkills((cur) =>
+      cur.includes(s) ? cur.filter((x) => x !== s)
+      : cur.length >= FIELD_LIMITS.skillsMax ? (toast({ title: t("pro.skillMax", { max: FIELD_LIMITS.skillsMax }) }), cur)
+      : [...cur, s]);
+    const addCustom = () => {
+      const s = customSkill.trim();
+      if (!s) return;
+      if (skills.some((x) => x.toLowerCase() === s.toLowerCase())) { toast({ title: t("pro.skillDupe") }); setCustomSkill(""); return; }
+      if (skills.length >= FIELD_LIMITS.skillsMax) { toast({ title: t("pro.skillMax", { max: FIELD_LIMITS.skillsMax }) }); return; }
+      setSkills((c) => [...c, s]); setCustomSkill("");
+    };
     const Chip = ({ s }: { s: string }) => (<button type="button" onClick={() => toggle(s)} className={`px-4 py-2.5 rounded-xl border text-sm font-semibold transition active:scale-95 ${skills.includes(s) ? "bg-blue-600 text-white border-blue-600" : "bg-white text-slate-600 border-slate-200 hover:border-blue-400"}`}>{s}</button>);
     return (
       <QuestionShell step={8} totalSteps={TOTAL} question={t("pro.skillsQ")} help={t("pro.skillsHelp")}
-        onBack={() => go(7)} onNext={() => save({ skills, preferredCategories: field ? [field.category] : undefined }, 9)} nextDisabled={skills.length === 0} loading={saving}>
-        <div className="flex flex-wrap gap-2">{primary.map((s) => <Chip key={s} s={s} />)}</div>
-        {!moreSkills ? (
+        onBack={() => go(7)} onNext={() => save({ skills, ...(field ? { preferredCategories: [field.category] } : {}) }, 9)} nextDisabled={skills.length === 0} loading={saving}>
+        {/* Your skills — every selected skill (predefined OR custom) shown here, removable. */}
+        {skills.length > 0 && (
+          <div className="mb-5">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-sm font-semibold text-slate-700">{t("pro.skillsSelectedTitle")}</p>
+              <span className="text-xs text-slate-400 tabular-nums">{t("pro.skillCount", { n: skills.length, max: FIELD_LIMITS.skillsMax })}</span>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {skills.map((s) => (
+                <span key={s} className="inline-flex items-center gap-1.5 pl-4 pr-2 py-2.5 rounded-xl text-sm font-semibold bg-blue-600 text-white">
+                  {s}
+                  <button type="button" onClick={() => setSkills((c) => c.filter((x) => x !== s))} aria-label={`Remove ${s}`} className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-blue-500"><X className="w-4 h-4" /></button>
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Suggested chips (full list if we don't know the field) */}
+        <p className="text-sm font-semibold text-slate-700 mb-2">{t("pro.skillsSuggested")}</p>
+        <div className="flex flex-wrap gap-2">{(noField ? rest : primary).map((s) => <Chip key={s} s={s} />)}</div>
+        {!noField && (!moreSkills ? (
           <button type="button" onClick={() => setMoreSkills(true)} className="mt-4 text-sm text-blue-600 hover:text-blue-700 underline underline-offset-4 py-2">{t("pro.showMoreSkills")}</button>
         ) : (
           <div className="flex flex-wrap gap-2 mt-4 max-h-64 overflow-y-auto pr-1">{rest.map((s) => <Chip key={s} s={s} />)}</div>
-        )}
-        <div className="mt-5 flex gap-2">
+        ))}
+
+        {/* Add your own */}
+        <p className="text-sm font-semibold text-slate-700 mt-5 mb-2">{t("pro.skillsAddOwn")}</p>
+        <div className="flex gap-2">
           <div className="flex-1"><MicField value={customSkill} onChange={setCustomSkill} placeholder={t("pro.skillPh")} /></div>
           <button type="button" onClick={addCustom} disabled={!customSkill.trim()} className="h-14 px-5 rounded-xl bg-blue-600 text-white font-semibold disabled:opacity-40 active:scale-95">{t("pro.add")}</button>
         </div>
-        <p className="mt-3 text-xs text-slate-400">{t("pro.skillCount", { n: skills.length, max: FIELD_LIMITS.skillsMax })}</p>
+        {skills.length === 0 && <p className="mt-3 text-xs text-slate-400">{t("pro.skillsEmptyHint")}</p>}
       </QuestionShell>
     );
   };
