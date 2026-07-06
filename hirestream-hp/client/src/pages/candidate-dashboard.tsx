@@ -364,7 +364,7 @@ export default function CandidateDashboard() {
                   <Phone className="w-5 h-5" /> {t("minDash.callHpsedc")}
                 </a>
               )}
-              <Button onClick={() => setLocation("/grievances")} className="w-full h-12 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-semibold">
+              <Button onClick={() => setLocation("/help")} className="w-full h-12 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-semibold">
                 <MessageCircleQuestion className="w-5 h-5 mr-2" /> {t("minDash.sendMessage")}
               </Button>
             </div>
@@ -577,7 +577,7 @@ function MinimalOverview({ profile, completion, applications, setActiveView, set
 
       {/* 4 · Help / safety */}
       <section className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 sm:p-6 space-y-3">
-        <Button onClick={() => setLocation("/grievances")} className={`${BIG} bg-slate-900 hover:bg-slate-800 text-white`}><MessageCircleQuestion className="w-6 h-6 mr-2" /> {t("simpleDash.askHpsedc")}</Button>
+        <Button onClick={() => setLocation("/help")} className={`${BIG} bg-slate-900 hover:bg-slate-800 text-white`}><MessageCircleQuestion className="w-6 h-6 mr-2" /> {t("simpleDash.askHpsedc")}</Button>
         {helpline.helplinePhone && (
           <a href={`tel:${helpline.helplinePhone.replace(/\s/g, "")}`} className={`${BIG} flex items-center justify-center border-2 border-blue-200 text-blue-800 hover:bg-blue-50`}><Phone className="w-5 h-5 mr-2" /> {t("simpleDash.callHelpline", { phone: helpline.helplinePhone })}</a>
         )}

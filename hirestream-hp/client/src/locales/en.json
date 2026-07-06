@@ -416,6 +416,22 @@
       "closedLabel": "This application did not go ahead", "closedLine": "No problem — apply for other jobs."
     }
   },
+  "help": {
+    "title": "Get help",
+    "subtitle": "Ask HPSEDC a question or send a message. For a formal complaint, file a grievance below.",
+    "faqTitle": "Common questions (FAQ)",
+    "faqSub": "Quick answers to the usual questions",
+    "callTitle": "Call HPSEDC",
+    "messageTitle": "Message HPSEDC",
+    "messageSub": "Write your question — HPSEDC will reply here. You'll be notified.",
+    "messagePh": "Type your message…",
+    "messageNote": "This is not a live chat — HPSEDC replies during working hours.",
+    "noMessages": "No messages yet. Send your first message below.",
+    "couldNotSend": "Couldn't send",
+    "grievanceTitle": "Have a complaint?",
+    "grievanceSub": "Fraud, an agent asking for money, or a placement dispute.",
+    "grievanceCta": "File a grievance"
+  },
   "minDash": {
     "navHome": "My Home",
     "navJobs": "Find a Job",

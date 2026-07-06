@@ -462,6 +462,23 @@ export const insertPostPlacementSchema = createInsertSchema(postPlacementSupport
   country: z.string().trim().max(60).optional().nullable(),
 });
 
+// ── Support messages (HP-6: Ask HPSEDC — async help thread) ─────────
+// A running conversation between a candidate and HPSEDC support. Separate from
+// the formal Grievance channel (which is regulated + SLA-tracked). This is the
+// foundation for a reusable, AI-pluggable chat module: today a human answers
+// from the admin inbox; later a Responder (Claude) or WhatsApp transport can
+// plug in without changing this thread model.
+export const supportMessages = pgTable("support_messages", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  candidateId: varchar("candidate_id").references(() => candidates.id).notNull(),
+  senderRole: text("sender_role").notNull(),        // 'candidate' | 'hpsedc'
+  senderUserId: varchar("sender_user_id"),
+  body: text("body").notNull(),
+  readByAdmin: boolean("read_by_admin").default(false),
+  readByCandidate: boolean("read_by_candidate").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // ── Recruitment Drives ──────────────────────────────────────────────
 export const recruitmentDrives = pgTable("recruitment_drives", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
