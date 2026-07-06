@@ -5,6 +5,7 @@
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -23,10 +24,11 @@ async function patchProfile(body: any) {
 }
 
 function TrustBand() {
+  const { t } = useTranslation();
   return (
     <div className="flex items-center justify-center gap-2 py-3 px-4 border-b border-slate-100 bg-white/80">
       <Landmark className="w-4 h-4 text-blue-700" />
-      <p className="text-sm font-semibold text-slate-700">HPSEDC <span className="text-slate-400 font-normal">· Government of Himachal Pradesh</span></p>
+      <p className="text-sm font-semibold text-slate-700">{t("shell.govBrand")} <span className="text-slate-400 font-normal">· {t("shell.govSubtitle")}</span></p>
     </div>
   );
 }
@@ -35,6 +37,7 @@ export default function RegisterStart() {
   const [, setLocation] = useLocation();
   const { user } = useAuth();
   const { toast } = useToast();
+  const { t } = useTranslation();
   const { data: profileRes } = useQuery<any>({ queryKey: ["/api/v1/candidates/profile"] });
   const profile = profileRes?.data || {};
 
@@ -55,7 +58,7 @@ export default function RegisterStart() {
     try {
       await patchProfile({ registrationTier: tier });
       setLocation(tier === "standard" ? "/apply" : "/apply/pro");
-    } catch (e: any) { toast({ title: e.message || "Could not continue", variant: "destructive" }); setSaving(false); }
+    } catch (e: any) { toast({ title: e.message || t("start.couldNotContinue"), variant: "destructive" }); setSaving(false); }
   };
 
   const submitAssisted = async () => {
@@ -63,7 +66,7 @@ export default function RegisterStart() {
     try {
       await patchProfile({ registrationTier: "assisted", wantsCallback: true, fullName: name, phone, ...(work.trim() ? { skills: [work.trim()] } : {}) });
       setMode("done");
-    } catch (e: any) { toast({ title: e.message || "Could not submit", variant: "destructive" }); }
+    } catch (e: any) { toast({ title: e.message || t("start.couldNotSubmit"), variant: "destructive" }); }
     finally { setSaving(false); }
   };
 
@@ -76,16 +79,16 @@ export default function RegisterStart() {
 
         {mode === "choose" && (
           <>
-            <h1 className="text-2xl md:text-3xl font-bold text-slate-900 mb-2">How would you like to register?</h1>
-            <p className="text-base text-slate-500 mb-6">Choose what is easiest for you. You can change later.</p>
+            <h1 className="text-2xl md:text-3xl font-bold text-slate-900 mb-2">{t("start.heading")}</h1>
+            <p className="text-base text-slate-500 mb-6">{t("start.sub")}</p>
             <div className="space-y-3">
               {/* Standard — blue-collar */}
               <button type="button" disabled={saving} onClick={() => chooseTier("standard")}
                 className="w-full flex items-center gap-4 rounded-2xl border border-slate-200 bg-white p-5 text-left hover:border-blue-300 hover:bg-blue-50/40 hover:shadow-md transition-all active:scale-[0.99]">
                 <span className="w-14 h-14 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0"><HardHat className="w-7 h-7" /></span>
                 <span className="min-w-0 flex-1">
-                  <span className="block text-lg font-bold text-slate-900">Fill it myself — quick form</span>
-                  <span className="block text-sm text-slate-500 mt-0.5">Simple picture-based questions. About 2 minutes. You can ask for help at a Common Service Centre / internet café.</span>
+                  <span className="block text-lg font-bold text-slate-900">{t("start.standardTitle")}</span>
+                  <span className="block text-sm text-slate-500 mt-0.5">{t("start.standardDesc")}</span>
                 </span>
                 <ArrowRight className="w-5 h-5 text-slate-400 shrink-0" />
               </button>
@@ -95,8 +98,8 @@ export default function RegisterStart() {
                 className="w-full flex items-center gap-4 rounded-2xl border border-slate-200 bg-white p-5 text-left hover:border-violet-300 hover:bg-violet-50/40 hover:shadow-md transition-all active:scale-[0.99]">
                 <span className="w-14 h-14 rounded-2xl bg-violet-50 text-violet-600 flex items-center justify-center shrink-0"><GraduationCap className="w-7 h-7" /></span>
                 <span className="min-w-0 flex-1">
-                  <span className="block text-lg font-bold text-slate-900">I have a degree or professional qualification</span>
-                  <span className="block text-sm text-slate-500 mt-0.5">A guided form for nurses, engineers, IT and other professionals — captures your degree and details.</span>
+                  <span className="block text-lg font-bold text-slate-900">{t("start.proTitle")}</span>
+                  <span className="block text-sm text-slate-500 mt-0.5">{t("start.proDesc")}</span>
                 </span>
                 <ArrowRight className="w-5 h-5 text-slate-400 shrink-0" />
               </button>
@@ -106,8 +109,8 @@ export default function RegisterStart() {
                 className="w-full flex items-center gap-4 rounded-2xl border border-slate-200 bg-white p-5 text-left hover:border-emerald-300 hover:bg-emerald-50/40 hover:shadow-md transition-all active:scale-[0.99]">
                 <span className="w-14 h-14 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0"><PhoneCall className="w-7 h-7" /></span>
                 <span className="min-w-0 flex-1">
-                  <span className="block text-lg font-bold text-slate-900">Ask HPSEDC to call me</span>
-                  <span className="block text-sm text-slate-500 mt-0.5">Leave your name and phone. Our team will call and help you register. This takes longer.</span>
+                  <span className="block text-lg font-bold text-slate-900">{t("start.assistedTitle")}</span>
+                  <span className="block text-sm text-slate-500 mt-0.5">{t("start.assistedDesc")}</span>
                 </span>
                 <ArrowRight className="w-5 h-5 text-slate-400 shrink-0" />
               </button>
@@ -117,25 +120,25 @@ export default function RegisterStart() {
 
         {mode === "assisted" && (
           <>
-            <h1 className="text-2xl md:text-3xl font-bold text-slate-900 mb-2">We will call you back</h1>
-            <p className="text-base text-slate-500 mb-6">Leave your details. An HPSEDC officer will call and help you register. This is slower than filling the form yourself.</p>
+            <h1 className="text-2xl md:text-3xl font-bold text-slate-900 mb-2">{t("start.assistedHeading")}</h1>
+            <p className="text-base text-slate-500 mb-6">{t("start.assistedSub")}</p>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-semibold text-slate-600 mb-1.5">Your name</label>
-                <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Ramesh Kumar" maxLength={100} className="h-14 rounded-xl text-lg" />
+                <label className="block text-sm font-semibold text-slate-600 mb-1.5">{t("start.nameLabel")}</label>
+                <Input value={name} onChange={(e) => setName(e.target.value)} placeholder={t("simpleApply.phName")} maxLength={100} className="h-14 rounded-xl text-lg" />
               </div>
               <div>
-                <label className="block text-sm font-semibold text-slate-600 mb-1.5">Phone number</label>
-                <Input type="tel" inputMode="numeric" value={phone} onChange={(e) => setPhone(e.target.value.replace(/[^\d+\s-]/g, ""))} placeholder="e.g. 98765 43210" maxLength={15} className="h-14 rounded-xl text-lg" />
+                <label className="block text-sm font-semibold text-slate-600 mb-1.5">{t("simpleApply.labelPhone")}</label>
+                <Input type="tel" inputMode="numeric" value={phone} onChange={(e) => setPhone(e.target.value.replace(/[^\d+\s-]/g, ""))} placeholder={t("simpleApply.phPhone")} maxLength={15} className="h-14 rounded-xl text-lg" />
               </div>
               <div>
-                <label className="block text-sm font-semibold text-slate-600 mb-1.5">What work do you do? <span className="text-slate-400 font-normal">(optional)</span></label>
-                <Input value={work} onChange={(e) => setWork(e.target.value)} placeholder="e.g. Mason, Driver, Cook" maxLength={60} className="h-14 rounded-xl text-lg" />
+                <label className="block text-sm font-semibold text-slate-600 mb-1.5">{t("start.workLabel")} <span className="text-slate-400 font-normal">{t("start.optional")}</span></label>
+                <Input value={work} onChange={(e) => setWork(e.target.value)} placeholder={t("start.phWork")} maxLength={60} className="h-14 rounded-xl text-lg" />
               </div>
               <Button onClick={submitAssisted} disabled={saving || !name.trim() || phone.replace(/\D/g, "").length < 10} className={`${BIG_BTN} bg-emerald-600 hover:bg-emerald-700 text-white mt-2`}>
-                {saving ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : <PhoneCall className="w-5 h-5 mr-2" />} Request a callback
+                {saving ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : <PhoneCall className="w-5 h-5 mr-2" />} {t("start.requestCallback")}
               </Button>
-              <button onClick={() => setMode("choose")} className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-blue-600 py-3"><ArrowLeft className="w-4 h-4" /> Back</button>
+              <button onClick={() => setMode("choose")} className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-blue-600 py-3"><ArrowLeft className="w-4 h-4" /> {t("shell.back")}</button>
             </div>
           </>
         )}
@@ -143,13 +146,13 @@ export default function RegisterStart() {
         {mode === "done" && (
           <div className="text-center py-6">
             <div className="w-20 h-20 rounded-full bg-emerald-100 flex items-center justify-center mx-auto mb-5"><CheckCircle2 className="w-11 h-11 text-emerald-600" /></div>
-            <h1 className="text-2xl font-bold text-slate-900 mb-2">Thank you, {name.split(" ")[0]}</h1>
-            <p className="text-lg text-slate-600 mb-6">An HPSEDC officer will call you on <span className="font-semibold text-slate-800">{phone}</span> to help you register.</p>
+            <h1 className="text-2xl font-bold text-slate-900 mb-2">{t("start.thankYou", { name: name.split(" ")[0] })}</h1>
+            <p className="text-lg text-slate-600 mb-6">{t("start.callYouOn", { phone })}</p>
             <div className="rounded-xl bg-emerald-50/70 border border-emerald-100 p-4 flex items-start gap-2.5 text-left mb-6">
               <ShieldCheck className="w-4 h-4 text-emerald-600 mt-0.5 shrink-0" />
-              <p className="text-sm text-emerald-800">No fees are charged for registration. If anyone asks you for money, use "Report a fraud agent".</p>
+              <p className="text-sm text-emerald-800">{t("start.noFeeFraud")}</p>
             </div>
-            <Button onClick={() => setLocation("/")} className={`${BIG_BTN} bg-blue-700 hover:bg-blue-800 text-white`}>Go to my dashboard</Button>
+            <Button onClick={() => setLocation("/")} className={`${BIG_BTN} bg-blue-700 hover:bg-blue-800 text-white`}>{t("start.goDashboard")}</Button>
           </div>
         )}
       </div>

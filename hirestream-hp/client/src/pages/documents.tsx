@@ -4,6 +4,7 @@
 import { useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import {
@@ -21,6 +22,7 @@ const DOC_SLOTS: { type: string; label: string; sub: string; icon: React.Element
 export default function DocumentsPage() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [uploading, setUploading] = useState<string | null>(null);
   const inputs = useRef<Record<string, HTMLInputElement | null>>({});
@@ -40,9 +42,9 @@ export default function DocumentsPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/v1/candidates/documents"] });
       queryClient.invalidateQueries({ queryKey: ["/api/v1/candidates/profile/completion"] });
       setUploading(null);
-      toast({ title: "Document added" });
+      toast({ title: t("documents.toastAdded") });
     },
-    onError: (e: any) => { setUploading(null); toast({ title: e.message || "Could not upload", variant: "destructive" }); },
+    onError: (e: any) => { setUploading(null); toast({ title: e.message || t("documents.toastCouldNotUpload"), variant: "destructive" }); },
   });
   const del = useMutation({
     mutationFn: async (id: string) => { await fetch(`/api/v1/candidates/documents/${id}`, { method: "DELETE", credentials: "include" }); },
@@ -54,7 +56,7 @@ export default function DocumentsPage() {
 
   const pick = (type: string, file?: File | null) => {
     if (!file) return;
-    if (file.size > 10 * 1024 * 1024) { toast({ title: "File is too large (max 10 MB)", variant: "destructive" }); return; }
+    if (file.size > 10 * 1024 * 1024) { toast({ title: t("documents.toastTooLarge"), variant: "destructive" }); return; }
     setUploading(type);
     upload.mutate({ file, type });
   };
@@ -63,11 +65,11 @@ export default function DocumentsPage() {
     <div className="min-h-[calc(100vh-4rem)] bg-gradient-to-br from-slate-50 via-white to-blue-50/30 flex flex-col">
       <div className="flex items-center justify-center gap-2 py-3 px-4 border-b border-slate-100 bg-white/80">
         <Landmark className="w-4 h-4 text-blue-700" />
-        <p className="text-sm font-semibold text-slate-700">HPSEDC <span className="text-slate-400 font-normal">· Government of Himachal Pradesh</span></p>
+        <p className="text-sm font-semibold text-slate-700">{t("shell.govBrand")} <span className="text-slate-400 font-normal">· {t("shell.govSubtitle")}</span></p>
       </div>
       <div className="flex-1 w-full max-w-xl mx-auto px-4 py-6">
-        <h1 className="text-2xl md:text-3xl font-bold text-slate-900 mb-2">Your documents</h1>
-        <p className="text-base text-slate-500 mb-6">Take a photo of each document with your phone camera. Adding even one completes your profile.</p>
+        <h1 className="text-2xl md:text-3xl font-bold text-slate-900 mb-2">{t("documents.heading")}</h1>
+        <p className="text-base text-slate-500 mb-6">{t("documents.sub")}</p>
 
         <div className="space-y-3">
           {DOC_SLOTS.map((slot) => {
@@ -80,8 +82,8 @@ export default function DocumentsPage() {
                   {existing ? <CheckCircle2 className="w-6 h-6" /> : <Icon className="w-6 h-6" />}
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className="text-base font-bold text-slate-900 leading-tight">{slot.label}</p>
-                  <p className="text-xs text-slate-500 truncate">{existing ? existing.fileName || "Uploaded" : slot.sub}</p>
+                  <p className="text-base font-bold text-slate-900 leading-tight">{t(`documents.slots.${slot.type}.label`)}</p>
+                  <p className="text-xs text-slate-500 truncate">{existing ? existing.fileName || t("documents.uploaded") : t(`documents.slots.${slot.type}.sub`)}</p>
                 </div>
                 <input ref={(el) => { inputs.current[slot.type] = el; }} type="file" accept="image/*,.pdf" capture="environment" className="hidden"
                   onChange={(e) => pick(slot.type, e.target.files?.[0])} />
@@ -90,7 +92,7 @@ export default function DocumentsPage() {
                 ) : (
                   <Button size="sm" disabled={busy} onClick={() => inputs.current[slot.type]?.click()}
                     className="rounded-xl bg-blue-600 hover:bg-blue-700 text-white gap-1.5 shrink-0">
-                    {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Camera className="w-4 h-4" />} Add
+                    {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Camera className="w-4 h-4" />} {t("documents.add")}
                   </Button>
                 )}
               </div>
@@ -100,13 +102,13 @@ export default function DocumentsPage() {
 
         <div className="mt-6 rounded-xl bg-emerald-50/70 border border-emerald-100 p-4 flex items-start gap-2.5">
           <ShieldCheck className="w-4 h-4 text-emerald-600 mt-0.5 shrink-0" />
-          <p className="text-xs text-emerald-800">Your documents are private and only seen by HPSEDC. No fees are charged for registration.</p>
+          <p className="text-xs text-emerald-800">{t("documents.privacyNote")}</p>
         </div>
 
         <Button onClick={() => setLocation("/")} className="w-full h-14 mt-6 rounded-xl text-lg font-semibold bg-slate-900 hover:bg-slate-800 text-white">
-          {docs.length > 0 ? "Done" : "Skip for now"}
+          {docs.length > 0 ? t("documents.done") : t("shell.skip")}
         </Button>
-        <button onClick={() => setLocation("/")} className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-blue-600 py-3 mt-1 mx-auto"><ArrowLeft className="w-4 h-4" /> Back to dashboard</button>
+        <button onClick={() => setLocation("/")} className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-blue-600 py-3 mt-1 mx-auto"><ArrowLeft className="w-4 h-4" /> {t("documents.backDashboard")}</button>
       </div>
     </div>
   );

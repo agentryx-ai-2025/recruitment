@@ -485,5 +485,47 @@
     "prof": { "elementary": "Little", "intermediate": "Good", "professional": "Very good" },
     "countries": { "UAE": "UAE", "Saudi Arabia": "Saudi Arabia", "Qatar": "Qatar", "Kuwait": "Kuwait", "Oman": "Oman", "Bahrain": "Bahrain" },
     "langs": { "Hindi": "Hindi", "English": "English", "Punjabi": "Punjabi", "Pahari": "Pahari", "Nepali": "Nepali", "Urdu": "Urdu", "Arabic": "Arabic" }
+  },
+  "start": {
+    "heading": "How would you like to register?",
+    "sub": "Choose what is easiest for you. You can change later.",
+    "standardTitle": "Fill it myself — quick form",
+    "standardDesc": "Simple picture-based questions. About 2 minutes. You can ask for help at a Common Service Centre / internet café.",
+    "proTitle": "I have a degree or professional qualification",
+    "proDesc": "A guided form for nurses, engineers, IT and other professionals — captures your degree and details.",
+    "assistedTitle": "Ask HPSEDC to call me",
+    "assistedDesc": "Leave your name and phone. Our team will call and help you register. This takes longer.",
+    "assistedHeading": "We will call you back",
+    "assistedSub": "Leave your details. An HPSEDC officer will call and help you register. This is slower than filling the form yourself.",
+    "nameLabel": "Your name",
+    "workLabel": "What work do you do?",
+    "optional": "(optional)",
+    "phWork": "e.g. Mason, Driver, Cook",
+    "requestCallback": "Request a callback",
+    "thankYou": "Thank you, {{name}}",
+    "callYouOn": "An HPSEDC officer will call you on {{phone}} to help you register.",
+    "noFeeFraud": "No fees are charged for registration. If anyone asks you for money, use \"Report a fraud agent\".",
+    "goDashboard": "Go to my dashboard",
+    "couldNotContinue": "Could not continue",
+    "couldNotSubmit": "Could not submit"
+  },
+  "documents": {
+    "heading": "Your documents",
+    "sub": "Take a photo of each document with your phone camera. Adding even one completes your profile.",
+    "slots": {
+      "identity_proof": { "label": "Aadhaar / ID card", "sub": "Front side is enough" },
+      "passport": { "label": "Passport", "sub": "The photo page" },
+      "educational_certificate": { "label": "Education certificate", "sub": "10th / 12th / degree" },
+      "experience_certificate": { "label": "Work experience letter", "sub": "If you have one" },
+      "other": { "label": "Other document", "sub": "Anything else useful" }
+    },
+    "uploaded": "Uploaded",
+    "add": "Add",
+    "privacyNote": "Your documents are private and only seen by HPSEDC. No fees are charged for registration.",
+    "done": "Done",
+    "backDashboard": "Back to dashboard",
+    "toastAdded": "Document added",
+    "toastCouldNotUpload": "Could not upload",
+    "toastTooLarge": "File is too large (max 10 MB)"
   }
 }
