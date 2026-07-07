@@ -202,12 +202,13 @@ export default function GrievancePage() {
               <Select value={category} onValueChange={setCategory}>
                 <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="fraud_report">Someone asked me for money / Fraud</SelectItem>
-                  <SelectItem value="agency_complaint">Agency Complaint</SelectItem>
-                  <SelectItem value="application_issue">Application Issue</SelectItem>
-                  <SelectItem value="technical_problem">Technical Problem</SelectItem>
-                  <SelectItem value="policy_inquiry">Policy Inquiry</SelectItem>
-                  <SelectItem value="other">Other</SelectItem>
+                  <SelectItem value="fraud_report">{t("grievance.fraudReport")}</SelectItem>
+                  <SelectItem value="workplace_abuse">{t("grievance.workplaceAbuse")}</SelectItem>
+                  <SelectItem value="recruitment_problem">{t("grievance.recruitmentProblem")}</SelectItem>
+                  <SelectItem value="application_issue">{t("grievance.applicationIssue")}</SelectItem>
+                  <SelectItem value="technical_problem">{t("grievance.technicalProblem")}</SelectItem>
+                  <SelectItem value="policy_inquiry">{t("grievance.policyInquiry")}</SelectItem>
+                  <SelectItem value="other">{t("grievance.other")}</SelectItem>
                 </SelectContent>
               </Select>
             </div>

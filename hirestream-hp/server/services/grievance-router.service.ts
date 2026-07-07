@@ -37,11 +37,13 @@ import { getSetting } from "./settings.service";
 
 export type GrievanceCategory =
   | "application_issue"
-  | "agency_complaint"
+  | "recruitment_problem"   // single-agency reframe (replaces agency_complaint)
+  | "workplace_abuse"       // deployed-worker abuse: unpaid wages, passport held, unsafe
   | "technical_problem"
   | "policy_inquiry"
   | "fraud_report"
-  | "other";
+  | "other"
+  | "agency_complaint";     // legacy — accepted for historical rows
 
 export interface AutoRouteResult {
   assignedToUserId: string | null;
@@ -103,7 +105,10 @@ export async function autoRouteGrievance(
       };
     }
 
-    // agency_complaint, fraud_report, policy_inquiry, other → admin queue.
+    // fraud_report, recruitment_problem, workplace_abuse, policy_inquiry, other
+    // (+ legacy agency_complaint) → admin queue. fraud_report and workplace_abuse
+    // are the priority buckets HPSEDC must act on fastest (tout/fee fraud and
+    // deployed-worker safety); the admin grievances tab surfaces them first.
     // We don't pin to a specific admin user_id because there's usually >1 and
     // the admin grievances tab handles the unassigned bucket as a queue.
     return {

@@ -26,7 +26,13 @@ router.post("/", protect, async (req, res, next) => {
     const subject = String(req.body?.subject ?? "").trim();
     const description = String(req.body?.description ?? "").trim();
 
-    const validCategories = ["agency_complaint", "application_issue", "technical_problem", "policy_inquiry", "fraud_report", "other"];
+    // Single-agency (HPSEDC) reframe 2026-07-07: "agency_complaint" made sense in
+    // the multi-agency marketplace but not when HPSEDC is the sole super-agency.
+    // Replaced in the UI by "recruitment_problem" (issue with the recruitment/
+    // placement process) and "workplace_abuse" (deployed-worker abuse: unpaid
+    // wages, passport held, unsafe conditions). Legacy "agency_complaint" stays
+    // accepted so historical rows and in-flight clients don't break.
+    const validCategories = ["fraud_report", "recruitment_problem", "workplace_abuse", "application_issue", "technical_problem", "policy_inquiry", "other", "agency_complaint"];
     if (!category || !validCategories.includes(category)) {
       return res.status(400).json({ success: false, error: { code: 400, message: `category must be: ${validCategories.join(", ")}` } });
     }

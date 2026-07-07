@@ -78,7 +78,7 @@ export function QuestionShell({
           <ShieldCheck className="w-3.5 h-3.5" /> {t("shell.verified")}
         </span>
         <span className="text-slate-300">|</span>
-        <a href="/grievance?type=fraud" className="inline-flex items-center gap-1.5 text-rose-600 hover:text-rose-700 font-medium">
+        <a href="/grievances?type=fraud" className="inline-flex items-center gap-1.5 text-rose-600 hover:text-rose-700 font-medium">
           <AlertTriangle className="w-3.5 h-3.5" /> {t("shell.reportFraud")}
         </a>
       </div>
