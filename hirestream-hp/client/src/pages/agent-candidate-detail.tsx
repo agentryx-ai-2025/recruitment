@@ -20,6 +20,14 @@ async function fetchJson(url: string) {
   return res.json();
 }
 
+// audit 2026-07-06 (C10b): the placement panels used qc.invalidateQueries({}),
+// which refetched the ENTIRE cache. All their data (visa status/history, start
+// date, appointment letter, welfare) comes from this page's candidate-detail
+// query — invalidate just that.
+function invalidateCandidateDetail(qc: ReturnType<typeof useQueryClient>) {
+  qc.invalidateQueries({ predicate: (q) => String(q.queryKey[0] ?? "").startsWith("/api/v1/agencies/candidates/") });
+}
+
 export default function AgentCandidateDetailPage() {
   const { id } = useParams<{ id: string }>();
   const [, setLocation] = useLocation();
@@ -434,7 +442,7 @@ function VisaStatusPanel({ placementId, current, history }: { placementId: strin
     onSuccess: () => {
       toast({ title: "Visa status updated", description: "The candidate has been notified." });
       setNote("");
-      qc.invalidateQueries({});
+      invalidateCandidateDetail(qc);
     },
     onError: (e: any) => toast({ title: "Couldn't update visa status", description: e.message, variant: "destructive" }),
   });
@@ -504,7 +512,7 @@ function AppointmentTravelPanel({ placementId, startDate, appointmentLetterUrl }
       if (!r.ok) throw new Error((await r.json().catch(() => ({})))?.error?.message || (await r.json().catch(() => ({})))?.message || "Upload failed");
       return r.json();
     },
-    onSuccess: () => { toast({ title: "Appointment letter uploaded" }); qc.invalidateQueries({}); },
+    onSuccess: () => { toast({ title: "Appointment letter uploaded" }); invalidateCandidateDetail(qc); },
     onError: (e: any) => toast({ title: "Couldn't upload letter", description: e.message, variant: "destructive" }),
   });
 
@@ -517,7 +525,7 @@ function AppointmentTravelPanel({ placementId, startDate, appointmentLetterUrl }
       if (!r.ok) throw new Error((await r.json().catch(() => ({})))?.message || "Failed");
       return r.json();
     },
-    onSuccess: () => { toast({ title: "Start date saved" }); qc.invalidateQueries({}); },
+    onSuccess: () => { toast({ title: "Start date saved" }); invalidateCandidateDetail(qc); },
     onError: (e: any) => toast({ title: "Couldn't save start date", description: e.message, variant: "destructive" }),
   });
 
@@ -530,7 +538,7 @@ function AppointmentTravelPanel({ placementId, startDate, appointmentLetterUrl }
       if (!r.ok) throw new Error((await r.json().catch(() => ({})))?.message || "Failed");
       return r.json();
     },
-    onSuccess: () => { toast({ title: "Appointment letter linked" }); qc.invalidateQueries({}); },
+    onSuccess: () => { toast({ title: "Appointment letter linked" }); invalidateCandidateDetail(qc); },
     onError: (e: any) => toast({ title: "Couldn't save letter", description: e.message, variant: "destructive" }),
   });
 
@@ -600,7 +608,7 @@ function WelfarePanel({ placementId, welfare }: { placementId: string; welfare?:
       if (!r.ok) throw new Error("Failed");
       return r.json();
     },
-    onSuccess: () => { toast({ title: "Welfare check-in recorded" }); setEditing(null); setDraftNotes(""); qc.invalidateQueries({}); },
+    onSuccess: () => { toast({ title: "Welfare check-in recorded" }); setEditing(null); setDraftNotes(""); invalidateCandidateDetail(qc); },
     onError: () => toast({ title: "Couldn't record check-in", variant: "destructive" }),
   });
   const milestones = [{ m: "30", w: welfare?.d30 }, { m: "60", w: welfare?.d60 }, { m: "90", w: welfare?.d90 }];

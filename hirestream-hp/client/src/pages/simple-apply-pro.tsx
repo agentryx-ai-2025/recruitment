@@ -41,7 +41,7 @@ const labelCls = "block text-sm font-semibold text-slate-600 mb-1.5";
 
 export default function SimpleApplyProPage() {
   const [, setLocation] = useLocation();
-  const { user } = useAuth();
+  const { user, isLoading: authLoading } = useAuth();
   const { toast } = useToast();
   const { t } = useTranslation();
   const tx = (key: string, fallback: string): string => t(key, { defaultValue: fallback }) as string;
@@ -95,7 +95,9 @@ export default function SimpleApplyProPage() {
   const qualRows = eduRows.filter((r) => r.type !== "certification");
   const expRows: any[] = expRes?.data || [];
 
-  useEffect(() => { if (!user) setLocation("/auth"); }, [user, setLocation]);
+  // audit 2026-07-06 (C2): wait for auth to finish loading before redirecting,
+  // otherwise a hard refresh mid-flow ejects logged-in users to /auth.
+  useEffect(() => { if (!authLoading && !user) setLocation("/auth"); }, [user, authLoading, setLocation]);
   useEffect(() => {
     const p = profileRes?.data;
     if (!p) return;

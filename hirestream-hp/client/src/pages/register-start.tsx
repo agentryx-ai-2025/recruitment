@@ -36,7 +36,7 @@ function TrustBand() {
 
 export default function RegisterStart() {
   const [, setLocation] = useLocation();
-  const { user } = useAuth();
+  const { user, isLoading } = useAuth();
   const { toast } = useToast();
   const { t } = useTranslation();
   const { capabilities } = useCapabilities();
@@ -58,7 +58,9 @@ export default function RegisterStart() {
   const [phone, setPhone] = useState("");
   const [work, setWork] = useState("");
 
-  useEffect(() => { if (!user) setLocation("/auth"); }, [user, setLocation]);
+  // audit 2026-07-06 (C2): wait for auth to finish loading before redirecting,
+  // otherwise a hard refresh mid-registration ejects logged-in users to /auth.
+  useEffect(() => { if (!isLoading && !user) setLocation("/auth"); }, [user, isLoading, setLocation]);
   useEffect(() => {
     if (profile.fullName) setName(profile.fullName);
     if (profile.phone) setPhone(profile.phone);

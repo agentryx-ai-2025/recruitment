@@ -282,13 +282,43 @@ router.post("/:id/reviews", protect, async (req, res, next) => {
     const agency = await storage.db.select().from(recruitmentAgents).where(eq(recruitmentAgents.id, req.params.id)).limit(1);
     if (!agency.length) return res.status(404).json({ success: false, message: "Agency not found" });
 
-    const [newReview] = await storage.db.insert(agencyReviews).values({
-      agencyId: req.params.id,
-      candidateUserId: user.id,
-      rating,
-      title: title || null,
-      review: review || null,
-    }).returning();
+    // audit 2026-07-06 (C17): rating-manipulation guard — one review per
+    // candidate per agency, and only from candidates with a real relationship
+    // (an application to one of this agency's jobs).
+    const [existingReview] = await storage.db.select().from(agencyReviews)
+      .where(and(eq(agencyReviews.agencyId, req.params.id), eq(agencyReviews.candidateUserId, user.id)))
+      .limit(1);
+    if (existingReview) {
+      return res.status(409).json({ success: false, message: "You have already reviewed this agency" });
+    }
+    const [myCandidate] = await storage.db.select().from(candidates).where(eq(candidates.userId, user.id)).limit(1);
+    const agencyUserId = agency[0].userId;
+    const related = (myCandidate && agencyUserId)
+      ? await storage.db.select({ id: applications.id }).from(applications)
+          .innerJoin(jobs, eq(applications.jobId, jobs.id))
+          .where(and(eq(applications.candidateId, myCandidate.id), eq(jobs.agentId, agencyUserId)))
+          .limit(1)
+      : [];
+    if (!related.length) {
+      return res.status(403).json({ success: false, message: "You can only review an agency you have applied to or been placed by" });
+    }
+
+    let newReview;
+    try {
+      [newReview] = await storage.db.insert(agencyReviews).values({
+        agencyId: req.params.id,
+        candidateUserId: user.id,
+        rating,
+        title: title || null,
+        review: review || null,
+      }).returning();
+    } catch (e: any) {
+      // unique-violation from the (agency_id, candidate_user_id) index → friendly 409
+      if (e?.code === "23505" || e?.cause?.code === "23505") {
+        return res.status(409).json({ success: false, message: "You have already reviewed this agency" });
+      }
+      throw e;
+    }
 
     // Update agency's aggregate rating
     const allReviews = await storage.db.select().from(agencyReviews).where(eq(agencyReviews.agencyId, req.params.id));

@@ -307,15 +307,14 @@ router.post("/:id/notify-candidates", protect, async (req, res, next) => {
       .innerJoin(jobs, eq(applications.jobId, jobs.id))
       .where(and(
         eq(jobs.agentId, owningAgency.userId),
+        // audit 2026-07-06 (C5): the old post-query "filter" was dead code
+        // (String(a.appId ? "" : "") is always ""), so rejected/withdrawn
+        // applicants were broadcast too. Filter to shortlisted+ in the query.
+        inArray(applications.status, ["shortlisted", "interview_scheduled", "selected"]),
       ));
 
     const targets = new Map<string, { candidateName: string; jobTitle: string }>();
     for (const a of apps as any[]) {
-      if (!["shortlisted", "interview_scheduled", "selected"].includes(String(a.appId ? "" : ""))) {
-        // status filter done at query would be cleaner; kept simple — we just
-        // notify every candidate with an application on this agency's jobs.
-        // If too broad, tighten later.
-      }
       if (a.candidateUserId && !targets.has(a.candidateUserId)) {
         targets.set(a.candidateUserId, { candidateName: a.candidateName, jobTitle: a.jobTitle });
       }

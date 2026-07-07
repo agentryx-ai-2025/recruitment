@@ -2700,6 +2700,8 @@ function DriveApprovalCard({ drive }: { drive: any }) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/v1/drives"] });
+      // audit 2026-07-06 (C10a): reject must refresh the dashboard report like approve does
+      queryClient.invalidateQueries({ queryKey: ["/api/v1/admin/reports/dashboard"] });
       toast({ title: "Drive Rejected" });
     },
   });

@@ -214,7 +214,7 @@ export default function SuperAdminDashboard() {
               {activeView === "reports" && <ReportsView />}
               {activeView === "sqlsandbox" && <SqlSandboxView />}
               {activeView === "backups" && <BackupsView />}
-              {activeView === "users" && <UsersView />}
+              {activeView === "users" && <UsersView setActiveView={setActiveView} />}
               {activeView === "flags" && <FeatureFlagsView />}
               {activeView === "logs" && <LogsView />}
               {activeView === "integrations" && <IntegrationsView />}
@@ -416,7 +416,12 @@ function QuickLink({ icon: Icon, title, desc, onClick }: { icon: React.ElementTy
 }
 
 // ── Users View ──
-function UsersView() {
+// audit 2026-07-06 (C16): "View Audit Trail" used to window.open the raw JSON
+// API. It now jumps to the in-app Audit tab pre-filtered by that user; this
+// module-scoped handoff seeds AuditView's userId filter on its next mount.
+let pendingAuditUserId = "";
+
+function UsersView({ setActiveView }: { setActiveView?: (v: string) => void }) {
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("candidate");  // default to the largest category
   const [showCreate, setShowCreate] = useState(false);
@@ -565,7 +570,8 @@ function UsersView() {
                         </DropdownMenuItem>
                       ))}
                       <DropdownMenuSeparator />
-                      <DropdownMenuItem onClick={() => window.open(`/api/v1/superadmin/audit?userId=${u.id}`, "_blank")}>
+                      {/* audit 2026-07-06 (C16): open the in-app Audit tab pre-filtered, not the raw JSON API */}
+                      <DropdownMenuItem onClick={() => { pendingAuditUserId = u.id; setActiveView?.("audit"); }}>
                         <History className="w-3.5 h-3.5 mr-2" /> View Audit Trail
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
@@ -962,7 +968,8 @@ function InfoCard({ icon: Icon, label, value, color, lightBg }: any) {
 
 // ── Audit View ──
 function AuditView() {
-  const [userId, setUserId] = useState("");
+  // audit 2026-07-06 (C16): seed the user filter when arriving via "View Audit Trail"
+  const [userId, setUserId] = useState(() => { const seed = pendingAuditUserId; pendingAuditUserId = ""; return seed; });
   const [action, setAction] = useState("");
   const [resourceType, setResourceType] = useState("");
 

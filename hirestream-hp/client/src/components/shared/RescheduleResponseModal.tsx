@@ -46,7 +46,8 @@ export function RescheduleResponseModal({
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify(vars),
       });
-      if (!r.ok) throw new Error((await r.json()).error?.message || (await r.json()).message || "Failed");
+      // audit 2026-07-06 (C8): read the body once — the second r.json() threw "body already read"
+      if (!r.ok) { const e = await r.json().catch(() => ({} as any)); throw new Error(e?.error?.message || e?.message || "Failed"); }
       return r.json();
     },
     onSuccess: (_d, vars) => {

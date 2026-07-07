@@ -430,6 +430,8 @@
     "messagePh": "Type your message…",
     "messageNote": "This is not a live chat — HPSEDC replies during working hours.",
     "noMessages": "No messages yet. Send your first message below.",
+    "couldNotLoad": "Couldn't load messages.",
+    "retry": "Retry",
     "couldNotSend": "Couldn't send",
     "grievanceTitle": "Have a complaint?",
     "grievanceSub": "Fraud, an agent asking for money, or a placement dispute.",
@@ -651,7 +653,10 @@
     "backDashboard": "Back to dashboard",
     "toastAdded": "Document added",
     "toastCouldNotUpload": "Could not upload",
-    "toastTooLarge": "File is too large (max 10 MB)"
+    "toastTooLarge": "File is too large (max 10 MB)",
+    "deleteConfirm": "Delete this document?",
+    "deleteAria": "Delete {{doc}}",
+    "toastCouldNotDelete": "Could not delete"
   },
   "pro": {
     "nameHelp": "As printed on your certificates and passport.",

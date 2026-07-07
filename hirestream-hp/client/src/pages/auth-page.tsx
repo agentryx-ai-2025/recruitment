@@ -255,8 +255,14 @@ function LoginForm() {
           )}
         />
         {/* CAPTCHA (HTIS T6 compliance) */}
-        <div
-          className={`flex items-center gap-3 p-3 border rounded-lg cursor-pointer transition-colors ${captchaChecked ? 'border-emerald-300 bg-emerald-50' : 'border-gray-200 hover:border-gray-300'}`}
+        {/* audit 2026-07-06 (C13): was a div onClick — keyboard users couldn't
+            check it and so couldn't sign in. Now a real, focusable checkbox button. */}
+        <button
+          type="button"
+          role="checkbox"
+          aria-checked={captchaChecked}
+          aria-label="I'm not a robot — CAPTCHA security check"
+          className={`w-full flex items-center gap-3 p-3 border rounded-lg cursor-pointer transition-colors text-left focus:outline-none focus:ring-2 focus:ring-blue-500/40 ${captchaChecked ? 'border-emerald-300 bg-emerald-50' : 'border-gray-200 hover:border-gray-300'}`}
           onClick={() => setCaptchaChecked(!captchaChecked)}
         >
           {captchaChecked ? (
@@ -269,7 +275,7 @@ function LoginForm() {
             <div className="font-medium">CAPTCHA</div>
             <div>Security Check</div>
           </div>
-        </div>
+        </button>
 
         <Button type="submit"
           className="w-full h-11 rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 transition-all"
@@ -306,6 +312,14 @@ function ForgotPasswordForm({ onBack }: { onBack: () => void }) {
       if (res.ok) {
         setSent(true);
         toast({ title: "Email Sent", description: "Check your inbox for the reset link." });
+      } else {
+        // audit 2026-07-06 (C15): a 429/500 used to end the spinner with no feedback
+        const err = await res.json().catch(() => ({} as any));
+        toast({
+          title: "Couldn't send reset email",
+          description: err?.error?.message || err?.message || `Request failed (${res.status}). Please try again later.`,
+          variant: "destructive",
+        });
       }
     } catch {
       toast({ title: "Error", description: "Could not send reset email.", variant: "destructive" });

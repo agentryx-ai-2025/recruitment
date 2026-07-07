@@ -130,6 +130,9 @@ export default function AgentApplicantsPage() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["/api/v1/agent/applicants"] });
+      // audit 2026-07-06 (C10c): the dashboard pipeline funnel aggregates per-job
+      // applicants under this key — refresh it too or it shows stale stages.
+      qc.invalidateQueries({ queryKey: ["agent-aggregate-applicants"] });
       toast({ title: "Status updated" });
     },
     onError: (e: any) => toast({ title: "Couldn't update", description: e.message, variant: "destructive" }),
@@ -465,6 +468,7 @@ export default function AgentApplicantsPage() {
         candidateName={interviewFor?.candidateName ?? ""}
         onScheduled={() => {
           qc.invalidateQueries({ queryKey: ["/api/v1/agent/applicants"] });
+          qc.invalidateQueries({ queryKey: ["agent-aggregate-applicants"] }); // audit 2026-07-06 (C10c)
           setInterviewFor(null);
         }}
       />
@@ -475,6 +479,7 @@ export default function AgentApplicantsPage() {
         candidateName={outcomeFor?.candidateName ?? ""}
         onRecorded={() => {
           qc.invalidateQueries({ queryKey: ["/api/v1/agent/applicants"] });
+          qc.invalidateQueries({ queryKey: ["agent-aggregate-applicants"] }); // audit 2026-07-06 (C10c)
           setOutcomeFor(null);
         }}
       />

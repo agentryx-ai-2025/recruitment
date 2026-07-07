@@ -15,7 +15,10 @@ import { useTranslation } from "react-i18next";
 
 async function fetchJson(url: string) {
   const res = await fetch(url);
-  if (!res.ok) return { data: [] };
+  // audit 2026-07-06 (C7): throw on non-OK so React Query enters its error
+  // state — with staleTime Infinity + retry false, a swallowed 500 used to
+  // render as a permanently empty list.
+  if (!res.ok) throw new Error(`Request failed (${res.status})`);
   return res.json();
 }
 
@@ -67,16 +70,16 @@ export default function GrievancePage() {
   const TAB_ALL = "all";
   const [tab, setTab] = useState<string>(isAdmin ? TAB_ALL : TAB_MY);
 
-  const { data: myRes, isLoading: myLoading } = useQuery({
+  const { data: myRes, isLoading: myLoading, isError: myError, refetch: refetchMy } = useQuery({
     queryKey: ["/api/v1/grievances/my"],
     queryFn: () => fetchJson("/api/v1/grievances/my"),
   });
-  const { data: assignedRes, isLoading: assignedLoading } = useQuery({
+  const { data: assignedRes, isLoading: assignedLoading, isError: assignedError, refetch: refetchAssigned } = useQuery({
     queryKey: ["/api/v1/grievances/assigned-to-me"],
     queryFn: () => fetchJson("/api/v1/grievances/assigned-to-me"),
     enabled: !!user,   // any logged-in role can have things assigned
   });
-  const { data: allRes, isLoading: allLoading } = useQuery({
+  const { data: allRes, isLoading: allLoading, isError: allError, refetch: refetchAll } = useQuery({
     queryKey: ["/api/v1/grievances"],
     queryFn: () => fetchJson("/api/v1/grievances"),
     enabled: isAdmin,  // god-view only fetched for admins
@@ -94,6 +97,15 @@ export default function GrievancePage() {
     tab === TAB_ASSIGNED ? assignedLoading :
     tab === TAB_ALL ? allLoading :
     myLoading;
+  // audit 2026-07-06 (C7): active tab's error state + retry handle
+  const isError =
+    tab === TAB_ASSIGNED ? assignedError :
+    tab === TAB_ALL ? allError :
+    myError;
+  const refetchActive =
+    tab === TAB_ASSIGNED ? refetchAssigned :
+    tab === TAB_ALL ? refetchAll :
+    refetchMy;
 
   // Status-update mutation — visible only on the assigned-to-me tab so an
   // owner (agent / Agentryx delivery / admin) can move a grievance through
@@ -291,6 +303,13 @@ export default function GrievancePage() {
         <div className="space-y-4">
           <Skeleton className="h-24 w-full rounded-lg" />
           <Skeleton className="h-24 w-full rounded-lg" />
+        </div>
+      ) : isError ? (
+        /* audit 2026-07-06 (C7): show a retry affordance instead of a false "no grievances" */
+        <div className="text-center py-16 text-gray-500 bg-white rounded-lg shadow-sm">
+          <AlertCircle className="w-16 h-16 mx-auto mb-4 opacity-30 text-red-400" />
+          <p className="text-lg font-medium">Couldn't load grievances</p>
+          <Button variant="outline" className="mt-4" onClick={() => refetchActive()}>Retry</Button>
         </div>
       ) : grievances.length === 0 ? (
         <div className="text-center py-16 text-gray-500 bg-white rounded-lg shadow-sm">

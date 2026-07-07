@@ -58,11 +58,16 @@ export default function DocumentsPage() {
     onError: (e: any) => { setUploading(null); toast({ title: e.message || t("documents.toastCouldNotUpload"), variant: "destructive" }); },
   });
   const del = useMutation({
-    mutationFn: async (id: string) => { await fetch(`/api/v1/candidates/documents/${id}`, { method: "DELETE", credentials: "include" }); },
+    // audit 2026-07-06 (C6): check res.ok — a failed delete used to report nothing.
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/v1/candidates/documents/${id}`, { method: "DELETE", credentials: "include" });
+      if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e?.error?.message || t("documents.toastCouldNotDelete")); }
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/v1/candidates/documents"] });
       queryClient.invalidateQueries({ queryKey: ["/api/v1/candidates/profile/completion"] });
     },
+    onError: (e: any) => toast({ title: e.message || t("documents.toastCouldNotDelete"), variant: "destructive" }),
   });
 
   const pick = (file?: File | null) => {
@@ -120,7 +125,11 @@ export default function DocumentsPage() {
                     <button disabled={busy} onClick={() => setChooserFor(slot.type)} className="h-9 px-3 rounded-lg text-sm font-semibold text-blue-700 hover:bg-blue-50 disabled:opacity-40">
                       {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : t("documents.replace")}
                     </button>
-                    <button onClick={() => del.mutate(existing.id)} className="w-9 h-9 rounded-lg flex items-center justify-center text-slate-400 hover:text-red-500 hover:bg-red-50"><Trash2 className="w-5 h-5" /></button>
+                    {/* audit 2026-07-06 (C6): confirm before delete + aria-label on the icon-only button */}
+                    <button
+                      aria-label={t("documents.deleteAria", { doc: t(`documents.slots.${slot.type}.label`) })}
+                      onClick={() => { if (window.confirm(t("documents.deleteConfirm"))) del.mutate(existing.id); }}
+                      className="w-9 h-9 rounded-lg flex items-center justify-center text-slate-400 hover:text-red-500 hover:bg-red-50"><Trash2 className="w-5 h-5" /></button>
                   </div>
                 ) : (
                   <Button size="sm" disabled={busy} onClick={() => setChooserFor(slot.type)}

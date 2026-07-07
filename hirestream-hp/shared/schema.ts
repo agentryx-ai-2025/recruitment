@@ -185,7 +185,12 @@ export const applications = pgTable("applications", {
   employerDecisionAt: timestamp("employer_decision_at"),
   employerDecisionNotes: text("employer_decision_notes"),
   appliedAt: timestamp("applied_at").defaultNow(),
-});
+}, (t) => ({
+  // audit 2026-07-06 (C4): DB-level duplicate-application guard. The route's
+  // read-then-insert pre-check stays (friendlier message, defense in depth),
+  // but only this unique index closes the race window.
+  uniqCandidateJob: uniqueIndex("applications_candidate_job_idx").on(t.candidateId, t.jobId),
+}));
 
 export const recruitmentAgents = pgTable("recruitment_agents", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -262,7 +267,10 @@ export const agencyReviews = pgTable("agency_reviews", {
   title: text("title"),
   review: text("review"),
   createdAt: timestamp("created_at").defaultNow(),
-});
+}, (t) => ({
+  // audit 2026-07-06 (C17): one review per candidate per agency
+  uniqAgencyCandidate: uniqueIndex("agency_reviews_agency_candidate_idx").on(t.agencyId, t.candidateUserId),
+}));
 
 export const employers = pgTable("employers", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),

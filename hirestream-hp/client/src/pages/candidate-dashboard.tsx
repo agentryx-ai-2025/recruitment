@@ -27,7 +27,10 @@ import { DrivesView } from "@/components/candidate/DrivesView";
 
 async function fetchJson(url: string) {
   const res = await fetch(url);
-  if (!res.ok) return { data: null };
+  // audit 2026-07-06 (C7): throw on non-OK so React Query enters its error
+  // state — with staleTime Infinity + retry false, a swallowed 500 used to
+  // render as a permanently empty dashboard.
+  if (!res.ok) throw new Error(`Request failed (${res.status})`);
   return res.json();
 }
 
@@ -100,15 +103,24 @@ export default function CandidateDashboard() {
   // "minimal" (few big buttons), professional → "advanced" (full dashboard).
   const [dashModeState, setDashModeState] = useState<"minimal" | "advanced" | null>(null);
 
-  const { data: profileRes, isLoading } = useQuery({ queryKey: ["/api/v1/candidates/profile"], queryFn: () => fetchJson("/api/v1/candidates/profile") });
-  const { data: completionRes } = useQuery({ queryKey: ["/api/v1/candidates/profile/completion"], queryFn: () => fetchJson("/api/v1/candidates/profile/completion") });
-  const { data: appsRes } = useQuery({ queryKey: ["/api/v1/candidates/applications"], queryFn: () => fetchJson("/api/v1/candidates/applications") });
-  const { data: eduRes } = useQuery({ queryKey: ["/api/v1/candidates/education"], queryFn: () => fetchJson("/api/v1/candidates/education") });
-  const { data: expRes } = useQuery({ queryKey: ["/api/v1/candidates/experience"], queryFn: () => fetchJson("/api/v1/candidates/experience") });
-  const { data: docsRes } = useQuery({ queryKey: ["/api/v1/candidates/documents"], queryFn: () => fetchJson("/api/v1/candidates/documents") });
-  const { data: jobsRes } = useQuery({ queryKey: ["/api/v1/jobs"], queryFn: () => fetchJson("/api/v1/jobs") });
-  const { data: recsRes } = useQuery({ queryKey: ["/api/v1/applications/recommendations/for-me"], queryFn: () => fetchJson("/api/v1/applications/recommendations/for-me") });
-  const { data: savedRes } = useQuery({ queryKey: ["/api/v1/jobs/saved/my"], queryFn: () => fetchJson("/api/v1/jobs/saved/my") });
+  const { data: profileRes, isLoading, isError: profileError, refetch: refetchProfile } = useQuery({ queryKey: ["/api/v1/candidates/profile"], queryFn: () => fetchJson("/api/v1/candidates/profile") });
+  const { data: completionRes, isError: completionError, refetch: refetchCompletion } = useQuery({ queryKey: ["/api/v1/candidates/profile/completion"], queryFn: () => fetchJson("/api/v1/candidates/profile/completion") });
+  const { data: appsRes, isError: appsError, refetch: refetchApps } = useQuery({ queryKey: ["/api/v1/candidates/applications"], queryFn: () => fetchJson("/api/v1/candidates/applications") });
+  const { data: eduRes, isError: eduError, refetch: refetchEdu } = useQuery({ queryKey: ["/api/v1/candidates/education"], queryFn: () => fetchJson("/api/v1/candidates/education") });
+  const { data: expRes, isError: expError, refetch: refetchExp } = useQuery({ queryKey: ["/api/v1/candidates/experience"], queryFn: () => fetchJson("/api/v1/candidates/experience") });
+  const { data: docsRes, isError: docsError, refetch: refetchDocs } = useQuery({ queryKey: ["/api/v1/candidates/documents"], queryFn: () => fetchJson("/api/v1/candidates/documents") });
+  const { data: jobsRes, isError: jobsError, refetch: refetchJobs } = useQuery({ queryKey: ["/api/v1/jobs"], queryFn: () => fetchJson("/api/v1/jobs") });
+  const { data: recsRes, isError: recsError, refetch: refetchRecs } = useQuery({ queryKey: ["/api/v1/applications/recommendations/for-me"], queryFn: () => fetchJson("/api/v1/applications/recommendations/for-me") });
+  const { data: savedRes, isError: savedError, refetch: refetchSaved } = useQuery({ queryKey: ["/api/v1/jobs/saved/my"], queryFn: () => fetchJson("/api/v1/jobs/saved/my") });
+
+  // audit 2026-07-06 (C7): with retry disabled a transient failure was
+  // permanent-and-silent; surface it with a retry banner instead.
+  const failedRefetches = ([
+    [profileError, refetchProfile], [completionError, refetchCompletion], [appsError, refetchApps],
+    [eduError, refetchEdu], [expError, refetchExp], [docsError, refetchDocs],
+    [jobsError, refetchJobs], [recsError, refetchRecs], [savedError, refetchSaved],
+  ] as [boolean, () => void][]).filter(([err]) => err);
+  const retryFailed = () => failedRefetches.forEach(([, refetch]) => refetch());
 
   const profile = profileRes?.data || {};
   const completion = completionRes?.data || { percentage: 0, checks: [] };
@@ -194,6 +206,13 @@ export default function CandidateDashboard() {
 
   return (
     <div className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 xl:px-8 2xl:px-12 py-5">
+      {/* audit 2026-07-06 (C7): retry banner when any dashboard query failed */}
+      {failedRefetches.length > 0 && (
+        <div className="mb-4 flex items-center justify-between gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3">
+          <p className="text-sm text-red-700 font-medium flex items-center gap-2"><AlertCircle className="w-4 h-4 shrink-0" /> Couldn't load some of your data.</p>
+          <Button size="sm" variant="outline" onClick={retryFailed} className="border-red-200 text-red-700 hover:bg-red-100 shrink-0">Retry</Button>
+        </div>
+      )}
       {/* ── MOBILE NAV (< lg) ─── */}
       <div className="lg:hidden mb-4">
         {minimal ? (

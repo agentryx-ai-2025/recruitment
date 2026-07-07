@@ -12,7 +12,9 @@ import {
   Landmark, ArrowLeft, HelpCircle, Phone, MessageSquare, ShieldAlert, Send, Loader2, ExternalLink,
 } from "lucide-react";
 
-async function fetchJson(url: string) { const r = await fetch(url, { credentials: "include" }); if (!r.ok) return { data: [] }; return r.json(); }
+// audit 2026-07-06 (C7): throw on non-OK so React Query enters its error state
+// instead of rendering a failed load as a silently empty thread.
+async function fetchJson(url: string) { const r = await fetch(url, { credentials: "include" }); if (!r.ok) throw new Error(`Request failed (${r.status})`); return r.json(); }
 
 export default function HelpPage() {
   const [, setLocation] = useLocation();
@@ -23,7 +25,7 @@ export default function HelpPage() {
   const [text, setText] = useState("");
   const endRef = useRef<HTMLDivElement | null>(null);
 
-  const { data: msgRes } = useQuery<any>({ queryKey: ["/api/v1/support/messages/my"], queryFn: () => fetchJson("/api/v1/support/messages/my"), refetchInterval: 15000 });
+  const { data: msgRes, isError: msgError, refetch: refetchMsgs } = useQuery<any>({ queryKey: ["/api/v1/support/messages/my"], queryFn: () => fetchJson("/api/v1/support/messages/my"), refetchInterval: 15000 });
   const messages: any[] = msgRes?.data || [];
 
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages.length]);
@@ -74,7 +76,13 @@ export default function HelpPage() {
           <p className="text-sm text-slate-500 mb-4">{t("help.messageSub")}</p>
 
           <div className="space-y-2.5 max-h-72 overflow-y-auto mb-4 pr-1">
-            {messages.length === 0 ? (
+            {/* audit 2026-07-06 (C7): distinguish a failed load from an empty thread */}
+            {msgError && messages.length === 0 ? (
+              <div className="text-center py-6">
+                <p className="text-sm text-slate-400 mb-2">{t("help.couldNotLoad", { defaultValue: "Couldn't load messages." })}</p>
+                <Button size="sm" variant="outline" onClick={() => refetchMsgs()}>{t("help.retry", { defaultValue: "Retry" })}</Button>
+              </div>
+            ) : messages.length === 0 ? (
               <p className="text-sm text-slate-400 text-center py-6">{t("help.noMessages")}</p>
             ) : messages.map((m) => (
               <div key={m.id} className={`flex ${m.senderRole === "candidate" ? "justify-end" : "justify-start"}`}>

@@ -30,7 +30,7 @@ async function patchProfile(body: any) {
 // qualificationLevel + candidate_education / candidate_languages / preferredCountries).
 export default function SimpleApplyPage() {
   const [, setLocation] = useLocation();
-  const { user } = useAuth();
+  const { user, isLoading: authLoading } = useAuth();
   const { toast } = useToast();
   const { t } = useTranslation();
   // Dynamic-key lookup with a raw-string fallback (for values a candidate may
@@ -62,14 +62,20 @@ export default function SimpleApplyPage() {
   const { data: langRes } = useQuery<any>({ queryKey: ["/api/v1/candidates/languages"] });
   const languages = langRes?.data || [];
 
+  // audit 2026-07-06 (C2): wait for auth to finish loading before redirecting,
+  // otherwise a hard refresh mid-flow ejects logged-in users to /auth.
   useEffect(() => {
-    if (!user) { setLocation("/auth"); return; }
-  }, [user, setLocation]);
+    if (!authLoading && !user) { setLocation("/auth"); return; }
+  }, [user, authLoading, setLocation]);
 
   // Prefill from an existing profile so returning candidates don't re-answer.
+  // audit 2026-07-06 (C11): run once (ref-guarded, like the resume effect below)
+  // — re-running on every save-triggered refetch clobbered in-progress answers.
+  const prefilledRef = useRef(false);
   useEffect(() => {
     const p = profileRes?.data;
-    if (!p) return;
+    if (!p || prefilledRef.current) return;
+    prefilledRef.current = true;
     if (p.fullName) setFullName(p.fullName);
     if (p.experienceMonths != null) setMonths(p.experienceMonths);
     else if (p.experience != null) setMonths(p.experience * 12);
@@ -250,17 +256,29 @@ export default function SimpleApplyPage() {
   // ── Screen 4: languages ────────────────────────────────────────────────
   const LanguageScreen = () => {
     const expanding = langExpanding, setExpanding = setLangExpanding;
+    // audit 2026-07-06 (C12): check res.ok — a silent failure left the chip
+    // missing and Next disabled with no message.
     const addLang = async (language: string, proficiency: string) => {
-      await fetch("/api/v1/candidates/languages", {
-        method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include",
-        body: JSON.stringify({ language, proficiency }),
-      });
-      queryClient.invalidateQueries({ queryKey: ["/api/v1/candidates/languages"] });
-      setExpanding(null);
+      try {
+        const res = await fetch("/api/v1/candidates/languages", {
+          method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include",
+          body: JSON.stringify({ language, proficiency }),
+        });
+        if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e?.error?.message || e?.message || t("simpleApply.couldNotSave")); }
+        queryClient.invalidateQueries({ queryKey: ["/api/v1/candidates/languages"] });
+        setExpanding(null);
+      } catch (e: any) {
+        toast({ title: e.message || t("simpleApply.couldNotSave"), variant: "destructive" });
+      }
     };
     const removeLang = async (id: string) => {
-      await fetch(`/api/v1/candidates/languages/${id}`, { method: "DELETE", credentials: "include" });
-      queryClient.invalidateQueries({ queryKey: ["/api/v1/candidates/languages"] });
+      try {
+        const res = await fetch(`/api/v1/candidates/languages/${id}`, { method: "DELETE", credentials: "include" });
+        if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e?.error?.message || e?.message || t("simpleApply.couldNotSave")); }
+        queryClient.invalidateQueries({ queryKey: ["/api/v1/candidates/languages"] });
+      } catch (e: any) {
+        toast({ title: e.message || t("simpleApply.couldNotSave"), variant: "destructive" });
+      }
     };
     const available = QUICK_LANGUAGES.filter((l) => !languages.some((s: any) => s.language.toLowerCase() === l.toLowerCase()));
     return (

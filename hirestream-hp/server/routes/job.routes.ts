@@ -978,12 +978,23 @@ router.post("/:id/apply", protect, async (req, res, next) => {
     const { calculateMatchScore: matchV2 } = await import("../services/matching.service");
     const matchScore = await matchV2(candidate, job);
 
-    const newApp = await db.insert(applications).values({
-      candidateId: candidate.id,
-      jobId,
-      status: "submitted",
-      matchScore,
-    }).returning();
+    // audit 2026-07-06 (C4): the pre-check above is racy (read-then-insert);
+    // the unique index on (candidate_id, job_id) is the real guard — map its
+    // violation to the same friendly 409 instead of a 500.
+    let newApp;
+    try {
+      newApp = await db.insert(applications).values({
+        candidateId: candidate.id,
+        jobId,
+        status: "submitted",
+        matchScore,
+      }).returning();
+    } catch (e: any) {
+      if (e?.code === "23505" || e?.cause?.code === "23505") {
+        return res.status(409).json({ success: false, error: { code: 409, message: "You have already applied to this job." } });
+      }
+      throw e;
+    }
 
     // Notify candidate (with email)
     notify({

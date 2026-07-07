@@ -143,7 +143,8 @@ export function ScheduleInterviewModal({
         </div>
         <DialogFooter>
           <Button variant="ghost" onClick={onClose}>Cancel</Button>
-          <Button disabled={!date || !time || schedule.isPending} onClick={() => schedule.mutate()}
+          {/* audit 2026-07-06 (C9): the virtual meeting link is marked required (*) — enforce it */}
+          <Button disabled={!date || !time || (mode === "virtual" && !meetingLink.trim()) || schedule.isPending} onClick={() => schedule.mutate()}
             className="bg-cyan-600 hover:bg-cyan-700 text-white">
             {schedule.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "Schedule & Notify Candidate"}
           </Button>

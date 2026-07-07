@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
@@ -75,9 +75,20 @@ export default function ProfileWizard() {
   const completion = completionRes?.data || { percentage: 0, checks: [] };
   const currentStepData = STEPS[currentStep];
 
+  // audit 2026-07-06 (C3): steps keep typed fields in local state and only
+  // persist on "Save & Continue" — a step-pill jump silently discarded them.
+  // Track dirtiness with a capture-phase input listener on the step body and
+  // confirm before a pill jump leaves unsaved input behind.
+  const dirtyRef = useRef(false);
   const goTo = (step: number) => {
     setDirection(step > currentStep ? 1 : -1);
     setCurrentStep(step);
+    dirtyRef.current = false;
+  };
+  const goToViaPill = (step: number) => {
+    if (step === currentStep) return;
+    if (dirtyRef.current && !window.confirm("You have unsaved changes on this step. Leave without saving?")) return;
+    goTo(step);
   };
 
   return (
@@ -149,7 +160,7 @@ export default function ProfileWizard() {
             return (
               <button
                 key={step.key}
-                onClick={() => goTo(i)}
+                onClick={() => goToViaPill(i)}
                 className={`flex items-center gap-2.5 px-4 py-3 rounded-xl text-sm font-medium whitespace-nowrap transition-all flex-1 justify-center ${
                   isCurrent
                     ? `bg-gradient-to-r ${step.color} text-white shadow-lg shadow-blue-500/20`
@@ -182,7 +193,8 @@ export default function ProfileWizard() {
             {/* Step color bar at top */}
             <div className={`h-1.5 bg-gradient-to-r ${currentStepData.color}`} />
 
-            <div className="p-6 md:p-8">
+            {/* audit 2026-07-06 (C3): mark the step dirty on any typed input */}
+            <div className="p-6 md:p-8" onInputCapture={() => { dirtyRef.current = true; }}>
               {currentStep === 0 && <BasicInfoStep profile={profile} onNext={() => goTo(1)} />}
               {currentStep === 1 && <EducationStep onNext={() => goTo(2)} onBack={() => goTo(0)} />}
               {currentStep === 2 && <ExperienceStep onNext={() => goTo(3)} onBack={() => goTo(1)} />}

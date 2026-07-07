@@ -246,9 +246,12 @@ router.post("/sql/execute", async (req, res) => {
     // Execute with statement_timeout via Postgres
     const start = Date.now();
     try {
-      // Set timeout for this transaction
-      await storage.db.execute(sql.raw(`SET LOCAL statement_timeout = 5000`));
-      const result = await storage.db.execute(sql.raw(trimmed));
+      // audit 2026-07-06 (C14): SET LOCAL is a no-op outside a transaction —
+      // run both statements inside one so the 5s timeout actually applies.
+      const result = await storage.db.transaction(async (tx: any) => {
+        await tx.execute(sql.raw(`SET LOCAL statement_timeout = 5000`));
+        return await tx.execute(sql.raw(trimmed));
+      });
       const elapsed = Date.now() - start;
 
       // Cap result rows to 500 to prevent payload bloat
