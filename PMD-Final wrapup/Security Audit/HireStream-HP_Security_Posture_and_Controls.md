@@ -61,7 +61,7 @@ Residual items (Section 6) are limited, documented, and low-risk.
 | A01 | Broken Access Control | **Remediated** — two authorization sweeps; shared ownership layer; all identified IDORs closed. |
 | A02 | Cryptographic Failures / Sensitive Data | **Remediated** — 2FA secrets never serialized; Aadhaar masked; no secrets in repo; single-use reset tokens. |
 | A03 | Injection | **Controlled** — no user-reachable SQLi; SQL console locked down; server-rendered HTML escaped. |
-| A04 | Insecure Design | **Remediated** — unauthenticated dev-login/DB-wipe endpoints hard-disabled in production. |
+| A04 | Insecure Design | **Remediated** — the demo quick-login / demo-reset endpoints are governed by an admin-managed feature flag that defaults **OFF in production** (was previously auto-enabled); disabled on STG/PROD unless a superadmin explicitly enables it for a demo. |
 | A05 | Security Misconfiguration | **Remediated** — generic 5xx errors (no stack leak); Helmet/CORS verified; no default creds in prod (Section 6.1). |
 | A06 | Vulnerable & Outdated Components | **Remediated** — production runtime dependencies: 0 vulnerabilities. |
 | A07 | Identification & Auth Failures | **Strong** — session hardening; no enumeration on login/register/reset; rate limiting. |
@@ -87,9 +87,11 @@ escaping advisory, GHSA-gpj5-g38j-94v9) and `nodemailer` (raw-option file-read/S
 GHSA-p6gq-j5cr-w38f). Result: `npm audit --omit=dev` → **0 vulnerabilities**.
 
 **OWASP/CERT-In audit fixes (v0.9.18):**
-- **CRITICAL** — disabled unauthenticated dev-login and demo-reset endpoints in
-  production (previously could grant anonymous admin access and wipe the database);
-  removed the shipped superadmin password from the seed (now env-provisioned).
+- **CRITICAL** — the demo quick-login and demo-reset endpoints (which could grant
+  anonymous admin access and wipe the database) are now behind an admin-managed
+  feature flag that defaults OFF in production, so they are disabled on STG/PROD
+  unless a superadmin explicitly enables them for a demo; removed the shipped
+  superadmin password from the seed (now env-provisioned).
 - **HIGH** — stopped serialising 2FA secrets/recovery codes and raw Aadhaar in user
   exports and lookups (shared `sanitizeUser`); scoped the candidate-browse list for
   employers and stripped passport/Aadhaar; ownership-gated interview `.ics` and drive
