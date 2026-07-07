@@ -165,6 +165,11 @@ async function seed() {
       pccStatus: c.pcc, medicalStatus: c.medical, ieltsBand: c.ielts as any,
       pdoCompleted: c.pdo, pbbyInsuranceStatus: c.pbby, pbbyPolicyNumber: c.pbbyPolicy ?? null,
       qualificationLevel: c.qual, preferredCategories: c.cats, openToOutreach: true,
+      // Track: professional = degree/IELTS-qualified (unlocks the skilled flow —
+      // Germany/UK/etc.); everyone else is standard (blue-collar). Without this
+      // the tier stayed null and the dashboard defaulted every persona to the
+      // blue-collar view + routed "Edit" into the blue-collar flow.
+      registrationTier: ((c as any).ielts || c.qual === "bachelor") ? "professional" : "standard",
     }).returning();
     cid[c.un] = row.id;
   }
@@ -172,6 +177,7 @@ async function seed() {
   const [demoCandRow] = await db.insert(candidates).values({
     userId: uid.demo_candidate, fullName: "Demo Candidate", email: email("demo_candidate"),
     location: "Shimla, Himachal Pradesh", experience: 2, experienceMonths: 24, skills: ["General"], preferredCountries: ["UAE"], profileComplete: false,
+    registrationTier: "standard",
   }).returning();
   cid.demo_candidate = demoCandRow.id;
 
@@ -199,6 +205,7 @@ async function seed() {
       userId: uid[c.un], fullName: c.name, email: email(c.un),
       location: `${c.city}, Himachal Pradesh`, experience: c.exp, experienceMonths: c.exp * 12, skills: c.skills,
       preferredCountries: c.pref, preferredCategories: [c.cat], qualificationLevel: c.qual,
+      registrationTier: c.qual === "bachelor" ? "professional" : "standard",
       sex: c.sex === "M" ? "male" : "female",
       passportNumber: `P${6700001 + i}`, ecrStatus: c.ecr, profileComplete: true, openToOutreach: true,
     }).returning();
