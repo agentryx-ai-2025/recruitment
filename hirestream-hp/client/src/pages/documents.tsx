@@ -37,6 +37,13 @@ export default function DocumentsPage() {
   const fileRef = useRef<HTMLInputElement | null>(null);
   const cameraRef = useRef<HTMLInputElement | null>(null);
   const pendingType = useRef<string | null>(null);
+  // audit 2026-07-07 (UI): the "Take a photo" (capture) input only opens a
+  // camera on touch/mobile devices — desktop browsers ignore `capture` and fall
+  // back to the file picker, which reads as "camera not working". So we only
+  // offer the camera path on coarse-pointer (touch) devices; on desktop the
+  // "Add" button goes straight to the file picker (no misleading chooser).
+  const [canUseCamera] = useState(() =>
+    typeof window !== "undefined" && !!window.matchMedia?.("(pointer: coarse)")?.matches);
 
   const { data: docsRes } = useQuery<any>({ queryKey: ["/api/v1/candidates/documents"] });
   const docs: any[] = docsRes?.data || [];
@@ -88,6 +95,15 @@ export default function DocumentsPage() {
     if (el) { el.value = ""; el.click(); }
   };
 
+  // Entry point for an "Add"/"Replace" tap: on touch devices show the chooser
+  // (Upload a file / Take a photo); on desktop skip straight to the file picker.
+  const openFor = (slotType: string) => {
+    if (canUseCamera) { setChooserFor(slotType); return; }
+    pendingType.current = slotType;
+    const el = fileRef.current;
+    if (el) { el.value = ""; el.click(); }
+  };
+
   const chooserSlot = DOC_SLOTS.find((s) => s.type === chooserFor);
 
   return (
@@ -122,7 +138,7 @@ export default function DocumentsPage() {
                 </div>
                 {existing ? (
                   <div className="flex items-center gap-1 shrink-0">
-                    <button disabled={busy} onClick={() => setChooserFor(slot.type)} className="h-9 px-3 rounded-lg text-sm font-semibold text-blue-700 hover:bg-blue-50 disabled:opacity-40">
+                    <button disabled={busy} onClick={() => openFor(slot.type)} className="h-9 px-3 rounded-lg text-sm font-semibold text-blue-700 hover:bg-blue-50 disabled:opacity-40">
                       {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : t("documents.replace")}
                     </button>
                     {/* audit 2026-07-06 (C6): confirm before delete + aria-label on the icon-only button */}
@@ -132,7 +148,7 @@ export default function DocumentsPage() {
                       className="w-9 h-9 rounded-lg flex items-center justify-center text-slate-400 hover:text-red-500 hover:bg-red-50"><Trash2 className="w-5 h-5" /></button>
                   </div>
                 ) : (
-                  <Button size="sm" disabled={busy} onClick={() => setChooserFor(slot.type)}
+                  <Button size="sm" disabled={busy} onClick={() => openFor(slot.type)}
                     className="rounded-xl bg-blue-600 hover:bg-blue-700 text-white gap-1.5 shrink-0">
                     {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />} {t("documents.add")}
                   </Button>
