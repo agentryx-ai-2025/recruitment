@@ -208,6 +208,9 @@ router.patch("/:id/verify", async (req, res, next) => {
           type: "system",
           title: "Document verified",
           message: `Your ${doc.type.replace(/_/g, " ")} document "${doc.fileName}" has been verified by HPSEDC.`,
+          // audit 2026-07-06 (Batch 4B-2): bilingual — citizen-facing.
+          titleHi: "दस्तावेज़ सत्यापित हुआ",
+          messageHi: `आपका ${doc.type.replace(/_/g, " ")} दस्तावेज़ "${doc.fileName}" HPSEDC द्वारा सत्यापित कर दिया गया है।`,
           severity: "positive",
           metadata: { documentId: doc.id },
         }).catch(() => {});

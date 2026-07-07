@@ -134,6 +134,11 @@ export async function fireEvent(eventKey: EventKey, ctx: EventContext): Promise<
 
       let title = interpolate(tpl.title, ctx);
       let body  = interpolate(tpl.body, ctx);
+      // audit 2026-07-06 (Batch 4B-2): render the Hindi variants when the
+      // template carries them — notify() decides per-recipient (preferred_
+      // language) which language actually gets delivered.
+      let titleHi = tpl.titleHi ? interpolate(tpl.titleHi, ctx) : undefined;
+      let bodyHi  = tpl.bodyHi ? interpolate(tpl.bodyHi, ctx) : undefined;
 
       // Global setting + per-template flag must BOTH allow the employer name before
       // we keep it. For safety the default is strip-when-either-is-on.
@@ -141,6 +146,8 @@ export async function fireEvent(eventKey: EventKey, ctx: EventContext): Promise<
       if (mustScrub) {
         title = scrubEmployerName(title, ctx);
         body  = scrubEmployerName(body, ctx);
+        if (titleHi) titleHi = scrubEmployerName(titleHi, ctx);
+        if (bodyHi)  bodyHi  = scrubEmployerName(bodyHi, ctx);
       }
 
       const severity = EVENT_SEVERITY[eventKey] ?? "info";
@@ -150,6 +157,8 @@ export async function fireEvent(eventKey: EventKey, ctx: EventContext): Promise<
         type: eventKey,
         title,
         message: body,
+        titleHi,
+        messageHi: bodyHi,
         severity,
         autoSave: shouldAutoSave,
         metadata: {

@@ -168,6 +168,7 @@ import { initControls } from "./services/system-controls.service";
 import { seedNotificationTemplates } from "./services/notification-templates.seed";
 import { startJobLifecycleCron } from "./services/job-lifecycle.service";
 import { startSavedSearchesCron } from "./services/saved-searches-digest.service";
+import { startComplianceCrons } from "./services/compliance-crons.service";
 import { seedCountryInfo } from "./services/country-info.seed";
 import { seedSystemConfig } from "./services/system-config.service";
 import { seedDefaultAgency } from "./services/default-agency.seed";
@@ -184,6 +185,9 @@ import { loadValidCountries } from "./services/country-validator.service";
   if (env.NODE_ENV !== "test") {
     startJobLifecycleCron();
     startSavedSearchesCron();
+    // audit 2026-07-06 (Batch 4B-2): expiry alerts, grievance SLA aging,
+    // 30/60/90 welfare prompts. Each task is individually setting-gated.
+    startComplianceCrons();
   }
   const server = await registerRoutes(app);
 

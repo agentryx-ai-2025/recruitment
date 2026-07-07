@@ -15,6 +15,32 @@ const router = Router();
 // list/edit endpoint below.
 const ADMIN_ROLES = ["admin", "superadmin"];
 
+// audit 2026-07-06 (Batch 4B-2): computed SLA/aging fields for list responses
+// so every grievance list can render an "overdue" badge without a second
+// round-trip. `overdue` = SLA already breached (cron-stamped) OR an active
+// grievance older than its per-category SLA; resolved grievances never flag.
+async function withSlaInfo(rows: any[]): Promise<any[]> {
+  const slaByCategory = new Map<string, number>();
+  const now = Date.now();
+  const out: any[] = [];
+  for (const r of rows) {
+    let slaDays = slaByCategory.get(r.category);
+    if (slaDays === undefined) {
+      slaDays = await slaDaysForCategory(r.category).catch(() => 7);
+      slaByCategory.set(r.category, slaDays);
+    }
+    const ageDays = r.createdAt ? Math.floor((now - new Date(r.createdAt).getTime()) / 86_400_000) : 0;
+    const active = r.status !== "resolved";
+    out.push({
+      ...r,
+      slaDays,
+      ageDays,
+      overdue: !!r.slaBreachedAt || (active && ageDays > slaDays),
+    });
+  }
+  return out;
+}
+
 // ── Submit Grievance (candidate or agent) ───────────────────────────
 router.post("/", protect, async (req, res, next) => {
   try {
@@ -131,7 +157,7 @@ router.get("/assigned-to-me", protect, async (req, res, next) => {
       .where(eq(grievances.assignedTo, (req.user as any).id))
       .orderBy(desc(grievances.createdAt));
 
-    res.json({ success: true, data: rows });
+    res.json({ success: true, data: await withSlaInfo(rows) });
   } catch (error) {
     next(error);
   }
@@ -147,7 +173,7 @@ router.get("/my", protect, async (req, res, next) => {
       .where(eq(grievances.userId, (req.user as any).id))
       .orderBy(desc(grievances.createdAt));
 
-    res.json({ success: true, data: rows });
+    res.json({ success: true, data: await withSlaInfo(rows) });
   } catch (error) {
     next(error);
   }
@@ -198,7 +224,7 @@ router.get("/", protect, requireRole(ADMIN_ROLES), async (req, res, next) => {
       owner: r.assignedTo ? userMap[r.assignedTo] : null,
     }));
 
-    res.json({ success: true, data: enriched });
+    res.json({ success: true, data: await withSlaInfo(enriched) });
   } catch (error) {
     next(error);
   }

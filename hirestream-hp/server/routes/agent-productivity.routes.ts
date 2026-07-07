@@ -17,7 +17,7 @@ import { storage } from "../storage";
 import {
   applicationNotes, applications, interviews, jobs, candidates,
   savedSegments, placements, users, recruitmentAgents, auditLog,
-  grievances, employers,
+  grievances, employers, countryInfo,
 } from "@shared/schema";
 import { eq, and, desc, isNull, or, sql, inArray } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
@@ -756,8 +756,15 @@ router.get("/placements", async (req, res, next) => {
 
     // Attach the shared deployment readiness (checklist + summary) so every
     // role renders the same pre-departure truth from one source.
+    // audit 2026-07-06 (Batch 4B-2): resolve the ECR destinations once so the
+    // eMigrate/PoE step appears for ECR candidates headed to ECR countries.
+    const ecrRows = await storage.db.select({ name: countryInfo.name }).from(countryInfo)
+      .where(eq(countryInfo.isEcrCountry, true));
+    const ecrCountryNames = new Set(ecrRows.map((r: any) => r.name));
     const withReadiness = (rows: any[]) => rows.map((r: any) => {
-      const checklist = buildDeploymentChecklist(r.candidate, r.placement);
+      const checklist = buildDeploymentChecklist(r.candidate, r.placement, {
+        destinationIsEcr: ecrCountryNames.has(r.placement?.country),
+      });
       return { ...r, deployment: { checklist, summary: readinessSummary(checklist) } };
     });
 
@@ -832,6 +839,14 @@ const VISA_LABEL: Record<string, string> = {
   approved: "Approved",
   rejected: "Rejected",
 };
+// audit 2026-07-06 (Batch 4B-2): Hindi labels for the candidate-facing
+// visa-status notification (bilingual mandate).
+const VISA_LABEL_HI: Record<string, string> = {
+  not_applied: "अभी आवेदन नहीं हुआ",
+  applied: "आवेदन जमा हुआ",
+  approved: "स्वीकृत",
+  rejected: "अस्वीकृत",
+};
 router.patch("/placements/:id/visa-status", async (req, res, next) => {
   try {
     const db = storage.db;
@@ -888,12 +903,84 @@ router.patch("/placements/:id/visa-status", async (req, res, next) => {
         type: "application_update",
         title: `Visa status: ${VISA_LABEL[visaStatus]}`,
         message: `Your agency updated the visa/passport status for ${row.job.title}: ${VISA_LABEL[visaStatus]}.${note ? ` Note: ${note}` : ""}`,
+        // audit 2026-07-06 (Batch 4B-2): bilingual — citizen-facing.
+        titleHi: `वीज़ा स्थिति: ${VISA_LABEL_HI[visaStatus]}`,
+        messageHi: `आपकी एजेंसी ने ${row.job.title} के लिए वीज़ा/पासपोर्ट स्थिति अपडेट की: ${VISA_LABEL_HI[visaStatus]}।${note ? ` टिप्पणी: ${note}` : ""}`,
         severity: visaStatus === "rejected" ? "warning" : visaStatus === "approved" ? "positive" : "info",
         metadata: { placementId: row.placement.id, applicationId: row.application.id, jobId: row.job.id, visaStatus },
       }).catch(() => { /* best-effort */ });
     }
 
     logger.info(`Visa status for placement ${row.placement.id} set to ${visaStatus} by ${user.role} ${user.id}`);
+    res.json({ success: true, data: updated });
+  } catch (err) { next(err); }
+});
+
+// ── eMigrate / PoE emigration clearance (ECR candidates) ─────────────
+// audit 2026-07-06 (Batch 4B-2): staff record the emigration-clearance outcome
+// for a placement. INTERNAL tracking only — there is NO live eMigrate API
+// integration; HPSEDC obtains clearance on the government eMigrate portal and
+// records the result here so the pre-departure checklist reflects the truth.
+const EMIGRATION_STATUSES = ["not_required", "pending", "cleared"] as const;
+const EMIGRATION_LABEL: Record<string, { en: string; hi: string }> = {
+  not_required: { en: "Not required", hi: "आवश्यक नहीं" },
+  pending:      { en: "In progress on eMigrate", hi: "eMigrate पर प्रक्रिया में" },
+  cleared:      { en: "Cleared by Protector of Emigrants", hi: "Protector of Emigrants द्वारा मंज़ूर" },
+};
+router.patch("/placements/:id/emigration-clearance", async (req, res, next) => {
+  try {
+    const db = storage.db;
+    if (!db) return res.status(500).json({ success: false });
+    const user = (req as any).user;
+    if (!["agent", "admin", "superadmin"].includes(user.role)) {
+      return res.status(403).json({ success: false, message: "Forbidden" });
+    }
+    const { emigrationClearanceStatus, note } = req.body ?? {};
+    if (!EMIGRATION_STATUSES.includes(emigrationClearanceStatus)) {
+      return res.status(400).json({ success: false, message: `emigrationClearanceStatus must be one of ${EMIGRATION_STATUSES.join(", ")}` });
+    }
+
+    const [row] = await db
+      .select({ placement: placements, application: applications, job: jobs })
+      .from(placements)
+      .innerJoin(applications, eq(placements.applicationId, applications.id))
+      .innerJoin(jobs, eq(applications.jobId, jobs.id))
+      .where(eq(placements.id, req.params.id)).limit(1);
+    if (!row) return res.status(404).json({ success: false, message: "Placement not found" });
+
+    // Same IDOR guard as visa-status: agent must own the job; admins bypass.
+    if (user.role === "agent" && row.job.agentId !== user.id) {
+      return res.status(403).json({ success: false, message: "Not your placement" });
+    }
+
+    const [updated] = await db.update(placements)
+      .set({ emigrationClearanceStatus })
+      .where(eq(placements.id, row.placement.id)).returning();
+
+    await db.insert(auditLog).values({
+      userId: user.id, action: "update", resourceType: "placement_emigration",
+      resourceId: row.placement.id,
+      details: { emigrationClearanceStatus, note: note?.trim() || null, role: user.role } as any,
+      ipAddress: (req as any).ip,
+    }).catch(() => { /* history is best-effort, never block the update */ });
+
+    // Notify the candidate (bilingual — deployed workers are citizen-facing).
+    const candRows = await db.select().from(candidates).where(eq(candidates.id, row.application.candidateId!)).limit(1);
+    if (candRows.length && candRows[0].userId) {
+      const label = EMIGRATION_LABEL[emigrationClearanceStatus];
+      notify({
+        userId: candRows[0].userId,
+        type: "application_update",
+        title: `Emigration clearance: ${label.en}`,
+        message: `HPSEDC updated your emigration-clearance (PoE / eMigrate) status for ${row.job.title}: ${label.en}.${note ? ` Note: ${note}` : ""}`,
+        titleHi: `उत्प्रवास मंज़ूरी: ${label.hi}`,
+        messageHi: `HPSEDC ने ${row.job.title} के लिए आपकी उत्प्रवास मंज़ूरी (PoE / eMigrate) की स्थिति अपडेट की: ${label.hi}।${note ? ` टिप्पणी: ${note}` : ""}`,
+        severity: emigrationClearanceStatus === "cleared" ? "positive" : "info",
+        metadata: { placementId: row.placement.id, applicationId: row.application.id, jobId: row.job.id, emigrationClearanceStatus },
+      }).catch(() => { /* best-effort */ });
+    }
+
+    logger.info(`Emigration clearance for placement ${row.placement.id} set to ${emigrationClearanceStatus} by ${user.role} ${user.id}`);
     res.json({ success: true, data: updated });
   } catch (err) { next(err); }
 });

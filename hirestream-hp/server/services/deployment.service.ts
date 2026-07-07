@@ -60,7 +60,16 @@ export function ecrTravelGateIssue(candidate: any): string | null {
   return missing.length ? missing.join(" and ") : null;
 }
 
-export function buildDeploymentChecklist(candidate: any, placement: any): DeployItem[] {
+// audit 2026-07-06 (Batch 4B-2): optional context the callers resolve outside
+// this pure function (it deliberately takes no DB dependency).
+export interface DeploymentChecklistOpts {
+  // Is the placement's destination one of the MEA-notified ECR countries?
+  // (country_info.is_ecr_country — resolved by the route from the placement's
+  // country.) Drives the conditional eMigrate/PoE emigration-clearance step.
+  destinationIsEcr?: boolean;
+}
+
+export function buildDeploymentChecklist(candidate: any, placement: any, opts?: DeploymentChecklistOpts): DeployItem[] {
   const c = candidate ?? {};
   const p = placement ?? {};
   const offerAccepted = ["accepted", "active", "completed"].includes(p.status);
@@ -109,6 +118,25 @@ export function buildDeploymentChecklist(candidate: any, placement: any): Deploy
       key: "pbby", label: "PBBY insurance", owner: "agency",
       status: c.pbbyInsuranceStatus === "enrolled" ? "done" : "pending",
     },
+    // audit 2026-07-06 (Batch 4B-2): eMigrate / PoE emigration clearance —
+    // shown ONLY when the destination is an ECR-notified country AND the
+    // candidate holds an ECR passport (an ECR worker departing to an ECR
+    // country without PoE clearance is unlawful under the Emigration Act).
+    // INTERNAL tracking only: there is no live eMigrate API integration —
+    // HPSEDC staff record the outcome obtained on the government portal via
+    // PATCH /placements/:id/emigration-clearance.
+    ...((opts?.destinationIsEcr && c.ecrStatus === "ecr" ? [{
+      key: "emigration",
+      label: "Emigration clearance (PoE / eMigrate)",
+      owner: "agency",
+      status: p.emigrationClearanceStatus === "cleared" || p.emigrationClearanceStatus === "not_required"
+        ? "done"
+        : p.emigrationClearanceStatus === "pending" ? "in_progress" : "pending",
+      detail: p.emigrationClearanceStatus === "cleared" ? "Cleared by Protector of Emigrants"
+        : p.emigrationClearanceStatus === "not_required" ? "Marked not required by HPSEDC"
+        : p.emigrationClearanceStatus === "pending" ? "Application in progress on eMigrate"
+        : "Required — ECR passport travelling to an ECR country",
+    }] : []) as DeployItem[]),
     {
       key: "appointment", label: "Appointment letter", owner: "agency",
       status: p.appointmentLetterUrl ? "done" : "pending",

@@ -5,7 +5,7 @@ import { storage } from "../../storage";
 import {
   users, candidates, jobs, applications, recruitmentAgents,
   employers, recruitmentDrives, interviews, placements,
-  grievances, notifications, documents,
+  grievances, notifications, documents, countryInfo,
 } from "@shared/schema";
 import { eq, count, sql, desc, and } from "drizzle-orm";
 
@@ -300,6 +300,70 @@ function toCSV(rows: any[]): string {
   }
   return lines.join("\n");
 }
+
+// ── MEA / PoE (eMigrate-aligned) reporting export ─────────────────────
+// audit 2026-07-06 (Batch 4B-2): CSV shaped for MEA / Protector-of-Emigrants
+// returns: deployed ECR candidates (ECR passport OR ECR-notified destination)
+// with passport, destination, employer, contract and clearance status.
+// HPSEDC is the Recruiting Agent (RA) on every row — single-agency deployment.
+// INTERNAL export only; there is no live eMigrate API submission.
+//
+// CSV-injection defense (same rule as the Smart Job Importer's defuseCell):
+// strip leading formula-trigger characters so cells are inert in Excel/Sheets.
+function defuseCsvCell(v: any): string {
+  if (v === null || v === undefined) return "";
+  return String(v).replace(/^[=+\-@\t\r]+/, "");
+}
+
+// NOTE: registered BEFORE /export/:entity.csv — Express matches in order, and
+// the generic :entity pattern would otherwise swallow "mea-emigrate".
+router.get("/export/mea-emigrate.csv", async (_req, res, next) => {
+  try {
+    const db = storage.db;
+    if (!db) return res.status(500).send("db unavailable");
+
+    const rows = await db
+      .select({ placement: placements, application: applications, candidate: candidates, job: jobs, country: countryInfo })
+      .from(placements)
+      .innerJoin(applications, eq(placements.applicationId, applications.id))
+      .innerJoin(candidates, eq(applications.candidateId, candidates.id))
+      .innerJoin(jobs, eq(applications.jobId, jobs.id))
+      .leftJoin(countryInfo, eq(countryInfo.name, placements.country))
+      .where(sql`${placements.status} IN ('accepted','active','completed')`);
+
+    const reportRows = (rows as any[])
+      .filter((r) => r.candidate?.ecrStatus === "ecr" || r.country?.isEcrCountry === true)
+      .map((r) => ({
+        candidate_name: defuseCsvCell(r.candidate.fullName),
+        passport_number: defuseCsvCell(r.candidate.passportNumber),
+        ecr_status: defuseCsvCell(r.candidate.ecrStatus ?? "unknown"),
+        destination_country: defuseCsvCell(r.placement.country),
+        destination_is_ecr: r.country?.isEcrCountry === true ? "yes" : "no",
+        employer_company: defuseCsvCell(r.job.company),
+        job_title: defuseCsvCell(r.job.title),
+        contract_salary: defuseCsvCell(r.placement.salary ?? r.job.salary),
+        emigration_clearance_status: defuseCsvCell(r.placement.emigrationClearanceStatus ?? "not_recorded"),
+        deployment_date: r.placement.startDate ? new Date(r.placement.startDate).toISOString().slice(0, 10) : "",
+        placement_status: defuseCsvCell(r.placement.status),
+        recruiting_agent: "HPSEDC", // single super-agency — the RA on record
+      }));
+
+    // Always emit the header row — an empty ECR return is a valid result HPSEDC
+    // still hands to the Protectorate, and a blank file reads as "broken export".
+    const MEA_HEADERS = [
+      "candidate_name", "passport_number", "ecr_status", "destination_country",
+      "destination_is_ecr", "employer_company", "job_title", "contract_salary",
+      "emigration_clearance_status", "deployment_date", "placement_status", "recruiting_agent",
+    ];
+    const csv = reportRows.length ? toCSV(reportRows) : MEA_HEADERS.join(",");
+    const filename = `mea-emigrate-return-${new Date().toISOString().slice(0, 10)}.csv`;
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.send(csv);
+  } catch (error) {
+    next(error);
+  }
+});
 
 router.get("/export/:entity.csv", async (req, res, next) => {
   try {

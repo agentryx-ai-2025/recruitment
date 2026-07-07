@@ -232,7 +232,9 @@ router.get("/placements/:id/deployment", async (req, res, next) => {
       .where(and(eq(auditLog.resourceType, "placement_visa"), eq(auditLog.resourceId, p.id)))
       .orderBy(desc(auditLog.createdAt));
 
-    const checklist = buildDeploymentChecklist(cand, p);
+    // audit 2026-07-06 (Batch 4B-2): destination ECR flag drives the
+    // conditional eMigrate/PoE checklist step for ECR candidates.
+    const checklist = buildDeploymentChecklist(cand, p, { destinationIsEcr: !!ci?.isEcrCountry });
 
     res.json({
       success: true,

@@ -103,6 +103,12 @@ export const candidates = pgTable("candidates", {
   emergencyContactName: text("emergency_contact_name"),
   emergencyContactPhone: text("emergency_contact_phone"),
   emergencyContactRelation: text("emergency_contact_relation"),
+  // audit 2026-07-06 (Batch 4B-2): expiry-alert cron state. Maps doc key →
+  // last alerted milestone (days-remaining bucket: 90/60/30/0=expired), e.g.
+  // {"passport": 60, "pcc": 0}. A key is cleared when the doc is renewed so
+  // alerts re-arm; the cron only notifies when a DEEPER milestone is crossed,
+  // which is what keeps the daily run from spamming the same warning forever.
+  expiryAlertsSent: jsonb("expiry_alerts_sent").default({}),
   // PWS §2: agent outreach opt-in (default controlled by setting candidate.default_open_to_outreach)
   openToOutreach: boolean("open_to_outreach").notNull().default(true),
   // v0.4.33 (Phase 3, HPSEDC Item 2): Matching Engine v2 candidate-side
@@ -261,6 +267,11 @@ export const notificationTemplates = pgTable("notification_templates", {
   recipientRole: text("recipient_role").notNull(), // candidate | agent | employer
   title: text("title").notNull(),
   body: text("body").notNull(),
+  // audit 2026-07-06 (Batch 4B-2): optional Hindi variants. When present AND
+  // the recipient's users.preferred_language = 'hi', fireEvent()/notify()
+  // deliver these instead of the English title/body (fallback = English).
+  titleHi: text("title_hi"),
+  bodyHi: text("body_hi"),
   channels: text("channels").array().notNull(),
   hideEmployerName: boolean("hide_employer_name").notNull().default(false),
   enabled: boolean("enabled").notNull().default(true),
@@ -576,6 +587,15 @@ export const placements = pgTable("placements", {
   // moment (admin override). Nullable = no expiry (pre-existing offers).
   offerExpiresAt: timestamp("offer_expires_at"),
   visaStatus: text("visa_status"), // not_applied, applied, approved, rejected
+  // audit 2026-07-06 (Batch 4B-2): eMigrate / PoE emigration-clearance tracking
+  // for ECR candidates going to ECR-notified countries. INTERNAL tracking only —
+  // there is no live eMigrate API; HPSEDC staff record the outcome they obtained
+  // on the government eMigrate portal. null = not yet assessed.
+  emigrationClearanceStatus: text("emigration_clearance_status"), // not_required | pending | cleared
+  // audit 2026-07-06 (Batch 4B-2): welfare-prompt cron state. Maps milestone →
+  // ISO date the automated "How are you?" prompt was sent, e.g. {"30": "2026-07-07"}.
+  // A milestone is prompted at most once per placement (idempotency marker).
+  welfarePromptsSent: jsonb("welfare_prompts_sent").default({}),
   // Post-placement welfare follow-up (MEA requirement)
   welfare30Day: text("welfare_30_day"),             // ok | concerns | no_response | not_applicable
   welfare30DayAt: timestamp("welfare_30_day_at"),
@@ -613,6 +633,10 @@ export const grievances = pgTable("grievances", {
   resolutionNotes: text("resolution_notes"),
   assignedTo: varchar("assigned_to").references(() => users.id),
   resolvedAt: timestamp("resolved_at"),
+  // audit 2026-07-06 (Batch 4B-2): stamped once by the SLA-aging cron when the
+  // grievance blows past its per-category SLA. Doubles as the re-escalation
+  // guard — a breached grievance is never escalated (or re-notified) again.
+  slaBreachedAt: timestamp("sla_breached_at"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
