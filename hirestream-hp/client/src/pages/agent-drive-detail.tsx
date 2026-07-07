@@ -484,8 +484,10 @@ function InterviewFeedbackModal({ open, onClose, interview, onSaved }: {
           <div>
             <label className="text-xs font-semibold text-slate-600 block mb-1">Overall rating</label>
             <div className="flex gap-1">
+              {/* audit 2026-07-06 (Batch 3): icon-only star buttons needed aria-labels (agent-facing, English) */}
               {[1, 2, 3, 4, 5].map((n) => (
                 <button key={n} type="button" onClick={() => setRating(n === rating ? 0 : n)}
+                  aria-label={`Rate ${n} out of 5`} aria-pressed={n <= rating}
                   className="p-0.5 hover:scale-110 transition">
                   <Star className={`w-6 h-6 ${n <= rating ? "fill-amber-500 text-amber-500" : "text-slate-300"}`} />
                 </button>

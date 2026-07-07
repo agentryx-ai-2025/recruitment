@@ -133,11 +133,14 @@ export function KYBDocSlots({ title, subtitle, slots, endpoint, queryKey }: Prop
             <Eye className="w-3 h-3 mr-1" /> Preview
           </Button>
           <Button variant="ghost" size="sm" onClick={() => window.open(`${endpoint}/${doc.id}/download`, "_blank")}
+            aria-label="Download document"
             className="h-7 w-7 p-0 rounded-md text-slate-500 hover:text-blue-600" title="Download">
             <Download className="w-3 h-3" />
           </Button>
           {doc.status !== "approved" && (
+            /* audit 2026-07-06 (Batch 3): icon-only delete needed an aria-label */
             <Button variant="ghost" size="sm" onClick={() => deleteMutation.mutate(doc.id)}
+              aria-label="Delete document" title="Delete document"
               className="h-7 w-7 p-0 rounded-md text-red-400 hover:text-red-600 hover:bg-red-50">
               <Trash2 className="w-3 h-3" />
             </Button>

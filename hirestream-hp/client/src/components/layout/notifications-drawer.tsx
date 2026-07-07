@@ -16,6 +16,8 @@
  */
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
+import i18n from "@/lib/i18n";
 import { Bell, X, Bookmark, CheckCheck, Inbox, Archive } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
@@ -37,20 +39,23 @@ function severityStyle(s: Severity) {
   }
 }
 
+// audit 2026-07-06 (Batch 3): relative times were hardcoded English; module-level
+// i18n instance works outside a component render (re-renders pick up language switches).
 function timeAgo(iso?: string): string {
   if (!iso) return "";
   const ms = Date.now() - new Date(iso).getTime();
   const m = Math.floor(ms / 60000);
-  if (m < 1) return "just now";
-  if (m < 60) return `${m}m ago`;
+  if (m < 1) return i18n.t("notif.justNow");
+  if (m < 60) return i18n.t("notif.minutesAgo", { count: m });
   const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h ago`;
+  if (h < 24) return i18n.t("notif.hoursAgo", { count: h });
   const d = Math.floor(h / 24);
-  return `${d}d ago`;
+  return i18n.t("notif.daysAgo", { count: d });
 }
 
 export function NotificationsDrawer() {
   const qc = useQueryClient();
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<"active" | "saved">("active");
 
@@ -96,7 +101,7 @@ export function NotificationsDrawer() {
       <SheetTrigger asChild>
         <button
           className="relative p-2 rounded-full hover:bg-gray-100 transition-colors"
-          aria-label={`Notifications (${unread} unread)`}
+          aria-label={t("notif.bellAria", { count: unread })}
         >
           <Bell className="w-5 h-5 text-gray-600" />
           {unread > 0 && (
@@ -112,21 +117,21 @@ export function NotificationsDrawer() {
       <SheetContent className="w-full sm:max-w-md p-0 flex flex-col">
         <SheetHeader className="px-5 py-4 border-b border-slate-200">
           <SheetTitle className="flex items-center gap-2 text-base">
-            <Bell className="w-5 h-5 text-slate-700" /> Notifications
+            <Bell className="w-5 h-5 text-slate-700" /> {t("notif.title")}
           </SheetTitle>
           <div className="flex gap-1 mt-3 bg-slate-100 rounded-lg p-1 text-xs">
             <button onClick={() => setTab("active")}
               className={`flex-1 px-3 py-1.5 rounded-md transition flex items-center justify-center gap-1.5 ${
                 tab === "active" ? "bg-white shadow-sm text-slate-900 font-medium" : "text-slate-600 hover:text-slate-900"
               }`}>
-              <Inbox className="w-3.5 h-3.5" /> Active
+              <Inbox className="w-3.5 h-3.5" /> {t("notif.tabActive")}
               {unread > 0 && <span className="bg-red-500 text-white text-[10px] rounded-full px-1.5 py-0.5">{unread}</span>}
             </button>
             <button onClick={() => setTab("saved")}
               className={`flex-1 px-3 py-1.5 rounded-md transition flex items-center justify-center gap-1.5 ${
                 tab === "saved" ? "bg-white shadow-sm text-slate-900 font-medium" : "text-slate-600 hover:text-slate-900"
               }`}>
-              <Archive className="w-3.5 h-3.5" /> Saved
+              <Archive className="w-3.5 h-3.5" /> {t("notif.tabSaved")}
               {savedCount > 0 && <span className="bg-slate-500 text-white text-[10px] rounded-full px-1.5 py-0.5">{savedCount}</span>}
             </button>
           </div>
@@ -136,11 +141,11 @@ export function NotificationsDrawer() {
           <div className="px-5 py-2 flex gap-2 border-b border-slate-100 bg-slate-50/50">
             <Button size="sm" variant="ghost" className="h-7 text-[11px] text-slate-600 hover:text-slate-900"
               onClick={() => markAllRead.mutate()}>
-              <CheckCheck className="w-3.5 h-3.5 mr-1" /> Mark all read
+              <CheckCheck className="w-3.5 h-3.5 mr-1" /> {t("notif.markAllRead")}
             </Button>
             <Button size="sm" variant="ghost" className="h-7 text-[11px] text-slate-600 hover:text-slate-900"
-              onClick={() => { if (window.confirm("Dismiss all unsaved notifications?")) dismissAll.mutate(); }}>
-              <X className="w-3.5 h-3.5 mr-1" /> Dismiss all
+              onClick={() => { if (window.confirm(t("notif.dismissAllConfirm"))) dismissAll.mutate(); }}>
+              <X className="w-3.5 h-3.5 mr-1" /> {t("notif.dismissAll")}
             </Button>
           </div>
         )}
@@ -164,9 +169,7 @@ export function NotificationsDrawer() {
         </div>
 
         <div className="px-5 py-3 border-t border-slate-200 text-[11px] text-slate-400 text-center">
-          {tab === "active"
-            ? "Dismissed items never appear again. Save important ones to keep them here."
-            : "Saved items stay here until you unsave or dismiss them."}
+          {tab === "active" ? t("notif.footerActive") : t("notif.footerSaved")}
         </div>
       </SheetContent>
     </Sheet>
@@ -176,6 +179,7 @@ export function NotificationsDrawer() {
 function NotificationCard({ n, inSavedTab, onDismiss, onToggleSave }: {
   n: Notif; inSavedTab: boolean; onDismiss: () => void; onToggleSave: () => void;
 }) {
+  const { t } = useTranslation();
   const style = severityStyle(n.severity);
   const isSaved = !!n.savedAt;
   return (
@@ -193,14 +197,14 @@ function NotificationCard({ n, inSavedTab, onDismiss, onToggleSave }: {
               className={`inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded ${
                 isSaved ? "bg-slate-900 text-white" : "bg-white text-slate-600 border border-slate-200 hover:border-slate-400"
               }`}
-              title={isSaved ? "Remove from Saved" : "Save for later"}>
+              title={isSaved ? t("notif.unsaveTitle") : t("notif.saveTitle")}>
               <Bookmark className="w-3 h-3" />
-              {isSaved ? (inSavedTab ? "Unsave" : "Saved") : "Save"}
+              {isSaved ? (inSavedTab ? t("notif.unsave") : t("notif.saved")) : t("notif.save")}
             </button>
             <button onClick={onDismiss}
               className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded bg-white text-slate-500 border border-slate-200 hover:border-red-300 hover:text-red-700"
-              title="Dismiss — never show again">
-              <X className="w-3 h-3" /> Dismiss
+              title={t("notif.dismissTitle")}>
+              <X className="w-3 h-3" /> {t("notif.dismiss")}
             </button>
           </div>
         </div>
@@ -210,19 +214,20 @@ function NotificationCard({ n, inSavedTab, onDismiss, onToggleSave }: {
 }
 
 function EmptyState({ tab }: { tab: "active" | "saved" }) {
+  const { t } = useTranslation();
   return (
     <div className="h-full flex flex-col items-center justify-center text-center p-10">
       {tab === "active" ? (
         <>
           <Inbox className="w-10 h-10 text-slate-300 mb-3" />
-          <p className="text-sm font-medium text-slate-700">You're all caught up</p>
-          <p className="text-xs text-slate-500 mt-1">New notifications will land here.</p>
+          <p className="text-sm font-medium text-slate-700">{t("notif.emptyActive")}</p>
+          <p className="text-xs text-slate-500 mt-1">{t("notif.emptyActiveDesc")}</p>
         </>
       ) : (
         <>
           <Archive className="w-10 h-10 text-slate-300 mb-3" />
-          <p className="text-sm font-medium text-slate-700">Nothing saved yet</p>
-          <p className="text-xs text-slate-500 mt-1">Hit 🔖 on a notification to keep it here for later.</p>
+          <p className="text-sm font-medium text-slate-700">{t("notif.emptySaved")}</p>
+          <p className="text-xs text-slate-500 mt-1">{t("notif.emptySavedDesc")}</p>
         </>
       )}
     </div>

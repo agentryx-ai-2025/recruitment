@@ -289,7 +289,8 @@ export default function SimpleApplyPage() {
             {languages.map((l: any) => (
               <span key={l.id} className="inline-flex items-center gap-2 pl-4 pr-2 py-2.5 rounded-xl text-sm font-semibold bg-sky-100 text-sky-800 border border-sky-200/80">
                 {tx(`choices.langs.${l.language}`, l.language)}<span className="text-sky-500 font-normal">· {tx(`choices.prof.${l.proficiency}`, l.proficiency)}</span>
-                <button onClick={() => removeLang(l.id)} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-sky-200 hover:text-red-500"><X className="w-4 h-4" /></button>
+                {/* audit 2026-07-06 (Batch 3): icon-only remove chip needed an aria-label */}
+                <button onClick={() => removeLang(l.id)} aria-label={t("simpleApply.removeLangAria", { lang: tx(`choices.langs.${l.language}`, l.language) })} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-sky-200 hover:text-red-500"><X className="w-4 h-4" /></button>
               </span>
             ))}
           </div>

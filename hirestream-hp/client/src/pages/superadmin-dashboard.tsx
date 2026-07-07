@@ -641,23 +641,24 @@ function CreateUserDialog({ open, onClose }: { open: boolean; onClose: () => voi
             Create any user directly — including admins and super admins. Registration form only allows candidate/agent/employer.
           </DialogDescription>
         </DialogHeader>
+        {/* audit 2026-07-06 (Batch 3): labels were not associated with their inputs — added htmlFor/id */}
         <div className="space-y-3 mt-2">
           <div>
-            <label className="text-xs font-semibold text-slate-600 mb-1 block">Username</label>
-            <Input value={username} onChange={e => setUsername(e.target.value)} placeholder="demo_admin2" className="rounded-lg" />
+            <label htmlFor="create-user-username" className="text-xs font-semibold text-slate-600 mb-1 block">Username</label>
+            <Input id="create-user-username" value={username} onChange={e => setUsername(e.target.value)} placeholder="demo_admin2" className="rounded-lg" />
           </div>
           <div>
-            <label className="text-xs font-semibold text-slate-600 mb-1 block">Email</label>
-            <Input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="user@hirestream.dev" className="rounded-lg" />
+            <label htmlFor="create-user-email" className="text-xs font-semibold text-slate-600 mb-1 block">Email</label>
+            <Input id="create-user-email" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="user@hirestream.dev" className="rounded-lg" />
           </div>
           <div>
-            <label className="text-xs font-semibold text-slate-600 mb-1 block">Password</label>
-            <Input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Min 8 chars, mixed case" className="rounded-lg" />
+            <label htmlFor="create-user-password" className="text-xs font-semibold text-slate-600 mb-1 block">Password</label>
+            <Input id="create-user-password" type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Min 8 chars, mixed case" className="rounded-lg" />
           </div>
           <div>
-            <label className="text-xs font-semibold text-slate-600 mb-1 block">Role</label>
+            <label htmlFor="create-user-role" className="text-xs font-semibold text-slate-600 mb-1 block">Role</label>
             <Select value={role} onValueChange={setRole}>
-              <SelectTrigger className="rounded-lg"><SelectValue /></SelectTrigger>
+              <SelectTrigger id="create-user-role" className="rounded-lg"><SelectValue /></SelectTrigger>
               <SelectContent>
                 {ROLES.map(r => <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>)}
               </SelectContent>
@@ -912,7 +913,8 @@ function DataManagementPanel() {
         <div className="mt-4 bg-slate-900 text-slate-100 rounded-lg p-3 font-mono text-[11px]">
           <div className="flex items-center justify-between mb-2">
             <span className="text-emerald-400 font-bold">{String(lastResult.type).toUpperCase()} · Success</span>
-            <button onClick={() => setLastResult(null)} className="text-slate-400 hover:text-white">✕</button>
+            {/* audit 2026-07-06 (Batch 3): icon-only dismiss needed an aria-label (superadmin-only, English) */}
+            <button onClick={() => setLastResult(null)} aria-label="Dismiss result" className="text-slate-400 hover:text-white">✕</button>
           </div>
           <pre className="whitespace-pre-wrap break-words overflow-auto max-h-48">{JSON.stringify(lastResult.data, null, 2)}</pre>
         </div>

@@ -654,23 +654,8 @@ function MinAppStatus({ app, extra, setActiveView, t }: any) {
 }
 
 // ── Helper Components ───────────────────────────────────────────────
-
-function InitialsAvatar({ name, size = "w-12 h-12" }: { name: string; size?: string }) {
-  const initials = name.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2);
-  const gradients = [
-    "from-blue-500 to-blue-600",
-    "from-emerald-500 to-emerald-600",
-    "from-purple-500 to-purple-600",
-    "from-orange-500 to-orange-600",
-    "from-rose-500 to-rose-600",
-  ];
-  const idx = name.split("").reduce((a, c) => a + c.charCodeAt(0), 0) % gradients.length;
-  return (
-    <div className={`${size} bg-gradient-to-br ${gradients[idx]} rounded-2xl flex items-center justify-center text-white font-bold text-sm flex-shrink-0 shadow-md`}>
-      {initials || "?"}
-    </div>
-  );
-}
+// audit 2026-07-06 (Batch 3): removed unused local InitialsAvatar — superseded
+// by the shared PhotoAvatar; other dashboards keep their own copies.
 
 // PhotoAvatar moved to @/components/shared/PhotoAvatar so every listing
 // (agent-candidate-detail, employer-review, agent-job-detail, etc.) renders
@@ -926,7 +911,16 @@ function JobsView({ allJobs, appliedJobIds, savedJobIds, recommendations, comple
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [reportOpen, setReportOpen] = useState(false);
   const { toast } = useToast();
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
+  // audit 2026-07-06 (Batch 3): on phones the views stack (list above detail);
+  // scroll the detail pane into view when a job is picked so the tap "responds".
+  const detailRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (selectedJob && typeof window !== "undefined" && window.innerWidth < 1024) {
+      detailRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, [selectedJob?.id]);
 
   const matchMap: Record<string, any> = {};
   recommendations.forEach((r: any) => { matchMap[r.id] = { score: r.matchScore, breakdown: r.scoreBreakdown }; });
@@ -969,7 +963,7 @@ function JobsView({ allJobs, appliedJobIds, savedJobIds, recommendations, comple
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/v1/jobs/saved/my"] });
-      toast({ title: data.saved ? "Job Saved" : "Removed from Saved" });
+      toast({ title: data.saved ? t("jobsView.toastSaved") : t("jobsView.toastUnsaved") });
     },
   });
 
@@ -982,33 +976,35 @@ function JobsView({ allJobs, appliedJobIds, savedJobIds, recommendations, comple
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/v1/candidates/applications"] });
       queryClient.invalidateQueries({ queryKey: ["/api/v1/applications/recommendations/for-me"] });
-      toast({ title: "Applied!", description: `Match score: ${data.data?.matchScore}%` });
+      toast({ title: t("jobsView.toastApplied"), description: t("jobsView.toastAppliedDesc", { score: data.data?.matchScore }) });
     },
-    onError: (err: any) => toast({ title: "Failed", description: err.message, variant: "destructive" }),
+    onError: (err: any) => toast({ title: t("jobsView.toastFailed"), description: err.message, variant: "destructive" }),
   });
 
   return (
-    <div className="flex gap-4 h-[calc(100vh-12rem)]">
+    /* audit 2026-07-06 (Batch 3): was desktop-only two-pane (fixed w-[400px]);
+       now stacks below lg: so 360px phones get list first, detail below. */
+    <div className="flex flex-col lg:flex-row gap-4 lg:h-[calc(100vh-12rem)]">
       {/* Job List */}
-      <div className="w-[400px] flex-shrink-0 flex flex-col">
+      <div className="w-full lg:w-[400px] lg:flex-shrink-0 flex flex-col">
         <div className="space-y-3 mb-4">
           <div className="relative">
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-            <Input placeholder="Search by title, company, skills..." value={search} onChange={e => setSearch(e.target.value)}
+            <Input placeholder={t("jobsView.searchPlaceholder")} value={search} onChange={e => setSearch(e.target.value)}
               className="pl-11 h-11 rounded-xl text-sm border-slate-200" />
           </div>
           <div className="grid grid-cols-2 gap-2">
             <Select value={country} onValueChange={setCountry}>
-              <SelectTrigger className="h-9 text-xs rounded-xl border-slate-200"><Globe className="w-3.5 h-3.5 mr-1.5 text-slate-400" /><SelectValue placeholder="Country" /></SelectTrigger>
+              <SelectTrigger className="h-9 text-xs rounded-xl border-slate-200"><Globe className="w-3.5 h-3.5 mr-1.5 text-slate-400" /><SelectValue placeholder={t("jobs.country")} /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Countries</SelectItem>
+                <SelectItem value="all">{t("jobsView.allCountries")}</SelectItem>
                 {countries.map(c => <SelectItem key={c} value={c!}>{c}</SelectItem>)}
               </SelectContent>
             </Select>
             <Select value={categoryFilter} onValueChange={setCategoryFilter}>
               <SelectTrigger className="h-9 text-xs rounded-xl border-slate-200"><Tag className="w-3.5 h-3.5 mr-1.5 text-slate-400" /><SelectValue placeholder="Category" /></SelectTrigger>
               <SelectContent className="max-h-72">
-                <SelectItem value="all">All Categories</SelectItem>
+                <SelectItem value="all">{t("jobsView.allCategories")}</SelectItem>
                 {JOB_CATEGORIES.map((c) => (
                   <SelectItem key={c.key} value={c.key}>{c.label}</SelectItem>
                 ))}
@@ -1017,40 +1013,40 @@ function JobsView({ allJobs, appliedJobIds, savedJobIds, recommendations, comple
             <Select value={experienceTier} onValueChange={setExperienceTier}>
               <SelectTrigger className="h-9 text-xs rounded-xl border-slate-200"><Briefcase className="w-3.5 h-3.5 mr-1.5 text-slate-400" /><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Any Experience</SelectItem>
-                <SelectItem value="fresher">Fresher (0–1 yr)</SelectItem>
-                <SelectItem value="junior">Junior (2–3 yr)</SelectItem>
-                <SelectItem value="mid">Mid (4–6 yr)</SelectItem>
-                <SelectItem value="senior">Senior (7–10 yr)</SelectItem>
-                <SelectItem value="lead">Lead (10+ yr)</SelectItem>
+                <SelectItem value="all">{t("jobsView.anyExperience")}</SelectItem>
+                <SelectItem value="fresher">{t("jobsView.expFresher")}</SelectItem>
+                <SelectItem value="junior">{t("jobsView.expJunior")}</SelectItem>
+                <SelectItem value="mid">{t("jobsView.expMid")}</SelectItem>
+                <SelectItem value="senior">{t("jobsView.expSenior")}</SelectItem>
+                <SelectItem value="lead">{t("jobsView.expLead")}</SelectItem>
               </SelectContent>
             </Select>
             <Select value={salaryTier} onValueChange={setSalaryTier}>
               <SelectTrigger className="h-9 text-xs rounded-xl border-slate-200"><DollarSign className="w-3.5 h-3.5 mr-1.5 text-slate-400" /><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Any Salary</SelectItem>
-                <SelectItem value="entry">Entry (&lt; $40k)</SelectItem>
-                <SelectItem value="mid">Mid ($40k – $80k)</SelectItem>
-                <SelectItem value="senior">Senior ($80k+)</SelectItem>
-                <SelectItem value="unknown">Unlisted / Monthly</SelectItem>
+                <SelectItem value="all">{t("jobsView.anySalary")}</SelectItem>
+                <SelectItem value="entry">{t("jobsView.salEntry")}</SelectItem>
+                <SelectItem value="mid">{t("jobsView.salMid")}</SelectItem>
+                <SelectItem value="senior">{t("jobsView.salSenior")}</SelectItem>
+                <SelectItem value="unknown">{t("jobsView.salUnknown")}</SelectItem>
               </SelectContent>
             </Select>
             <Select value={sortBy} onValueChange={setSortBy}>
               <SelectTrigger className="h-9 text-xs rounded-xl border-slate-200"><ArrowUpDown className="w-3 h-3 mr-1.5 text-slate-400" /><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="match">Best Match</SelectItem>
-                <SelectItem value="date">Newest</SelectItem>
-                <SelectItem value="salary">Salary (high → low)</SelectItem>
+                <SelectItem value="match">{t("jobsView.sortMatch")}</SelectItem>
+                <SelectItem value="date">{t("jobsView.sortNewest")}</SelectItem>
+                <SelectItem value="salary">{t("jobsView.sortSalary")}</SelectItem>
               </SelectContent>
             </Select>
           </div>
         </div>
         <div className="flex items-center justify-between mb-3">
-          <p className="text-xs text-slate-400 font-medium">{filtered.length} jobs found</p>
+          <p className="text-xs text-slate-400 font-medium">{t("jobsView.jobsFound", { count: filtered.length })}</p>
           <SaveSearchButton filters={{ search, country, sortBy, salaryTier, experienceTier }} />
         </div>
 
-        <div className="flex-1 overflow-y-auto space-y-2 pr-1">
+        <div className="flex-1 overflow-y-auto space-y-2 pr-1 max-h-[55vh] lg:max-h-none">
           {filtered.map((job: any) => {
             const isApplied = appliedJobIds.has(job.id);
             const isSaved = savedJobIds.has(job.id);
@@ -1070,7 +1066,8 @@ function JobsView({ allJobs, appliedJobIds, savedJobIds, recommendations, comple
                 <button
                   onClick={(e) => { e.stopPropagation(); saveMutation.mutate(job.id); }}
                   className="absolute top-3 right-3 p-1.5 rounded-lg hover:bg-slate-100 transition-all z-10"
-                  title={isSaved ? "Remove from saved" : "Save for later"}>
+                  aria-label={isSaved ? t("jobsView.removeSaved") : t("jobsView.saveForLater")}
+                  title={isSaved ? t("jobsView.removeSaved") : t("jobsView.saveForLater")}>
                   {isSaved
                     ? <BookmarkCheck className="w-4 h-4 text-blue-600 fill-blue-600" />
                     : <Bookmark className="w-4 h-4 text-slate-400 hover:text-blue-500" />}
@@ -1083,8 +1080,8 @@ function JobsView({ allJobs, appliedJobIds, savedJobIds, recommendations, comple
                         <p className="text-sm font-bold text-slate-900 truncate">{job.title}</p>
                         {isApplied && <CheckCircle className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" />}
                         {!isApplied && easyApplyEligible && (
-                          <span className="inline-flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200" title="Your profile is ready — apply in one click">
-                            <Zap className="w-2.5 h-2.5" /> EASY APPLY
+                          <span className="inline-flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200" title={t("jobsView.easyApplyTitle")}>
+                            <Zap className="w-2.5 h-2.5" /> {t("jobsView.easyApply")}
                           </span>
                         )}
                       </div>
@@ -1096,7 +1093,7 @@ function JobsView({ allJobs, appliedJobIds, savedJobIds, recommendations, comple
                             Tester feedback 1.16: "no indication of how much experience is required". */}
                         {typeof job.experience === "number" && job.experience > 0 && (
                           <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold px-1.5 py-0 rounded bg-slate-100 text-slate-700 ml-1">
-                            <Briefcase className="w-2.5 h-2.5" /> {job.experience}+ yrs
+                            <Briefcase className="w-2.5 h-2.5" /> {t("jobsView.yrsPlus", { years: job.experience })}
                           </span>
                         )}
                         {job.category && (
@@ -1126,8 +1123,8 @@ function JobsView({ allJobs, appliedJobIds, savedJobIds, recommendations, comple
                         className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-md px-2 py-1 inline-flex items-center gap-1 transition"
                       >
                         {applyMutation.isPending && applyMutation.variables === job.id
-                          ? <><Loader2 className="w-3 h-3 animate-spin" /> Applying…</>
-                          : <><Zap className="w-3 h-3" /> Apply now</>}
+                          ? <><Loader2 className="w-3 h-3 animate-spin" /> {t("jobsView.applying")}</>
+                          : <><Zap className="w-3 h-3" /> {t("jobsView.applyNowShort")}</>}
                       </button>
                     </div>
                   )}
@@ -1139,7 +1136,7 @@ function JobsView({ allJobs, appliedJobIds, savedJobIds, recommendations, comple
       </div>
 
       {/* Job Detail */}
-      <div className="flex-1 min-w-0">
+      <div ref={detailRef} className="flex-1 min-w-0 min-h-[50vh] lg:min-h-0">
         <AnimatePresence mode="wait">
           {selectedJob ? (
             <motion.div
@@ -1154,9 +1151,9 @@ function JobsView({ allJobs, appliedJobIds, savedJobIds, recommendations, comple
                 <button
                   onClick={() => setReportOpen(true)}
                   className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold bg-slate-50 text-slate-500 border border-slate-200 hover:text-red-600 hover:border-red-200 transition-all"
-                  title="Report a suspicious job to HPSEDC"
+                  title={t("jobsView.reportTitle")}
                 >
-                  <Flag className="w-3.5 h-3.5" /> Report
+                  <Flag className="w-3.5 h-3.5" /> {t("jobsView.report")}
                 </button>
                 <button
                   onClick={() => saveMutation.mutate(selectedJob.id)}
@@ -1166,8 +1163,8 @@ function JobsView({ allJobs, appliedJobIds, savedJobIds, recommendations, comple
                       : "bg-slate-50 text-slate-500 border border-slate-200 hover:text-blue-600 hover:border-blue-200"
                   }`}>
                   {savedJobIds.has(selectedJob.id)
-                    ? <><BookmarkCheck className="w-4 h-4 fill-blue-600" /> Saved</>
-                    : <><Bookmark className="w-4 h-4" /> Save</>}
+                    ? <><BookmarkCheck className="w-4 h-4 fill-blue-600" /> {t("jobsView.saved")}</>
+                    : <><Bookmark className="w-4 h-4" /> {t("common.save")}</>}
                 </button>
               </div>
 
@@ -1181,7 +1178,7 @@ function JobsView({ allJobs, appliedJobIds, savedJobIds, recommendations, comple
                       <span className="flex items-center gap-1.5"><Tag className="w-3.5 h-3.5 text-slate-400" />{jobCategoryLabel(selectedJob.category)}</span>
                     )}
                     {selectedJob.salary && <span className="flex items-center gap-1.5"><DollarSign className="w-3.5 h-3.5 text-slate-400" />{selectedJob.salary}</span>}
-                    <span className="flex items-center gap-1.5"><Clock className="w-3.5 h-3.5 text-slate-400" />{selectedJob.createdAt ? new Date(selectedJob.createdAt).toLocaleDateString("en-IN") : "Recent"}</span>
+                    <span className="flex items-center gap-1.5"><Clock className="w-3.5 h-3.5 text-slate-400" />{selectedJob.createdAt ? new Date(selectedJob.createdAt).toLocaleDateString("en-IN") : t("jobsView.recent")}</span>
                   </div>
                 </div>
                 {matchMap[selectedJob.id] && (
@@ -1189,7 +1186,7 @@ function JobsView({ allJobs, appliedJobIds, savedJobIds, recommendations, comple
                     <div className={`text-2xl font-bold tabular-nums ${matchMap[selectedJob.id].score >= 80 ? 'text-emerald-600' : matchMap[selectedJob.id].score >= 60 ? 'text-amber-600' : 'text-slate-500'}`}>
                       {matchMap[selectedJob.id].score}%
                     </div>
-                    <p className="text-[10px] text-slate-400 font-medium">Match Score</p>
+                    <p className="text-[10px] text-slate-400 font-medium">{t("jobs.matchScore")}</p>
                   </div>
                 )}
               </div>
@@ -1207,12 +1204,12 @@ function JobsView({ allJobs, appliedJobIds, savedJobIds, recommendations, comple
                   employer/agent hasn't written one yet, rather than hiding the
                   section (which led tester to flag FRS 1.17 "not detailed"). */}
               <div className="mb-5">
-                <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Description</h4>
+                <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">{t("jobsView.description")}</h4>
                 {selectedJob.description ? (
                   <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">{selectedJob.description}</p>
                 ) : (
                   <p className="text-xs italic text-slate-400 bg-slate-50 border border-dashed border-slate-200 rounded-lg p-3">
-                    The employer / agency hasn't written a full description for this role yet.
+                    {t("jobsView.noDescription")}
                   </p>
                 )}
               </div>
@@ -1220,14 +1217,14 @@ function JobsView({ allJobs, appliedJobIds, savedJobIds, recommendations, comple
               {/* Requirements — surfaced as its own section so the tester sees
                   it distinctly from Description. */}
               <div className="mb-5">
-                <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Requirements</h4>
+                <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">{t("jobsView.requirements")}</h4>
                 {selectedJob.requirements?.length > 0 ? (
                   <ul className="text-sm text-slate-700 list-disc pl-5 space-y-0.5">
                     {selectedJob.requirements.map((r: string, i: number) => <li key={i}>{r}</li>)}
                   </ul>
                 ) : (
                   <p className="text-xs italic text-slate-400 bg-slate-50 border border-dashed border-slate-200 rounded-lg p-3">
-                    No specific requirements listed. Check the Description and Required Skills below for the role expectations.
+                    {t("jobsView.noRequirements")}
                   </p>
                 )}
               </div>
@@ -1235,28 +1232,29 @@ function JobsView({ allJobs, appliedJobIds, savedJobIds, recommendations, comple
               {/* Skills — always rendered even when empty so the reviewer
                   sees the section exists, not that it's missing. */}
               <div className="mb-5">
-                <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Required Skills</h4>
+                <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">{t("jobsView.requiredSkills")}</h4>
                 {selectedJob.skills?.length > 0 ? (
                   <div className="flex flex-wrap gap-2">
                     {selectedJob.skills.map((s: string) => <Badge key={s} variant="secondary" className="text-xs rounded-lg px-3 py-1">{s}</Badge>)}
-                    {selectedJob.experience > 0 && <Badge variant="outline" className="text-xs bg-orange-50 text-orange-700 border-orange-200 rounded-lg px-3 py-1">{selectedJob.experience}+ years</Badge>}
+                    {selectedJob.experience > 0 && <Badge variant="outline" className="text-xs bg-orange-50 text-orange-700 border-orange-200 rounded-lg px-3 py-1">{t("jobsView.yearsPlus", { years: selectedJob.experience })}</Badge>}
                   </div>
                 ) : (
                   <p className="text-xs italic text-slate-400 bg-slate-50 border border-dashed border-slate-200 rounded-lg p-3">
-                    No specific skills listed.
-                    {selectedJob.experience > 0 && ` Minimum experience: ${selectedJob.experience}+ years.`}
+                    {t("jobsView.noSkills")}
+                    {selectedJob.experience > 0 && ` ${t("jobsView.minExperience", { years: selectedJob.experience })}`}
                   </p>
                 )}
               </div>
 
               {/* Benefits (derived from description + country conventions) */}
               <div className="mb-5">
-                <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Benefits & Perks</h4>
+                <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">{t("jobsView.benefitsTitle")}</h4>
                 <div className="grid grid-cols-2 gap-2">
+                  {/* audit 2026-07-06 (Batch 3): inferBenefits now returns benefits.* keys */}
                   {inferBenefits(selectedJob).map((b) => (
                     <div key={b.label} className="flex items-center gap-2 bg-slate-50 rounded-lg px-3 py-2 text-xs text-slate-700">
                       <CheckCircle className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />
-                      <span className="font-medium">{b.label}</span>
+                      <span className="font-medium">{t(`benefits.${b.label}`)}</span>
                     </div>
                   ))}
                 </div>
@@ -1264,7 +1262,7 @@ function JobsView({ allJobs, appliedJobIds, savedJobIds, recommendations, comple
 
               {/* Employer card */}
               <div className="mb-5">
-                <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">About the Employer</h4>
+                <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">{t("jobsView.aboutEmployer")}</h4>
                 <div className="flex items-start gap-4 bg-gradient-to-br from-slate-50 to-white rounded-xl p-4 border border-slate-200">
                   <div className={`w-14 h-14 rounded-xl flex items-center justify-center text-white font-bold text-lg bg-gradient-to-br ${companyGradient(selectedJob.company)}`}>
                     {companyInitials(selectedJob.company)}
@@ -1272,7 +1270,7 @@ function JobsView({ allJobs, appliedJobIds, savedJobIds, recommendations, comple
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <p className="text-sm font-bold text-slate-900 truncate">{selectedJob.company}</p>
-                      <Badge variant="outline" className="text-[10px] bg-emerald-50 text-emerald-700 border-emerald-200 px-1.5 py-0">✓ Verified</Badge>
+                      <Badge variant="outline" className="text-[10px] bg-emerald-50 text-emerald-700 border-emerald-200 px-1.5 py-0">{t("jobsView.verified")}</Badge>
                     </div>
                     <p className="text-xs text-slate-500 mt-0.5">{selectedJob.location}, {selectedJob.country}</p>
                     <p className="text-xs text-slate-600 mt-2 leading-relaxed">{companyTagline(selectedJob)}</p>
@@ -1283,7 +1281,7 @@ function JobsView({ allJobs, appliedJobIds, savedJobIds, recommendations, comple
               {/* Similar jobs */}
               {similarJobs(selectedJob, allJobs).length > 0 && (
                 <div className="mb-5">
-                  <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Similar Jobs</h4>
+                  <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">{t("jobsView.similarJobs")}</h4>
                   <div className="space-y-2">
                     {similarJobs(selectedJob, allJobs).map((j: any) => (
                       <button key={j.id} onClick={() => setSelectedJob(j)} className="w-full text-left flex items-center justify-between bg-white rounded-lg p-3 border border-slate-200 hover:border-blue-400 hover:shadow-sm transition">
@@ -1301,14 +1299,14 @@ function JobsView({ allJobs, appliedJobIds, savedJobIds, recommendations, comple
               {/* Apply */}
               <div className="flex items-center justify-between pt-5 border-t border-slate-100">
                 <div className="flex items-center gap-1.5 text-xs text-slate-400">
-                  <Shield className="w-3.5 h-3.5" /> Verified by HPSEDC
+                  <Shield className="w-3.5 h-3.5" /> {t("shell.verified")}
                 </div>
                 {(() => {
                   const applied = appliedJobIds.has(selectedJob.id);
                   if (applied) {
                     return (
                       <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 px-5 py-2 text-sm font-semibold rounded-xl">
-                        <CheckCircle className="w-4 h-4 mr-1.5" /> Applied
+                        <CheckCircle className="w-4 h-4 mr-1.5" /> {t("jobs.applied")}
                       </Badge>
                     );
                   }
@@ -1316,17 +1314,17 @@ function JobsView({ allJobs, appliedJobIds, savedJobIds, recommendations, comple
                   // missing instead of letting the apply click silently fail.
                   const missing: string[] = completion.missing || [];
                   const reasons: string[] = [];
-                  if (!(selectedJob.status === "active")) reasons.push("This job is no longer accepting applications.");
-                  if (missing.includes("fullName")) reasons.push("Add your full name to your profile.");
-                  if (missing.includes("phone")) reasons.push("Add a phone number to your profile.");
-                  if (missing.includes("documents")) reasons.push("Upload at least one document (CV or passport).");
-                  if ((completion.percentage ?? 0) < 40) reasons.push("Your profile is below 40% complete — finish a few more sections.");
+                  if (!(selectedJob.status === "active")) reasons.push(t("jobsView.reasonClosed"));
+                  if (missing.includes("fullName")) reasons.push(t("jobsView.reasonFullName"));
+                  if (missing.includes("phone")) reasons.push(t("jobsView.reasonPhone"));
+                  if (missing.includes("documents")) reasons.push(t("jobsView.reasonDocuments"));
+                  if ((completion.percentage ?? 0) < 40) reasons.push(t("jobsView.reasonProfile40"));
 
                   if (reasons.length > 0) {
                     return (
                       <div className="text-right">
                         <Button disabled className="px-6 h-11 rounded-xl bg-slate-200 text-slate-500 cursor-not-allowed">
-                          Apply Now
+                          {t("jobsView.applyNow")}
                         </Button>
                         <ul className="text-xs text-red-600 mt-1.5 max-w-[260px] text-left">
                           {reasons.map((r) => <li key={r}>• {r}</li>)}
@@ -1338,7 +1336,7 @@ function JobsView({ allJobs, appliedJobIds, savedJobIds, recommendations, comple
                     <Button
                       className="px-6 h-11 rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold shadow-lg shadow-blue-500/25 hover:-translate-y-0.5 transition-all"
                       onClick={() => applyMutation.mutate(selectedJob.id)} disabled={applyMutation.isPending}>
-                      {applyMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <>Apply Now <ArrowRight className="w-4 h-4 ml-1.5" /></>}
+                      {applyMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <>{t("jobsView.applyNow")} <ArrowRight className="w-4 h-4 ml-1.5" /></>}
                     </Button>
                   );
                 })()}
@@ -1358,8 +1356,8 @@ function JobsView({ allJobs, appliedJobIds, savedJobIds, recommendations, comple
                 <div className="w-20 h-20 rounded-2xl bg-slate-100 flex items-center justify-center mx-auto mb-4">
                   <Briefcase className="w-9 h-9 text-slate-300" />
                 </div>
-                <p className="font-semibold text-slate-500">Select a job to view details</p>
-                <p className="text-sm text-slate-400 mt-1">Click any job from the list on the left</p>
+                <p className="font-semibold text-slate-500">{t("jobsView.selectJob")}</p>
+                <p className="text-sm text-slate-400 mt-1">{t("jobsView.selectJobHint")}</p>
               </div>
             </motion.div>
           )}
@@ -1405,7 +1403,8 @@ function groupForStatus(status: string): GroupKey | null {
   return null;
 }
 
-function renderAppCard(app: any, selectedApp: any, setSelectedApp: (a: any) => void) {
+// audit 2026-07-06 (Batch 3): takes the caller's `t` — module-level helper, not a component.
+function renderAppCard(app: any, selectedApp: any, setSelectedApp: (a: any) => void, t: (k: string, o?: any) => string) {
   const isSelected = selectedApp?.id === app.id;
   return (
     <div key={app.id} onClick={() => setSelectedApp(app)}
@@ -1417,17 +1416,17 @@ function renderAppCard(app: any, selectedApp: any, setSelectedApp: (a: any) => v
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <div className="flex items-center gap-1.5 flex-wrap">
-            <p className="text-sm font-bold text-slate-900 truncate">{app.jobTitle || "Job"}</p>
+            <p className="text-sm font-bold text-slate-900 truncate">{app.jobTitle || t("appsView.jobFallback")}</p>
             {["reviewed","shortlisted","interview_scheduled","selected","placed"].includes(app.status) && (
               <span
                 className="inline-flex items-center gap-0.5 text-[9px] font-semibold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200"
-                title="The agency has opened and reviewed this application">
-                <Eye className="w-2.5 h-2.5" /> Viewed
+                title={t("appsView.viewedTitle")}>
+                <Eye className="w-2.5 h-2.5" /> {t("appsView.viewed")}
               </span>
             )}
             {app.placement?.status === "offered" && (
               <span className="inline-flex items-center gap-0.5 text-[9px] font-semibold px-1.5 py-0.5 rounded bg-amber-500 text-white">
-                ⚡ Decide
+                ⚡ {t("appsView.decide")}
               </span>
             )}
           </div>
@@ -1454,8 +1453,8 @@ function renderAppCard(app: any, selectedApp: any, setSelectedApp: (a: any) => v
           label doesn't lie about what the date represents. */}
       <p className="text-[10px] text-slate-400 mt-1.5 capitalize font-medium">
         {app.status === "interview_scheduled" && app.nextInterview?.scheduledAt
-          ? <>Interview on {new Date(app.nextInterview.scheduledAt).toLocaleDateString("en-IN")}</>
-          : <>{app.status?.replace(/_/g, " ")}{" · "}Applied {app.appliedAt ? new Date(app.appliedAt).toLocaleDateString("en-IN") : ""}</>
+          ? <>{t("appsView.interviewOn", { date: new Date(app.nextInterview.scheduledAt).toLocaleDateString("en-IN") })}</>
+          : <>{t(`appsView.stage.${app.status}`, { defaultValue: app.status?.replace(/_/g, " ") })}{" · "}{t("appsView.appliedOn", { date: app.appliedAt ? new Date(app.appliedAt).toLocaleDateString("en-IN") : "" })}</>
         }
       </p>
     </div>
@@ -1489,7 +1488,16 @@ function ApplicationsView({ applications, initialIntent, setActiveView }: { appl
   const [showDeclineForm, setShowDeclineForm] = useState(false);
   const [declineReason, setDeclineReason] = useState("");
   const { toast } = useToast();
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
+  // audit 2026-07-06 (Batch 3): stacked mobile layout — bring detail into view on select
+  const detailRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (selectedApp && typeof window !== "undefined" && window.innerWidth < 1024) {
+      detailRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedApp?.id]);
 
   // v0.4.36.2: keep the open detail panel in sync with refetched data.
   // `selectedApp` is a snapshot taken when the card was clicked; after
@@ -1511,7 +1519,7 @@ function ApplicationsView({ applications, initialIntent, setActiveView }: { appl
       return res.json();
     },
     onSuccess: () => {
-      toast({ title: "Offer accepted", description: "Your visa process will begin. Check documents." });
+      toast({ title: t("appsView.toastAccepted"), description: t("appsView.toastAcceptedDesc") });
       queryClient.invalidateQueries({ queryKey: ["/api/v1/candidates/applications"] });
     },
   });
@@ -1524,7 +1532,7 @@ function ApplicationsView({ applications, initialIntent, setActiveView }: { appl
       return res.json();
     },
     onSuccess: () => {
-      toast({ title: "Offer declined", description: "Thank you for letting us know." });
+      toast({ title: t("appsView.toastDeclined"), description: t("appsView.toastDeclinedDesc") });
       queryClient.invalidateQueries({ queryKey: ["/api/v1/candidates/applications"] });
     },
   });
@@ -1565,15 +1573,17 @@ function ApplicationsView({ applications, initialIntent, setActiveView }: { appl
   }
 
   return (
-    <div className="flex gap-4 h-[calc(100vh-12rem)]">
-      <div className="w-[400px] flex-shrink-0 flex flex-col">
+    /* audit 2026-07-06 (Batch 3): was desktop-only two-pane (fixed w-[400px]);
+       now stacks below lg: so 360px phones get list first, detail below. */
+    <div className="flex flex-col lg:flex-row gap-4 lg:h-[calc(100vh-12rem)]">
+      <div className="w-full lg:w-[400px] lg:flex-shrink-0 flex flex-col">
         <div className="flex gap-2 mb-3 flex-wrap">
           <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="h-9 text-xs rounded-xl border-slate-200 flex-1 min-w-[120px]"><SelectValue placeholder="Status" /></SelectTrigger>
+            <SelectTrigger className="h-9 text-xs rounded-xl border-slate-200 flex-1 min-w-[120px]"><SelectValue placeholder={t("common.status")} /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Status</SelectItem>
-              {PIPELINE.map(s => <SelectItem key={s.key} value={s.key}>{s.label}</SelectItem>)}
-              <SelectItem value="rejected">Rejected</SelectItem>
+              <SelectItem value="all">{t("appsView.allStatus")}</SelectItem>
+              {PIPELINE.map(s => <SelectItem key={s.key} value={s.key}>{t(`appsView.stage.${s.key}`)}</SelectItem>)}
+              <SelectItem value="rejected">{t("appsView.stage.rejected")}</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -1587,21 +1597,24 @@ function ApplicationsView({ applications, initialIntent, setActiveView }: { appl
                 ? "bg-amber-500 border-amber-600 text-white shadow"
                 : "bg-amber-50 border-amber-200 text-amber-800 hover:bg-amber-100"
             }`}
-            title="Offers awaiting your accept/decline">
-            ⚡ Awaiting your action <span className={awaitingMe ? "bg-white/30 px-1.5 rounded" : "bg-amber-200 px-1.5 rounded"}>{awaitingMeIds.size}</span>
+            title={t("appsView.awaitingTitle")}>
+            ⚡ {t("appsView.awaiting")} <span className={awaitingMe ? "bg-white/30 px-1.5 rounded" : "bg-amber-200 px-1.5 rounded"}>{awaitingMeIds.size}</span>
           </button>
         )}
         <p className="text-xs text-slate-400 mb-3 font-medium">
-          {filtered.length} application{filtered.length !== 1 ? "s" : ""}
-          {awaitingMe && <span className="text-amber-700"> · awaiting your action</span>}
+          {t("appsView.appsCount", { count: filtered.length })}
+          {awaitingMe && <span className="text-amber-700"> · {t("appsView.awaitingSuffix")}</span>}
         </p>
 
-        <div className="flex-1 overflow-y-auto space-y-2 pr-1">
+        <div className="flex-1 overflow-y-auto space-y-2 pr-1 max-h-[55vh] lg:max-h-none">
           {filtered.length === 0 ? (
             <div className="text-center py-16 bg-gradient-to-br from-slate-50 to-blue-50/30 rounded-xl border border-dashed border-slate-200">
               <ClipboardList className="w-10 h-10 mx-auto mb-3 text-slate-300" />
               <p className="text-sm text-slate-400">
-                {awaitingMe ? "Nothing needs your action right now" : `No applications ${statusFilter !== "all" ? `with status "${statusFilter}"` : "yet"}`}
+                {awaitingMe ? t("appsView.emptyAwaiting")
+                  : statusFilter !== "all"
+                    ? t("appsView.emptyStatus", { status: t(`appsView.stage.${statusFilter}`, { defaultValue: statusFilter }) })
+                    : t("appsView.emptyNone")}
               </p>
             </div>
           ) : useGrouping ? (
@@ -1613,25 +1626,25 @@ function ApplicationsView({ applications, initialIntent, setActiveView }: { appl
                   className="w-full flex items-center justify-between text-[11px] font-semibold uppercase tracking-wide text-slate-500 hover:text-slate-900 px-1 py-1.5 transition">
                   <span className="flex items-center gap-1.5">
                     <span className={`transition-transform ${collapsed[g.key] ? "" : "rotate-90"}`}>▸</span>
-                    {g.label}
+                    {t(`appsView.group.${g.key}`)}
                     <span className="text-slate-400 font-mono">{grouped[g.key].length}</span>
                   </span>
                 </button>
                 {!collapsed[g.key] && (
                   <div className="space-y-2 mt-1">
-                    {grouped[g.key].map((app: any) => renderAppCard(app, selectedApp, setSelectedApp))}
+                    {grouped[g.key].map((app: any) => renderAppCard(app, selectedApp, setSelectedApp, t))}
                   </div>
                 )}
               </div>
             ))
           ) : (
-            filtered.map((app: any) => renderAppCard(app, selectedApp, setSelectedApp))
+            filtered.map((app: any) => renderAppCard(app, selectedApp, setSelectedApp, t))
           )}
         </div>
       </div>
 
       {/* App Detail */}
-      <div className="flex-1 min-w-0">
+      <div ref={detailRef} className="flex-1 min-w-0 min-h-[50vh] lg:min-h-0">
         <AnimatePresence mode="wait">
           {selectedApp ? (
             <motion.div
@@ -1664,7 +1677,7 @@ function ApplicationsView({ applications, initialIntent, setActiveView }: { appl
                           {isDone ? <CheckCircle className="w-4 h-4" /> : isRejected && i === 0 ? <XCircle className="w-4 h-4" /> : <span className="text-[10px] font-bold">{i + 1}</span>}
                         </div>
                         <span className={`text-[10px] mt-1.5 font-semibold ${isCurrent ? stage.color : isDone ? "text-emerald-600" : "text-slate-300"}`}>
-                          {stage.label}
+                          {t(`appsView.stage.${stage.key}`)}
                         </span>
                       </div>
                       {i < PIPELINE.length - 1 && <div className={`flex-1 h-0.5 mx-1 rounded-full ${isDone ? "bg-emerald-400" : "bg-slate-200"}`} />}
@@ -1680,15 +1693,15 @@ function ApplicationsView({ applications, initialIntent, setActiveView }: { appl
                       <XCircle className="w-5 h-5 text-red-500" />
                     </div>
                     <div>
-                      <p className="text-sm text-red-800 font-semibold">This application was not selected</p>
+                      <p className="text-sm text-red-800 font-semibold">{t("appsView.notSelected")}</p>
                       {!selectedApp.rejectionFeedback && (
-                        <p className="text-xs text-red-600/80 mt-0.5">No detailed feedback was provided by the recruiter.</p>
+                        <p className="text-xs text-red-600/80 mt-0.5">{t("appsView.noFeedback")}</p>
                       )}
                     </div>
                   </div>
                   {selectedApp.rejectionFeedback && (
                     <div className="mt-3 pt-3 border-t border-red-200/60">
-                      <p className="text-[11px] uppercase tracking-wide text-red-700 font-semibold mb-1">Feedback from the recruiter</p>
+                      <p className="text-[11px] uppercase tracking-wide text-red-700 font-semibold mb-1">{t("appsView.feedbackFrom")}</p>
                       <p className="text-sm text-slate-700 leading-relaxed">{selectedApp.rejectionFeedback}</p>
                     </div>
                   )}
@@ -1697,11 +1710,11 @@ function ApplicationsView({ applications, initialIntent, setActiveView }: { appl
 
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div className="bg-gradient-to-br from-blue-50 to-indigo-50/30 rounded-xl p-4 border border-blue-100/50">
-                  <p className="text-xs text-blue-600 font-semibold mb-1">Match Score</p>
+                  <p className="text-xs text-blue-600 font-semibold mb-1">{t("jobs.matchScore")}</p>
                   <p className="text-2xl font-bold tabular-nums text-slate-900">{selectedApp.matchScore}%</p>
                 </div>
                 <div className="bg-gradient-to-br from-slate-50 to-white rounded-xl p-4 border border-slate-100">
-                  <p className="text-xs text-slate-500 font-semibold mb-1">Applied Date</p>
+                  <p className="text-xs text-slate-500 font-semibold mb-1">{t("appsView.appliedDate")}</p>
                   <p className="text-2xl font-bold text-slate-900">{selectedApp.appliedAt ? new Date(selectedApp.appliedAt).toLocaleDateString("en-IN") : "—"}</p>
                 </div>
               </div>
@@ -1734,14 +1747,13 @@ function ApplicationsView({ applications, initialIntent, setActiveView }: { appl
                       <Award className="w-5 h-5 text-blue-600" />
                     </div>
                     <div className="min-w-0">
-                      <p className="text-sm font-bold text-slate-900">You've been selected 🎯</p>
+                      <p className="text-sm font-bold text-slate-900">{t("appsView.selectedTitle")}</p>
                       <p className="text-xs text-slate-600 mt-1 leading-relaxed">
-                        {selectedApp.company || "The agency"} has shortlisted you for this role.
-                        They're now preparing your formal offer letter (salary, joining date, visa-sponsorship terms).
-                        <strong> Accept / Decline buttons will appear here once the offer is issued.</strong>
+                        {t("appsView.selectedBody", { company: selectedApp.company || t("appsView.theAgency") })}
+                        <strong> {t("appsView.selectedStrong")}</strong>
                       </p>
                       <p className="text-[11px] text-slate-500 mt-2">
-                        This usually takes 2–5 business days. The agency will reach out by email or phone if anything's needed from you in the meantime.
+                        {t("appsView.selectedEta")}
                       </p>
                     </div>
                   </div>
@@ -1756,11 +1768,11 @@ function ApplicationsView({ applications, initialIntent, setActiveView }: { appl
                       <Award className="w-5 h-5 text-emerald-600" />
                     </div>
                     <div className="flex-1">
-                      <p className="text-sm font-bold text-slate-900">Offer received 🎉</p>
+                      <p className="text-sm font-bold text-slate-900">{t("appsView.offerReceived")}</p>
                       <p className="text-xs text-slate-600 mt-0.5">
-                        Salary: {selectedApp.placement.salary || "—"} ·
-                        Start: {selectedApp.placement.startDate ? new Date(selectedApp.placement.startDate).toLocaleDateString("en-IN") : "TBD"} ·
-                        Country: {selectedApp.placement.country}
+                        {t("appsView.salary")}: {selectedApp.placement.salary || "—"} ·
+                        {" "}{t("appsView.start")}: {selectedApp.placement.startDate ? new Date(selectedApp.placement.startDate).toLocaleDateString("en-IN") : t("appsView.tbd")} ·
+                        {" "}{t("appsView.country")}: {selectedApp.placement.country}
                       </p>
                     </div>
                   </div>
@@ -1772,12 +1784,12 @@ function ApplicationsView({ applications, initialIntent, setActiveView }: { appl
                         {acceptMutation.isPending
                           ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />
                           : <CheckCircle className="w-4 h-4 mr-1.5" />}
-                        {acceptMutation.isPending ? "Accepting…" : "Accept Offer"}
+                        {acceptMutation.isPending ? t("appsView.accepting") : t("appsView.acceptOffer")}
                       </Button>
                       <Button size="sm" variant="outline"
                         onClick={() => { setShowDeclineForm(true); setDeclineReason(""); }}
                         className="border-red-200 text-red-700 hover:bg-red-50">
-                        <XCircle className="w-4 h-4 mr-1.5" /> Decline
+                        <XCircle className="w-4 h-4 mr-1.5" /> {t("appsView.decline")}
                       </Button>
                       {/* v0.4.36.2: open in a NEW TAB. The endpoint serves
                           the PDF inline, so the browser's viewer opens with
@@ -1786,15 +1798,15 @@ function ApplicationsView({ applications, initialIntent, setActiveView }: { appl
                       <a href={`/api/v1/me/placements/${selectedApp.placement.id}/offer-letter.pdf`}
                         target="_blank" rel="noopener noreferrer"
                         className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-2 rounded-md border border-slate-200 bg-white hover:border-emerald-400 hover:text-emerald-700 transition">
-                        <Download className="w-4 h-4" /> View / print offer letter (PDF)
+                        <Download className="w-4 h-4" /> {t("appsView.viewOfferPdf")}
                       </a>
                     </div>
                   ) : (
                     <div className="bg-white rounded-lg border border-red-200 p-3">
-                      <label className="text-xs font-semibold text-slate-700">Reason for declining <span className="text-slate-400">(optional, helps us improve matches)</span></label>
+                      <label className="text-xs font-semibold text-slate-700">{t("appsView.declineReasonLabel")} <span className="text-slate-400">{t("appsView.declineOptional")}</span></label>
                       <textarea
                         value={declineReason} onChange={(e) => setDeclineReason(e.target.value)}
-                        placeholder="e.g. Found a better opportunity, family reasons, salary too low…"
+                        placeholder={t("appsView.declinePlaceholder")}
                         className="mt-2 w-full border border-slate-200 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-red-200 focus:border-red-400 min-h-[64px]"
                       />
                       <div className="flex gap-2 mt-3">
@@ -1805,9 +1817,9 @@ function ApplicationsView({ applications, initialIntent, setActiveView }: { appl
                           }}
                           className="bg-red-600 hover:bg-red-700 text-white">
                           {declineMutation.isPending && <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />}
-                          {declineMutation.isPending ? "Declining…" : "Confirm Decline"}
+                          {declineMutation.isPending ? t("appsView.declining") : t("appsView.confirmDecline")}
                         </Button>
-                        <Button size="sm" variant="ghost" onClick={() => setShowDeclineForm(false)}>Cancel</Button>
+                        <Button size="sm" variant="ghost" onClick={() => setShowDeclineForm(false)}>{t("common.cancel")}</Button>
                       </div>
                     </div>
                   )}
@@ -1819,7 +1831,7 @@ function ApplicationsView({ applications, initialIntent, setActiveView }: { appl
                 <>
                   <div className="mt-5 bg-emerald-50 border border-emerald-200 rounded-xl p-4 flex items-center gap-3">
                     <CheckCircle className="w-5 h-5 text-emerald-600" />
-                    <p className="text-sm text-emerald-900 font-medium">Offer accepted. Your agency is preparing your departure.</p>
+                    <p className="text-sm text-emerald-900 font-medium">{t("appsView.offerAccepted")}</p>
                   </div>
                   <CandidateDeploymentTracker placementId={selectedApp.placement.id}
                     onAction={() => setActiveView?.("documents", "compliance")} />
@@ -1842,8 +1854,8 @@ function ApplicationsView({ applications, initialIntent, setActiveView }: { appl
                 <div className="w-20 h-20 rounded-2xl bg-slate-100 flex items-center justify-center mx-auto mb-4">
                   <ClipboardList className="w-9 h-9 text-slate-300" />
                 </div>
-                <p className="font-semibold text-slate-500">Select an application</p>
-                <p className="text-sm text-slate-400 mt-1">Click any application from the list</p>
+                <p className="font-semibold text-slate-500">{t("appsView.selectApp")}</p>
+                <p className="text-sm text-slate-400 mt-1">{t("appsView.selectAppHint")}</p>
               </div>
             </motion.div>
           )}
@@ -1978,6 +1990,7 @@ function RecommendedView({ recommendations, savedJobIds, setActiveView }: { reco
 
 function DocumentsView({ docs, profile, intent }: { docs: any[]; profile: any; intent?: string | null }) {
   const { toast } = useToast();
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [docType, setDocType] = useState<string>("cv");
   const fileInputRef = React.useRef<HTMLInputElement>(null);
@@ -2121,9 +2134,11 @@ function DocumentsView({ docs, profile, intent }: { docs: any[]; profile: any; i
                     className="rounded-xl gap-1.5">
                     <Download className="w-4 h-4" /> Download
                   </Button>
+                  {/* audit 2026-07-06 (Batch 3): icon-only delete needed an aria-label (reuses documents.deleteAria) */}
                   <Button variant="ghost" size="sm" onClick={() => {
-                      if (window.confirm(`Delete ${doc.fileName}?`)) deleteMutation.mutate(doc.id);
+                      if (window.confirm(t("documents.deleteConfirm"))) deleteMutation.mutate(doc.id);
                     }}
+                    aria-label={t("documents.deleteAria", { doc: doc.fileName })}
                     className="opacity-0 group-hover:opacity-100 transition-opacity text-red-400 hover:text-red-600 hover:bg-red-50">
                     <Trash2 className="w-4 h-4" />
                   </Button>
@@ -2846,35 +2861,37 @@ function companyTagline(job: any): string {
   return countryPitch[job.country] || `Verified employer recruiting internationally from Himachal Pradesh.`;
 }
 
+// audit 2026-07-06 (Batch 3): returns benefits.* i18n keys (not English labels)
+// so the Benefits & Perks section renders bilingually — callers do t(`benefits.${label}`).
 function inferBenefits(job: any): { label: string }[] {
   const desc = (job.description || "").toLowerCase();
   const text = desc + " " + (job.salary || "").toLowerCase();
   const benefits: { label: string }[] = [];
   const add = (label: string) => { if (!benefits.find((b) => b.label === label)) benefits.push({ label }); };
 
-  if (/visa|sponsor|blue.?card|tier.?2|457|ssw|pr sponsor/.test(text)) add("Visa sponsorship");
-  if (/reloc|moving|flight|airfare/.test(text))                        add("Relocation assistance");
-  if (/accommod|housing|board|dorm/.test(text))                        add("Accommodation");
-  if (/health|medical|insurance/.test(text))                           add("Health insurance");
-  if (/tax.?free/.test(text))                                          add("Tax-free salary");
-  if (/training|language|upskill/.test(text))                          add("Training & upskilling");
-  if (/annual flight|home.*flight|home.*leave/.test(text))             add("Annual home flight");
-  if (/hybrid|remote|flexible/.test(text))                             add("Flexible work");
+  if (/visa|sponsor|blue.?card|tier.?2|457|ssw|pr sponsor/.test(text)) add("visaSponsorship");
+  if (/reloc|moving|flight|airfare/.test(text))                        add("relocation");
+  if (/accommod|housing|board|dorm/.test(text))                        add("accommodation");
+  if (/health|medical|insurance/.test(text))                           add("healthInsurance");
+  if (/tax.?free/.test(text))                                          add("taxFree");
+  if (/training|language|upskill/.test(text))                          add("training");
+  if (/annual flight|home.*flight|home.*leave/.test(text))             add("homeFlight");
+  if (/hybrid|remote|flexible/.test(text))                             add("flexible");
 
   // Fallback: country-conventional benefits (so the section never looks empty)
   if (benefits.length < 3) {
     const fallback: Record<string, string[]> = {
-      Canada: ["Health insurance", "PR sponsorship", "Relocation assistance"],
-      Australia: ["Visa sponsorship", "Superannuation", "Annual leave 4 weeks"],
-      Germany: ["EU Blue Card", "Health insurance", "30 days paid leave"],
-      UAE: ["Tax-free salary", "Housing allowance", "Annual home flight"],
-      UK: ["NHS access", "Visa sponsorship", "Pension scheme"],
-      "New Zealand": ["Skilled Migrant pathway", "Relocation assistance", "KiwiSaver"],
-      "Saudi Arabia": ["Tax-free salary", "Housing + transport", "End-of-service benefits"],
-      Maldives: ["Full board (stay + meals)", "Bi-annual flights home", "Medical cover"],
-      Japan: ["SSW visa", "Japanese language training", "Subsidised housing"],
+      Canada: ["healthInsurance", "prSponsorship", "relocation"],
+      Australia: ["visaSponsorship", "superannuation", "annualLeave4w"],
+      Germany: ["euBlueCard", "healthInsurance", "paidLeave30"],
+      UAE: ["taxFree", "housingAllowance", "homeFlight"],
+      UK: ["nhsAccess", "visaSponsorship", "pension"],
+      "New Zealand": ["skilledMigrant", "relocation", "kiwiSaver"],
+      "Saudi Arabia": ["taxFree", "housingTransport", "endOfService"],
+      Maldives: ["fullBoard", "biAnnualFlights", "medicalCover"],
+      Japan: ["sswVisa", "jpLanguageTraining", "subsidisedHousing"],
     };
-    (fallback[job.country] || ["Visa support", "Medical cover", "Relocation help"]).forEach(add);
+    (fallback[job.country] || ["visaSupport", "medicalCover", "relocationHelp"]).forEach(add);
   }
   return benefits.slice(0, 6);
 }

@@ -20,7 +20,9 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { ISO_COUNTRIES, COMMON_DESTINATION_CODES } from "@/lib/iso-countries";
-import { AgencyApprovalList } from "@/components/admin/agency-approval-list";
+// audit 2026-07-06 (Batch 3): dropped dead AgencyApprovalList import — the
+// component is no longer mounted here (superseded by KYBReviewList); the
+// component file itself stays for the e2e tests that import it directly.
 import { KYBReviewList } from "@/components/admin/KYBReviewList";
 import { GrievanceThread } from "@/components/shared/GrievanceThread";
 import { MatchingEnginePanel } from "@/components/admin/MatchingEnginePanel";

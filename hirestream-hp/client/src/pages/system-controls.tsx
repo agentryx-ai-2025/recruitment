@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
+import { useTranslation } from "react-i18next";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { motion } from "framer-motion";
@@ -32,30 +33,36 @@ interface Controls {
   jobPostingPauseMessage: string;
 }
 
-const APP_PAUSE_PRESETS = [
-  "Applications are temporarily paused while we update the matching engine.",
-  "Application submissions are unavailable. Please try again in a few hours.",
-  "We're refreshing our candidate data. New applications reopen shortly.",
-  "Application pipeline is under maintenance — track existing applications normally.",
+// audit 2026-07-06 (Batch 3): preset messages are shown portal-wide to all
+// citizens once saved, so they must be translatable. The presets are now
+// maintenance.* i18n keys, resolved with t() at render time — the superadmin
+// picks the message in the portal language they intend citizens to see
+// (the saved value is a plain string served by the maintenance middleware).
+const APP_PAUSE_PRESET_KEYS = [
+  "maintenance.appPause1",
+  "maintenance.appPause2",
+  "maintenance.appPause3",
+  "maintenance.appPause4",
 ];
 
-const JOB_PAUSE_PRESETS = [
-  "New job postings are paused. Existing jobs continue to accept applications.",
-  "Job posting service is under maintenance — please try again later.",
-  "We're updating the job board. Posting reopens after 2 pm IST.",
+const JOB_PAUSE_PRESET_KEYS = [
+  "maintenance.jobPause1",
+  "maintenance.jobPause2",
+  "maintenance.jobPause3",
 ];
 
-const LOCKDOWN_PRESETS = [
-  "HireStream is undergoing scheduled maintenance. Please try again shortly.",
-  "We're performing a system upgrade. The portal will be back soon.",
-  "Technical issue being investigated. We appreciate your patience.",
-  "Portal is temporarily offline for infrastructure updates.",
+const LOCKDOWN_PRESET_KEYS = [
+  "maintenance.lockdown1",
+  "maintenance.lockdown2",
+  "maintenance.lockdown3",
+  "maintenance.lockdown4",
 ];
 
 export default function SystemControlsPage() {
   const { user, isLoading } = useAuth();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const { t } = useTranslation();
   const qc = useQueryClient();
 
   const { data: res } = useQuery({
@@ -149,7 +156,7 @@ export default function SystemControlsPage() {
         <PresetMessagePicker
           label="Pause message shown to candidates"
           value={draft.applicationsPauseMessage}
-          presets={APP_PAUSE_PRESETS}
+          presets={APP_PAUSE_PRESET_KEYS.map((k) => t(k))}
           onChange={(v) => save.mutate({ applicationsPauseMessage: v })}
         />
       </Section>
@@ -175,7 +182,7 @@ export default function SystemControlsPage() {
         <PresetMessagePicker
           label="Pause message shown to posters"
           value={draft.jobPostingPauseMessage}
-          presets={JOB_PAUSE_PRESETS}
+          presets={JOB_PAUSE_PRESET_KEYS.map((k) => t(k))}
           onChange={(v) => save.mutate({ jobPostingPauseMessage: v })}
         />
       </Section>
@@ -215,7 +222,7 @@ export default function SystemControlsPage() {
         <PresetMessagePicker
           label="Maintenance message displayed to users"
           value={draft.lockdownMessage}
-          presets={LOCKDOWN_PRESETS}
+          presets={LOCKDOWN_PRESET_KEYS.map((k) => t(k))}
           onChange={(v) => save.mutate({ lockdownMessage: v })}
         />
 

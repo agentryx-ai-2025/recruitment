@@ -20,7 +20,7 @@ async function fetchJson(url: string) {
 export function JobSearchBoard() {
   const [searchTerm, setSearchTerm] = useState("");
   const [countryFilter, setCountryFilter] = useState("all");
-  const [sortBy, setSortBy] = useState("match"); // match, date, salary
+  const [sortBy, setSortBy] = useState("match"); // match, date
   const [expandedJob, setExpandedJob] = useState<string | null>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -69,7 +69,7 @@ export function JobSearchBoard() {
     if (sortBy === "date") {
       return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
     }
-    return 0; // salary sort would need numeric parsing
+    return 0;
   });
 
   const countries = Array.from(new Set(allJobs.map((j) => j.country).filter(Boolean)));
@@ -115,10 +115,11 @@ export function JobSearchBoard() {
         </Select>
         <Select value={sortBy} onValueChange={setSortBy}>
           <SelectTrigger className="w-[150px] h-10"><ArrowUpDown className="w-3.5 h-3.5 mr-1.5" /><SelectValue /></SelectTrigger>
+          {/* audit 2026-07-06 (Batch 3): removed the "Salary" sort option — its
+              comparator was a no-op (returned 0), silently doing nothing. */}
           <SelectContent>
             <SelectItem value="match">Best Match</SelectItem>
             <SelectItem value="date">Newest First</SelectItem>
-            <SelectItem value="salary">Salary</SelectItem>
           </SelectContent>
         </Select>
       </div>

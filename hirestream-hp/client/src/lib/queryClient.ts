@@ -1,5 +1,8 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 import { toast } from "@/hooks/use-toast";
+// audit 2026-07-06 (Batch 3): module-level i18n instance so the global
+// mutation-error toast is translated outside React render.
+import i18n from "@/lib/i18n";
 
 // Pull a clean, human message out of a failed response. The server returns
 // { success:false, error:{ code, message } } (or sometimes { message }), so we
@@ -69,8 +72,8 @@ export const queryClient = new QueryClient({
       onError: (error: unknown) => {
         const message = error instanceof Error && error.message
           ? error.message
-          : "Something went wrong. Please try again.";
-        toast({ title: "Action failed", description: message, variant: "destructive" });
+          : i18n.t("shell.actionFailedDesc");
+        toast({ title: i18n.t("shell.actionFailed"), description: message, variant: "destructive" });
       },
     },
   },

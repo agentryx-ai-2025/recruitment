@@ -208,8 +208,11 @@ export function Header() {
             )}
 
             {/* Mobile Menu Toggle */}
+            {/* audit 2026-07-06 (Batch 3): icon-only hamburger needed an aria-label */}
             <button
               className="md:hidden p-2 rounded-md text-gray-500 hover:text-gray-700 hover:bg-gray-100"
+              aria-label={mobileMenuOpen ? t("shell.menuClose") : t("shell.menuOpen")}
+              aria-expanded={mobileMenuOpen}
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             >
               {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}

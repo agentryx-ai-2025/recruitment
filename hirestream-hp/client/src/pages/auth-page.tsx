@@ -69,17 +69,18 @@ export default function AuthPage() {
             {t("landing.heroDesc")}
           </p>
 
+          {/* audit 2026-07-06 (Batch 3): wired to existing landing.* keys — was hardcoded English */}
           <div className="space-y-4">
-            <FeatureItem icon={<User className="w-5 h-5" />} title="Job Seekers" desc="Register, build your profile, and apply for verified overseas positions" />
-            <FeatureItem icon={<Briefcase className="w-5 h-5" />} title="Recruitment Agencies" desc="Post jobs, manage drives, and connect with qualified candidates" />
-            <FeatureItem icon={<Building2 className="w-5 h-5" />} title="Employers" desc="Access a vetted talent pool and streamline international hiring" />
-            <FeatureItem icon={<Shield className="w-5 h-5" />} title="Government Oversight" desc="HPSEDC monitors, verifies agencies, and ensures candidate safety" />
+            <FeatureItem icon={<User className="w-5 h-5" />} title={t("landing.jobSeekers")} desc={t("landing.jobSeekersDesc")} />
+            <FeatureItem icon={<Briefcase className="w-5 h-5" />} title={t("landing.recruitmentAgencies")} desc={t("landing.recruitmentAgenciesDesc")} />
+            <FeatureItem icon={<Building2 className="w-5 h-5" />} title={t("landing.employers")} desc={t("landing.employersDesc")} />
+            <FeatureItem icon={<Shield className="w-5 h-5" />} title={t("landing.govOversight")} desc={t("landing.govOversightDesc")} />
           </div>
 
           {/* Footer note */}
           <div className="mt-10 pt-6 border-t border-white/10 flex items-center gap-2 text-xs text-blue-200/80">
             <img src="/hpsedc-logo.png" alt="HPSEDC" className="w-5 h-5 object-contain" />
-            <span>A verified Government of Himachal Pradesh initiative</span>
+            <span>{t("auth.verifiedInitiative")}</span>
           </div>
         </div>
       </div>
@@ -187,7 +188,7 @@ function LoginForm() {
   const onSubmit = (data: any) => {
     loginMutation.mutate(data, {
       onError: (err: any) => {
-        toast({ title: "Login Failed", description: err.message, variant: "destructive" });
+        toast({ title: t("auth.loginFailed"), description: err.message, variant: "destructive" });
       },
     });
   };
@@ -204,7 +205,7 @@ function LoginForm() {
           name="username"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Email Address</FormLabel>
+              <FormLabel>{t("auth.email")}</FormLabel>
               <FormControl>
                 <div className="relative">
                   <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
@@ -221,13 +222,13 @@ function LoginForm() {
           render={({ field }) => (
             <FormItem>
               <div className="flex items-center justify-between">
-                <FormLabel>Password</FormLabel>
+                <FormLabel>{t("auth.password")}</FormLabel>
                 <button
                   type="button"
                   onClick={() => setShowForgotPassword(true)}
                   className="text-xs text-blue-600 hover:underline"
                 >
-                  Forgot password?
+                  {t("auth.forgotPassword")}
                 </button>
               </div>
               <FormControl>
@@ -235,14 +236,16 @@ function LoginForm() {
                   <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                   <Input
                     type={showPassword ? "text" : "password"}
-                    placeholder="Enter your password"
+                    placeholder={t("auth.passwordPlaceholder")}
                     autoComplete="off"
                     maxLength={128}
                     className="pl-10 pr-10"
                     {...field}
                   />
+                  {/* audit 2026-07-06 (Batch 3): icon-only toggle needed an aria-label */}
                   <button
                     type="button"
+                    aria-label={showPassword ? t("auth.hidePassword") : t("auth.showPassword")}
                     onClick={() => setShowPassword(!showPassword)}
                     className="absolute right-3 top-3 text-muted-foreground hover:text-foreground"
                   >
@@ -261,7 +264,7 @@ function LoginForm() {
           type="button"
           role="checkbox"
           aria-checked={captchaChecked}
-          aria-label="I'm not a robot — CAPTCHA security check"
+          aria-label={t("auth.captchaAria")}
           className={`w-full flex items-center gap-3 p-3 border rounded-lg cursor-pointer transition-colors text-left focus:outline-none focus:ring-2 focus:ring-blue-500/40 ${captchaChecked ? 'border-emerald-300 bg-emerald-50' : 'border-gray-200 hover:border-gray-300'}`}
           onClick={() => setCaptchaChecked(!captchaChecked)}
         >
@@ -270,10 +273,10 @@ function LoginForm() {
           ) : (
             <Square className="w-5 h-5 text-gray-400" />
           )}
-          <span className="text-sm text-gray-700">I'm not a robot</span>
+          <span className="text-sm text-gray-700">{t("auth.notARobot")}</span>
           <div className="ml-auto text-[10px] text-gray-400 text-right leading-tight">
-            <div className="font-medium">CAPTCHA</div>
-            <div>Security Check</div>
+            <div className="font-medium">{t("auth.captcha")}</div>
+            <div>{t("auth.securityCheck")}</div>
           </div>
         </button>
 
@@ -293,6 +296,7 @@ function LoginForm() {
 
 function ForgotPasswordForm({ onBack }: { onBack: () => void }) {
   const { toast } = useToast();
+  const { t } = useTranslation();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [sent, setSent] = useState(false);
 
@@ -311,18 +315,18 @@ function ForgotPasswordForm({ onBack }: { onBack: () => void }) {
       });
       if (res.ok) {
         setSent(true);
-        toast({ title: "Email Sent", description: "Check your inbox for the reset link." });
+        toast({ title: t("auth.emailSent"), description: t("auth.emailSentDesc") });
       } else {
         // audit 2026-07-06 (C15): a 429/500 used to end the spinner with no feedback
         const err = await res.json().catch(() => ({} as any));
         toast({
-          title: "Couldn't send reset email",
+          title: t("auth.resetFailed"),
           description: err?.error?.message || err?.message || `Request failed (${res.status}). Please try again later.`,
           variant: "destructive",
         });
       }
     } catch {
-      toast({ title: "Error", description: "Could not send reset email.", variant: "destructive" });
+      toast({ title: t("common.error"), description: t("auth.resetFailedDesc"), variant: "destructive" });
     } finally {
       setIsSubmitting(false);
     }
@@ -332,12 +336,12 @@ function ForgotPasswordForm({ onBack }: { onBack: () => void }) {
     return (
       <div className="text-center space-y-4 py-4">
         <Mail className="w-12 h-12 text-blue-600 mx-auto" />
-        <h3 className="text-lg font-semibold">Check your email</h3>
+        <h3 className="text-lg font-semibold">{t("auth.checkEmail")}</h3>
         <p className="text-sm text-muted-foreground">
-          If an account exists with that email, we've sent a password reset link.
+          {t("auth.checkEmailDesc")}
         </p>
         <Button variant="outline" onClick={onBack} className="mt-4">
-          <ArrowLeft className="mr-2 h-4 w-4" /> Back to Sign In
+          <ArrowLeft className="mr-2 h-4 w-4" /> {t("auth.backToSignIn")}
         </Button>
       </div>
     );
@@ -350,11 +354,11 @@ function ForgotPasswordForm({ onBack }: { onBack: () => void }) {
         onClick={onBack}
         className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-1"
       >
-        <ArrowLeft className="h-3 w-3" /> Back to Sign In
+        <ArrowLeft className="h-3 w-3" /> {t("auth.backToSignIn")}
       </button>
-      <h3 className="text-lg font-semibold">Reset your password</h3>
+      <h3 className="text-lg font-semibold">{t("auth.resetPassword")}</h3>
       <p className="text-sm text-muted-foreground">
-        Enter your email and we'll send you a link to reset your password.
+        {t("auth.resetDesc")}
       </p>
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
@@ -375,9 +379,9 @@ function ForgotPasswordForm({ onBack }: { onBack: () => void }) {
           />
           <Button type="submit" className="w-full" disabled={isSubmitting}>
             {isSubmitting ? (
-              <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Sending...</>
+              <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> {t("auth.sending")}</>
             ) : (
-              "Send Reset Link"
+              t("auth.sendResetLink")
             )}
           </Button>
         </form>
@@ -410,21 +414,15 @@ function RegisterForm() {
   const password = form.watch("password");
   const passwordsMatch = !confirmPassword || confirmPassword === password;
 
-  const roleDescriptions: Record<string, string> = {
-    candidate: "Search and apply for verified overseas job opportunities",
-    agent: "Post jobs and manage recruitment drives as a licensed agency",
-    employer: "Hire directly from a pool of qualified candidates",
-  };
-
   const onSubmit = (data: any) => {
     if (data.password !== confirmPassword) {
       setConfirmTouched(true);
-      toast({ title: "Passwords don't match", description: "Re-type your password in the confirm field.", variant: "destructive" });
+      toast({ title: t("auth.passwordsMismatchTitle"), description: t("auth.passwordsMismatchDesc"), variant: "destructive" });
       return;
     }
     registerMutation.mutate({ ...data, username: data.email }, {
       onError: (err: any) => {
-        toast({ title: "Registration Failed", description: err.message, variant: "destructive" });
+        toast({ title: t("auth.registrationFailed"), description: err.message, variant: "destructive" });
       },
     });
   };
@@ -437,32 +435,33 @@ function RegisterForm() {
           name="role"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>I want to register as</FormLabel>
+              <FormLabel>{t("auth.registerAs")}</FormLabel>
               <Select onValueChange={field.onChange} defaultValue={field.value}>
                 <FormControl>
                   <SelectTrigger>
-                    <SelectValue placeholder="Select your role" />
+                    <SelectValue placeholder={t("auth.selectRole")} />
                   </SelectTrigger>
                 </FormControl>
+                {/* audit 2026-07-06 (Batch 3): role options + descriptions come from roles.* */}
                 <SelectContent>
                   <SelectItem value="candidate">
-                    <span className="flex items-center gap-2"><User className="h-4 w-4" /> Job Seeker (Candidate)</span>
+                    <span className="flex items-center gap-2"><User className="h-4 w-4" /> {t("roles.candidate")}</span>
                   </SelectItem>
                   {capabilities.agencySelfRegistration && (
                     <SelectItem value="agent">
-                      <span className="flex items-center gap-2"><Briefcase className="h-4 w-4" /> Recruitment Agency</span>
+                      <span className="flex items-center gap-2"><Briefcase className="h-4 w-4" /> {t("roles.agent")}</span>
                     </SelectItem>
                   )}
                   {capabilities.employerSelfRegistration && (
                     <SelectItem value="employer">
-                      <span className="flex items-center gap-2"><Building2 className="h-4 w-4" /> Employer</span>
+                      <span className="flex items-center gap-2"><Building2 className="h-4 w-4" /> {t("roles.employer")}</span>
                     </SelectItem>
                   )}
                 </SelectContent>
               </Select>
               {selectedRole && (
                 <p className="text-xs text-muted-foreground mt-1">
-                  {roleDescriptions[selectedRole]}
+                  {t(`roles.${selectedRole}Desc`)}
                 </p>
               )}
               <FormMessage />
@@ -475,9 +474,9 @@ function RegisterForm() {
           name="fullName"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Full Name</FormLabel>
+              <FormLabel>{t("auth.fullName")}</FormLabel>
               <FormControl>
-                <Input placeholder="Enter your full name" maxLength={100} {...field} />
+                <Input placeholder={t("auth.fullNamePlaceholder")} maxLength={100} {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -489,7 +488,7 @@ function RegisterForm() {
           name="email"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Email Address</FormLabel>
+              <FormLabel>{t("auth.email")}</FormLabel>
               <FormControl>
                 <div className="relative">
                   <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
@@ -506,19 +505,21 @@ function RegisterForm() {
           name="password"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Password</FormLabel>
+              <FormLabel>{t("auth.password")}</FormLabel>
               <FormControl>
                 <div className="relative">
                   <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                   <Input
                     type={showPassword ? "text" : "password"}
-                    placeholder="At least 8 characters"
+                    placeholder={t("auth.minPassword")}
                     maxLength={128}
                     className="pl-10 pr-10"
                     {...field}
                   />
+                  {/* audit 2026-07-06 (Batch 3): icon-only toggle needed an aria-label */}
                   <button
                     type="button"
+                    aria-label={showPassword ? t("auth.hidePassword") : t("auth.showPassword")}
                     onClick={() => setShowPassword(!showPassword)}
                     className="absolute right-3 top-3 text-muted-foreground hover:text-foreground"
                   >
@@ -527,7 +528,7 @@ function RegisterForm() {
                 </div>
               </FormControl>
               <p className="text-xs text-muted-foreground mt-1">
-                Must include uppercase, lowercase, number and special character
+                {t("auth.passwordRule")}
               </p>
               <FormMessage />
             </FormItem>
@@ -537,14 +538,14 @@ function RegisterForm() {
         {/* v0.7.6.1 — Confirm password (FB-2026-0007). Client-only validation;
             server still only receives `password`. */}
         <FormItem>
-          <FormLabel htmlFor="confirmPassword">Confirm Password</FormLabel>
+          <FormLabel htmlFor="confirmPassword">{t("auth.confirmPassword")}</FormLabel>
           <FormControl>
             <div className="relative">
               <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
               <Input
                 id="confirmPassword"
                 type={showPassword ? "text" : "password"}
-                placeholder="Re-type your password"
+                placeholder={t("auth.confirmPlaceholder")}
                 maxLength={128}
                 className="pl-10"
                 value={confirmPassword}
@@ -556,7 +557,7 @@ function RegisterForm() {
             </div>
           </FormControl>
           {confirmTouched && !passwordsMatch && (
-            <p className="text-xs text-red-600 mt-1">Passwords don't match — re-type to confirm.</p>
+            <p className="text-xs text-red-600 mt-1">{t("auth.passwordsMismatch")}</p>
           )}
         </FormItem>
 
@@ -564,14 +565,14 @@ function RegisterForm() {
           className="w-full h-11 rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 transition-all"
           disabled={registerMutation.isPending || !passwordsMatch || !confirmPassword}>
           {registerMutation.isPending ? (
-            <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Creating account...</>
+            <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> {t("auth.creatingAccount")}</>
           ) : (
-            "Create Account"
+            t("auth.createTab")
           )}
         </Button>
 
         <p className="text-xs text-center text-muted-foreground mt-2">
-          By registering, you agree to the HPSEDC portal terms of use.
+          {t("auth.terms")}
         </p>
       </form>
     </Form>

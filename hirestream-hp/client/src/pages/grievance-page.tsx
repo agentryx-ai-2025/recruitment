@@ -129,9 +129,9 @@ export default function GrievancePage() {
       queryClient.invalidateQueries({ queryKey: ["/api/v1/grievances/assigned-to-me"] });
       queryClient.invalidateQueries({ queryKey: ["/api/v1/grievances"] });
       queryClient.invalidateQueries({ queryKey: ["/api/v1/grievances/my"] });
-      toast({ title: "Updated" });
+      toast({ title: t("grievance.updatedToast") });
     },
-    onError: (e: any) => toast({ title: "Couldn't update", description: e.message, variant: "destructive" }),
+    onError: (e: any) => toast({ title: t("grievance.couldNotUpdate"), description: e.message, variant: "destructive" }),
   });
 
   const submitMutation = useMutation({
@@ -148,7 +148,7 @@ export default function GrievancePage() {
       return res.json();
     },
     onSuccess: () => {
-      toast({ title: "Grievance Submitted", description: "Your grievance has been recorded. You'll be notified of updates." });
+      toast({ title: t("grievance.submittedToast"), description: t("grievance.submittedToastDesc") });
       setShowForm(false);
       setCategory("");
       setSubject("");
@@ -156,7 +156,7 @@ export default function GrievancePage() {
       queryClient.invalidateQueries({ queryKey: ["/api/v1/grievances/my"] });
     },
     onError: (err: any) => {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
+      toast({ title: t("common.error"), description: err.message, variant: "destructive" });
     },
   });
 
@@ -186,8 +186,8 @@ export default function GrievancePage() {
     return (
       <div className="max-w-2xl mx-auto px-4 py-16 text-center">
         <MessageSquare className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-        <h2 className="text-xl font-bold text-gray-900">Please sign in</h2>
-        <p className="text-gray-500 mt-2">You need to be logged in to submit or view grievances</p>
+        <h2 className="text-xl font-bold text-gray-900">{t("grievance.pleaseSignIn")}</h2>
+        <p className="text-gray-500 mt-2">{t("grievance.signInGate")}</p>
       </div>
     );
   }
@@ -207,12 +207,13 @@ export default function GrievancePage() {
       {/* Submit Form */}
       {showForm && (
         <div className="bg-white rounded-lg shadow-sm border p-6 mb-8">
-          <h3 className="text-lg font-semibold mb-4">Submit a Grievance</h3>
+          {/* audit 2026-07-06 (Batch 3): wired remaining hardcoded strings to grievance.* */}
+          <h3 className="text-lg font-semibold mb-4">{t("grievance.submitGrievance")}</h3>
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{t("grievance.category")}</label>
               <Select value={category} onValueChange={setCategory}>
-                <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
+                <SelectTrigger><SelectValue placeholder={t("grievance.selectCategory")} /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="fraud_report">{t("grievance.fraudReport")}</SelectItem>
                   <SelectItem value="workplace_abuse">{t("grievance.workplaceAbuse")}</SelectItem>
@@ -225,24 +226,24 @@ export default function GrievancePage() {
               </Select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Subject</label>
-              <Input placeholder="Brief summary of your issue" value={subject}
+              <label className="block text-sm font-medium text-gray-700 mb-1">{t("grievance.subject")}</label>
+              <Input placeholder={t("grievance.subjectPlaceholder")} value={subject}
                 maxLength={FIELD_LIMITS.grievanceSubject}
                 onChange={(e) => setSubject(e.target.value)} />
               <p className="text-[10px] text-slate-400 text-right mt-0.5">{subject.length} / {FIELD_LIMITS.grievanceSubject}</p>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{t("grievance.description")}</label>
               <div className="relative">
                 <textarea
                   className={`w-full min-h-[120px] p-3 ${speechSupported ? "pr-14" : ""} border border-gray-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500`}
-                  placeholder="Describe your issue in detail…"
+                  placeholder={t("grievance.descPlaceholder")}
                   value={description}
                   maxLength={FIELD_LIMITS.grievanceBody}
                   onChange={(e) => setDescription(e.target.value)}
                 />
                 {speechSupported && (
-                  <button type="button" onClick={toggleVoice} title={listening ? "Listening…" : "Tap to speak"} aria-label={listening ? "Listening" : "Tap to speak"}
+                  <button type="button" onClick={toggleVoice} title={listening ? t("shell.voiceListening") : t("shell.voiceTap")} aria-label={listening ? t("shell.voiceListening") : t("shell.voiceTap")}
                     className={`absolute right-2 top-2 w-10 h-10 rounded-xl text-white flex items-center justify-center shadow-md transition-all ${listening ? "bg-gradient-to-br from-rose-500 to-red-600 animate-pulse" : "bg-gradient-to-br from-blue-500 to-blue-600"}`}>
                     <Mic className="w-5 h-5" />
                   </button>
@@ -256,9 +257,9 @@ export default function GrievancePage() {
                 disabled={!category || !subject || !description || submitMutation.isPending}
                 className="bg-blue-600 text-white"
               >
-                {submitMutation.isPending ? <><Loader2 className="w-4 h-4 mr-1 animate-spin" /> Submitting...</> : "Submit Grievance"}
+                {submitMutation.isPending ? <><Loader2 className="w-4 h-4 mr-1 animate-spin" /> {t("grievance.submitting")}</> : t("grievance.submit")}
               </Button>
-              <Button variant="outline" onClick={() => setShowForm(false)}>Cancel</Button>
+              <Button variant="outline" onClick={() => setShowForm(false)}>{t("grievance.cancel")}</Button>
             </div>
           </div>
         </div>
@@ -273,7 +274,7 @@ export default function GrievancePage() {
           className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition ${tab === TAB_MY ? "border-blue-600 text-blue-700" : "border-transparent text-slate-500 hover:text-slate-700"}`}
         >
           <Inbox className="w-4 h-4 inline mr-1.5 -mt-0.5" />
-          My Grievances
+          {t("grievance.tabMy")}
           <span className="ml-2 text-xs text-slate-400">({myList.length})</span>
         </button>
         {assignedList.length > 0 && (
@@ -282,7 +283,7 @@ export default function GrievancePage() {
             className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition ${tab === TAB_ASSIGNED ? "border-blue-600 text-blue-700" : "border-transparent text-slate-500 hover:text-slate-700"}`}
           >
             <MessageSquare className="w-4 h-4 inline mr-1.5 -mt-0.5" />
-            Assigned to me
+            {t("grievance.tabAssigned")}
             <span className="ml-2 text-xs text-amber-600 font-semibold">({assignedList.length})</span>
           </button>
         )}
@@ -292,7 +293,7 @@ export default function GrievancePage() {
             className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition ${tab === TAB_ALL ? "border-blue-600 text-blue-700" : "border-transparent text-slate-500 hover:text-slate-700"}`}
           >
             <ShieldCheck className="w-4 h-4 inline mr-1.5 -mt-0.5" />
-            All grievances
+            {t("grievance.tabAll")}
             <span className="ml-2 text-xs text-slate-400">({allList.length})</span>
           </button>
         )}
@@ -308,21 +309,21 @@ export default function GrievancePage() {
         /* audit 2026-07-06 (C7): show a retry affordance instead of a false "no grievances" */
         <div className="text-center py-16 text-gray-500 bg-white rounded-lg shadow-sm">
           <AlertCircle className="w-16 h-16 mx-auto mb-4 opacity-30 text-red-400" />
-          <p className="text-lg font-medium">Couldn't load grievances</p>
-          <Button variant="outline" className="mt-4" onClick={() => refetchActive()}>Retry</Button>
+          <p className="text-lg font-medium">{t("grievance.couldNotLoad")}</p>
+          <Button variant="outline" className="mt-4" onClick={() => refetchActive()}>{t("common.retry")}</Button>
         </div>
       ) : grievances.length === 0 ? (
         <div className="text-center py-16 text-gray-500 bg-white rounded-lg shadow-sm">
           <MessageSquare className="w-16 h-16 mx-auto mb-4 opacity-30" />
           <p className="text-lg font-medium">
-            {tab === TAB_ASSIGNED ? "Nothing assigned to you"
-              : tab === TAB_ALL ? "No grievances in the system"
-              : "No grievances submitted"}
+            {tab === TAB_ASSIGNED ? t("grievance.nothingAssigned")
+              : tab === TAB_ALL ? t("grievance.noneInSystem")
+              : t("grievance.noGrievances")}
           </p>
           <p className="text-sm mt-1">
-            {tab === TAB_MY ? 'Click "New Grievance" if you have an issue to report' :
-             tab === TAB_ASSIGNED ? "Grievances routed to you will appear here." :
-             "When candidates submit complaints, they'll appear here for triage."}
+            {tab === TAB_MY ? t("grievance.noGrievancesDesc") :
+             tab === TAB_ASSIGNED ? t("grievance.assignedEmptyDesc") :
+             t("grievance.allEmptyDesc")}
           </p>
         </div>
       ) : (
@@ -372,21 +373,21 @@ export default function GrievancePage() {
                         <Button size="sm" variant="outline" className="text-xs h-7"
                           disabled={updateStatus.isPending}
                           onClick={() => updateStatus.mutate({ id: g.id, status: "under_review" })}>
-                          Start Review
+                          {t("grievance.startReview")}
                         </Button>
                       )}
                       {g.status === "under_review" && (
                         <Button size="sm" variant="outline" className="text-xs h-7"
                           disabled={updateStatus.isPending}
                           onClick={() => {
-                            const note = window.prompt("What action did you take? (the complainant will see this)", "");
+                            const note = window.prompt(t("grievance.actionPrompt"), "");
                             if (note !== null) updateStatus.mutate({ id: g.id, status: "action_taken", resolutionNotes: note.trim() || undefined });
                           }}>
-                          Mark Action Taken
+                          {t("grievance.markActionTaken")}
                         </Button>
                       )}
                       {g.status === "action_taken" && (
-                        <span className="text-[11px] text-amber-600 font-medium max-w-[140px] text-right">Awaiting complainant's confirmation</span>
+                        <span className="text-[11px] text-amber-600 font-medium max-w-[140px] text-right">{t("grievance.awaitingConfirmation")}</span>
                       )}
                     </div>
                   )}
@@ -399,19 +400,19 @@ export default function GrievancePage() {
                           <Button size="sm" className="bg-emerald-600 text-white text-xs h-7"
                             disabled={updateStatus.isPending}
                             onClick={() => updateStatus.mutate({ id: g.id, status: "resolved" })}>
-                            Mark Resolved
+                            {t("grievance.markResolved")}
                           </Button>
                           <Button size="sm" variant="outline" className="text-xs h-7"
                             disabled={updateStatus.isPending}
                             onClick={() => updateStatus.mutate({ id: g.id, status: "under_review" })}>
-                            Reopen — not resolved
+                            {t("grievance.reopen")}
                           </Button>
                         </>
                       ) : (
                         <Button size="sm" variant="outline" className="text-xs h-7"
                           disabled={updateStatus.isPending}
-                          onClick={() => { if (window.confirm("Close this grievance? It will be marked resolved.")) updateStatus.mutate({ id: g.id, status: "resolved" }); }}>
-                          Close grievance
+                          onClick={() => { if (window.confirm(t("grievance.closeConfirm"))) updateStatus.mutate({ id: g.id, status: "resolved" }); }}>
+                          {t("grievance.closeGrievance")}
                         </Button>
                       )}
                     </div>
@@ -419,13 +420,13 @@ export default function GrievancePage() {
                 </div>
                 {g.resolutionNotes && (
                   <div className="mt-3 bg-emerald-50 border border-emerald-200 p-3 rounded text-sm">
-                    <p className="font-medium text-emerald-800">Resolution:</p>
+                    <p className="font-medium text-emerald-800">{t("grievance.resolutionLabel")}:</p>
                     <p className="text-emerald-700 mt-1 whitespace-pre-wrap">{g.resolutionNotes}</p>
                   </div>
                 )}
                 {g.adminNotes && !g.resolutionNotes && tab !== TAB_MY && (
                   <div className="mt-3 bg-blue-50 border border-blue-200 p-3 rounded text-sm">
-                    <p className="font-medium text-blue-800">Internal Note:</p>
+                    <p className="font-medium text-blue-800">{t("grievance.internalNote")}:</p>
                     <p className="text-blue-700 mt-1">{g.adminNotes}</p>
                   </div>
                 )}
