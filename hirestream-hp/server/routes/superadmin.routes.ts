@@ -261,12 +261,13 @@ const DEFAULT_FLAGS = [
   { key: "feature.agency_reviews_enabled", value: true, description: "Candidates can post agency reviews", category: "feature_flag" },
   { key: "feature.registration_enabled", value: true, description: "Public registration open", category: "feature_flag" },
   { key: "feature.dark_mode_enabled", value: true, description: "Dark mode toggle visible in header", category: "feature_flag" },
-  // security 2026-07-07 (A04-1): default OFF. The previous default (true) was
-  // auto-inserted the first time the Feature Flags page loaded, silently
-  // re-enabling password-less demo login + demo-reset. The routes are also
-  // hard-blocked when NODE_ENV=production (auth.routes.ts); this flag now only
-  // opts-in quick login on dev/staging.
-  { key: "feature.quick_login_enabled", value: false, description: "Quick role login on auth page (dev/testing only). Off by default; never active in production.", category: "feature_flag" },
+  // security 2026-07-07 (A04-1): admin-managed. Default follows environment —
+  // ON in dev (so demo login just works), OFF in production (so it's disabled
+  // on STG/PROD until an admin explicitly flips it here, e.g. for a live demo).
+  // The previous static `true` default silently re-enabled password-less demo
+  // login the first time this page loaded; env-aware default keeps prod safe
+  // while leaving dev convenient, and the admin toggle overrides either way.
+  { key: "feature.quick_login_enabled", value: process.env.NODE_ENV !== "production", description: "Quick one-click demo login on the auth page. Off by default in production; enable here only for demos. Also gates the destructive demo-reset.", category: "feature_flag" },
   { key: "system.maintenance_mode", value: false, description: "Portal in read-only/maintenance. When ON, non-superadmin users see 503.", category: "maintenance" },
   { key: "system.maintenance_message", value: "HireStream is undergoing scheduled maintenance. Please try again shortly.", description: "Message shown during maintenance", category: "maintenance" },
 ];

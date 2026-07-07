@@ -162,12 +162,10 @@ router.post("/login", validateRequest(loginSchema), (req, res, next) => {
 // non-production, OFF in production). When flag is OFF returns 403.
 router.post("/dev-login", async (req, res, next) => {
   try {
-    // security 2026-07-07 (A04-1): hard-block in production regardless of the
-    // feature.quick_login_enabled DB flag — a password-less login must never
-    // be reachable in prod. 404 so the route's existence isn't advertised.
-    if (env.NODE_ENV === "production") {
-      return res.status(404).json({ success: false, error: { code: 404, message: "Not found" } });
-    }
+    // security 2026-07-07 (A04-1): controlled by the admin-managed feature flag
+    // `feature.quick_login_enabled` (Superadmin → Feature Flags). Default is ON
+    // in dev, OFF in production — so it's disabled on STG/PROD until an admin
+    // explicitly enables it (e.g. for a live demo), and never on by accident.
     const { role, username } = req.body;
     const validRoles = ["candidate", "agent", "employer", "admin"];
     if (!username && !validRoles.includes(role)) {
@@ -239,11 +237,8 @@ router.post("/dev-login", async (req, res, next) => {
 
 // ── Dev / Testing: is quick-login available? (drives the Demo Switcher UI) ──
 router.get("/dev-login", async (_req, res) => {
-  // security 2026-07-07 (A04-1): quick login is hard-disabled in production —
-  // report it as unavailable so the Demo Switcher UI never renders there.
-  if (env.NODE_ENV === "production") {
-    return res.json({ success: true, data: { enabled: false } });
-  }
+  // Drives the Demo Switcher UI — reflects the admin-managed feature flag
+  // (default ON in dev, OFF in production).
   let enabled = process.env.NODE_ENV !== "production";
   if (storage.db) {
     try {
@@ -264,12 +259,10 @@ router.get("/dev-login", async (_req, res) => {
 // presenter can wipe everything created during a test run and restore the
 // pristine demo state. Flag-gated by `feature.quick_login_enabled` (off in prod).
 router.post("/demo-reset", async (_req, res) => {
-  // security 2026-07-07 (A04-1): hard-block in production regardless of the
-  // feature.quick_login_enabled DB flag — an unauthenticated TRUNCATE-CASCADE
-  // reseed must never be reachable in prod. 404 so the route isn't advertised.
-  if (env.NODE_ENV === "production") {
-    return res.status(404).json({ success: false, error: { code: 404, message: "Not found" } });
-  }
+  // security 2026-07-07 (A04-1): gated by the same admin-managed
+  // `feature.quick_login_enabled` flag (default OFF in production). NOTE: this
+  // is a destructive TRUNCATE-CASCADE reseed — only enable the flag on a
+  // demo/UAT box and only during an active demo, never on the real deployment.
   let enabled = process.env.NODE_ENV !== "production";
   if (storage.db) {
     try {
