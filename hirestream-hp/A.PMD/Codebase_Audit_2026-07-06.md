@@ -1,5 +1,14 @@
 # HireStream-HP — Codebase Audit (Fable, 2026-07-06)
 
+> **STATUS (2026-07-07): REMEDIATED — portal frozen at v0.9.22 for UAT.**
+> Batch 1 authz/IDOR → v0.9.10 · Batch 2 correctness C2–C17 → v0.9.12 · Batch 3
+> i18n/a11y/dead-code → v0.9.13 · Batch 4 domain features (Smart Job Importer +
+> compliance) → v0.9.14–v0.9.16. Dedicated security/VAPT pass (deps + OWASP) →
+> v0.9.17–v0.9.18 (see `Security_Audit_OWASP_2026-07-07.md`). Every batch verified
+> live on staging. Some Batch-4 items held by product decision (fee tracking dropped
+> — no payments on portal; offer-letter QR + multi-slot interviews parked).
+
+
 Read-only audit of `hirestream-hp` across three dimensions (backend/security/data-layer,
 frontend/UX/i18n/a11y, product/domain). Findings are code-cited; **CONFIRMED** = the
 auditor read the exact offending code, **PLAUSIBLE** = strong pattern evidence not fully traced.
