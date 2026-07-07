@@ -28,6 +28,27 @@ async function seed() {
   if (!storage.db) throw new Error("No database connection.");
   const db = storage.db;
 
+  // security 2026-07-07 (A02-1): this DESTRUCTIVE demo seed ships weak, known
+  // passwords (test123 / the superadmin default). That is fine for dev/UAT but
+  // must NEVER run against the real Government production DB. Two guards:
+  //  1. In production, refuse to run unless ALLOW_DEMO_SEED=true is set
+  //     explicitly (prevents an accidental reseed wiping prod + planting
+  //     known credentials).
+  //  2. The superadmin password comes from SEED_SUPERADMIN_PASSWORD when set;
+  //     in production the env var is REQUIRED (no weak default is planted).
+  const isProd = process.env.NODE_ENV === "production";
+  if (isProd && process.env.ALLOW_DEMO_SEED !== "true") {
+    throw new Error(
+      "Refusing to run the destructive demo seed in production. " +
+      "Set ALLOW_DEMO_SEED=true only on a demo/UAT box, never on the real deployment.",
+    );
+  }
+  const superadminPassword = process.env.SEED_SUPERADMIN_PASSWORD
+    || (isProd ? null : "hpsedc@super2026");
+  if (!superadminPassword) {
+    throw new Error("SEED_SUPERADMIN_PASSWORD must be set to seed the superadmin in production.");
+  }
+
   // ── USERS ────────────────────────────────────────────────────────────
   const accounts = [
     // defaults kept so role-based quick login + tests still resolve
@@ -35,7 +56,7 @@ async function seed() {
     { username: "demo_agent",     email: "demo_agent@hirestream.dev",     role: "agent",     password: "test123" },
     { username: "demo_employer",  email: "demo_employer@hirestream.dev",  role: "employer",  password: "test123" },
     { username: "demo_admin",     email: "demo_admin@hirestream.dev",     role: "admin",     password: "test123" },
-    { username: "superadmin",     email: "superadmin@hirestream.dev",     role: "superadmin", password: "hpsedc@super2026" },
+    { username: "superadmin",     email: "superadmin@hirestream.dev",     role: "superadmin", password: superadminPassword },
     // 10 curated candidates
     { username: "arjun_thakur",  email: "arjun.thakur@hirestream.dev",  role: "candidate", password: "test123" },
     { username: "priya_verma",   email: "priya.verma@hirestream.dev",   role: "candidate", password: "test123" },
@@ -610,7 +631,7 @@ async function seed() {
 
   console.log("\n✅ Curated demo seed complete (expanded master set).");
   console.log("   25 candidates (10 hero) · 10 agencies (7✓/3⏳) · 10 employers (7✓/3⏳) · 28 jobs · " + (APPS.length + bgAppCount) + " applications · " + (5 + bgPlaced.length) + " placements");
-  console.log("   All passwords: test123 · superadmin / hpsedc@super2026\n");
+  console.log("   Demo passwords: test123 · superadmin password from SEED_SUPERADMIN_PASSWORD (or dev default)\n");
   process.exit(0);
 }
 

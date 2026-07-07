@@ -15,6 +15,8 @@ import { z } from "zod";
 import { notify } from "../services/notification.service";
 import { candidates, employers } from "@shared/schema";
 import { getSetting } from "../services/settings.service";
+import { env } from "../config/env.config";
+import { sanitizeUser } from "../lib/safeUser";
 
 const router = Router();
 
@@ -44,9 +46,17 @@ router.post("/register", validateRequest(registerSchema), async (req, res, next)
     // Check if user exists
     const existing = await storage.getUserByUsername(email);
     if (existing) {
-      return res.status(409).json({
-        success: false,
-        error: { code: 409, message: "User already exists with this email" },
+      // security 2026-07-07 (A07-1): don't confirm account existence ("User
+      // already exists…") — that let anyone probe which emails are registered.
+      // Return the same status/shape as a successful registration, minus the
+      // session/user object. Duplicate prevention stays server-side; the real
+      // owner simply signs in or uses password reset.
+      return res.status(201).json({
+        success: true,
+        data: {
+          message:
+            "Registration received. If an account already exists for this email, please sign in or use 'Forgot password' instead.",
+        },
       });
     }
 
@@ -84,7 +94,8 @@ router.post("/register", validateRequest(registerSchema), async (req, res, next)
       (req.session as any).passport = { user: user.id };
       req.login(user, (err) => {
         if (err) return next(err);
-        const { password: _, ...safeUser } = user;
+        // security 2026-07-07 (A02-3): shared serializer — never emit 2FA secrets.
+        const safeUser = sanitizeUser(user);
         logger.info(`User registered and logged in: ${user.id}`);
 
         notify({
@@ -136,7 +147,8 @@ router.post("/login", validateRequest(loginSchema), (req, res, next) => {
       if (err) return next(err);
       req.login(user, (err) => {
         if (err) return next(err);
-        const { password: _, ...safeUser } = user;
+        // security 2026-07-07 (A02-3): shared serializer — never emit 2FA secrets.
+        const safeUser = sanitizeUser(user);
         logger.info(`User logged in: ${safeUser.id}`);
         return res.json({ success: true, data: safeUser });
       });
@@ -150,6 +162,12 @@ router.post("/login", validateRequest(loginSchema), (req, res, next) => {
 // non-production, OFF in production). When flag is OFF returns 403.
 router.post("/dev-login", async (req, res, next) => {
   try {
+    // security 2026-07-07 (A04-1): hard-block in production regardless of the
+    // feature.quick_login_enabled DB flag — a password-less login must never
+    // be reachable in prod. 404 so the route's existence isn't advertised.
+    if (env.NODE_ENV === "production") {
+      return res.status(404).json({ success: false, error: { code: 404, message: "Not found" } });
+    }
     const { role, username } = req.body;
     const validRoles = ["candidate", "agent", "employer", "admin"];
     if (!username && !validRoles.includes(role)) {
@@ -208,7 +226,8 @@ router.post("/dev-login", async (req, res, next) => {
       if (err) return next(err);
       req.login(user, (err) => {
         if (err) return next(err);
-        const { password: _, ...safeUser } = user as any;
+        // security 2026-07-07 (A02-3): shared serializer — never emit 2FA secrets.
+        const safeUser = sanitizeUser(user as any);
         logger.info(`Dev login as ${role}: ${safeUser.id}`);
         return res.json({ success: true, data: safeUser });
       });
@@ -220,6 +239,11 @@ router.post("/dev-login", async (req, res, next) => {
 
 // ── Dev / Testing: is quick-login available? (drives the Demo Switcher UI) ──
 router.get("/dev-login", async (_req, res) => {
+  // security 2026-07-07 (A04-1): quick login is hard-disabled in production —
+  // report it as unavailable so the Demo Switcher UI never renders there.
+  if (env.NODE_ENV === "production") {
+    return res.json({ success: true, data: { enabled: false } });
+  }
   let enabled = process.env.NODE_ENV !== "production";
   if (storage.db) {
     try {
@@ -240,6 +264,12 @@ router.get("/dev-login", async (_req, res) => {
 // presenter can wipe everything created during a test run and restore the
 // pristine demo state. Flag-gated by `feature.quick_login_enabled` (off in prod).
 router.post("/demo-reset", async (_req, res) => {
+  // security 2026-07-07 (A04-1): hard-block in production regardless of the
+  // feature.quick_login_enabled DB flag — an unauthenticated TRUNCATE-CASCADE
+  // reseed must never be reachable in prod. 404 so the route isn't advertised.
+  if (env.NODE_ENV === "production") {
+    return res.status(404).json({ success: false, error: { code: 404, message: "Not found" } });
+  }
   let enabled = process.env.NODE_ENV !== "production";
   if (storage.db) {
     try {
@@ -299,7 +329,8 @@ router.get("/me", (req, res) => {
       error: { code: 401, message: "Not authenticated" },
     });
   }
-  const { password: _, ...safeUser } = req.user as any;
+  // security 2026-07-07 (A02-3): shared serializer — never emit 2FA secrets.
+  const safeUser = sanitizeUser(req.user as any);
   res.json({ success: true, data: safeUser });
 });
 

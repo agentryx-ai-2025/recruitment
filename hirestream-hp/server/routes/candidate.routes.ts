@@ -11,6 +11,7 @@ import {
 import { eq, and, ne, count, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { notify } from "../services/notification.service";
+import { userOwnsCandidate } from "../lib/ownership";
 
 const router = Router();
 
@@ -209,6 +210,19 @@ router.get("/applications", protect, async (req, res, next) => {
 // PDF PROFILE EXPORT
 // ═══════════════════════════════════════════════════════════════════
 
+// security 2026-07-07 (A03): HTML-escape user-supplied fields before
+// interpolating them into the server-rendered profile HTML (self-XSS —
+// sanitizeRequest strips obvious tags, but escape-on-output is the rule).
+function escapeHtml(value: unknown): string {
+  if (value === null || value === undefined) return "";
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 router.get("/profile/pdf", protect, async (req, res, next) => {
   try {
     const db = storage.db;
@@ -224,10 +238,11 @@ router.get("/profile/pdf", protect, async (req, res, next) => {
     const eduRows = await db.select().from(candidateEducation).where(eq(candidateEducation.candidateId, candidateId));
     const expRows = await db.select().from(candidateExperience).where(eq(candidateExperience.candidateId, candidateId));
 
-    // Generate HTML resume
+    // Generate HTML resume — all candidate-supplied fields go through
+    // escapeHtml (security 2026-07-07, A03).
     const html = `
 <!DOCTYPE html>
-<html><head><meta charset="utf-8"><title>${profile.fullName} - Profile</title>
+<html><head><meta charset="utf-8"><title>${escapeHtml(profile.fullName)} - Profile</title>
 <style>
   body { font-family: Arial, sans-serif; max-width: 700px; margin: 0 auto; padding: 40px; color: #333; }
   h1 { color: #1a56db; margin-bottom: 4px; }
@@ -243,17 +258,17 @@ router.get("/profile/pdf", protect, async (req, res, next) => {
   .footer { margin-top: 40px; text-align: center; color: #999; font-size: 11px; border-top: 1px solid #eee; padding-top: 12px; }
 </style></head><body>
 
-<h1>${profile.fullName}</h1>
-<p class="subtitle">${profile.email}${profile.phone ? ' | ' + profile.phone : ''}${profile.location ? ' | ' + profile.location : ''}</p>
+<h1>${escapeHtml(profile.fullName)}</h1>
+<p class="subtitle">${escapeHtml(profile.email)}${profile.phone ? ' | ' + escapeHtml(profile.phone) : ''}${profile.location ? ' | ' + escapeHtml(profile.location) : ''}</p>
 
 ${profile.skills && profile.skills.length > 0 ? `
 <h2>Skills</h2>
-<div class="skills">${profile.skills.map((s: string) => `<span class="skill-tag">${s}</span>`).join('')}</div>
+<div class="skills">${profile.skills.map((s: string) => `<span class="skill-tag">${escapeHtml(s)}</span>`).join('')}</div>
 ` : ''}
 
 ${profile.preferredCountries && profile.preferredCountries.length > 0 ? `
 <h2>Preferred Countries</h2>
-<p>${profile.preferredCountries.join(', ')}</p>
+<p>${escapeHtml(profile.preferredCountries.join(', '))}</p>
 ` : ''}
 
 ${eduRows.length > 0 ? `
@@ -261,10 +276,10 @@ ${eduRows.length > 0 ? `
 ${eduRows.map((e: any) => `
 <div class="entry">
   <div class="header-line">
-    <span class="entry-title">${e.degree}</span>
-    <span class="entry-detail">${e.year || ''}</span>
+    <span class="entry-title">${escapeHtml(e.degree)}</span>
+    <span class="entry-detail">${escapeHtml(e.year || '')}</span>
   </div>
-  <div class="entry-detail">${e.institution}${e.percentage ? ' — ' + e.percentage + '%' : ''}</div>
+  <div class="entry-detail">${escapeHtml(e.institution)}${e.percentage ? ' — ' + escapeHtml(e.percentage) + '%' : ''}</div>
 </div>`).join('')}
 ` : ''}
 
@@ -273,11 +288,11 @@ ${expRows.length > 0 ? `
 ${expRows.map((e: any) => `
 <div class="entry">
   <div class="header-line">
-    <span class="entry-title">${e.role}</span>
-    <span class="entry-detail">${e.years ? e.years + ' yr(s)' : ''}</span>
+    <span class="entry-title">${escapeHtml(e.role)}</span>
+    <span class="entry-detail">${e.years ? escapeHtml(e.years) + ' yr(s)' : ''}</span>
   </div>
-  <div class="entry-detail">${e.company}${e.country ? ', ' + e.country : ''}</div>
-  ${e.description ? `<div class="entry-detail" style="margin-top:4px">${e.description}</div>` : ''}
+  <div class="entry-detail">${escapeHtml(e.company)}${e.country ? ', ' + escapeHtml(e.country) : ''}</div>
+  ${e.description ? `<div class="entry-detail" style="margin-top:4px">${escapeHtml(e.description)}</div>` : ''}
 </div>`).join('')}
 ` : ''}
 
@@ -624,6 +639,11 @@ router.post("/:id/country-rejection", protect, async (req, res, next) => {
     if (!db) return res.status(500).json({ success: false, message: "No db" });
     const rows = await db.select({ rc: candidates.rejectedCountries }).from(candidates).where(eq(candidates.id, req.params.id)).limit(1);
     if (!rows.length) return res.status(404).json({ success: false, message: "Candidate not found" });
+    // security 2026-07-07 (A01-8): per-candidate ownership — the agent must
+    // own at least one job this candidate applied to (admins bypass inside).
+    if (!(await userOwnsCandidate(db, req.user as any, req.params.id))) {
+      return res.status(403).json({ success: false, message: "You can only record rejections for candidates on your own jobs." });
+    }
     const set = Array.from(new Set([...(rows[0].rc || []), country]));
     await db.update(candidates).set({ rejectedCountries: set }).where(eq(candidates.id, req.params.id));
     res.json({ success: true, data: { rejectedCountries: set } });
@@ -638,6 +658,10 @@ router.delete("/:id/country-rejection", protect, async (req, res, next) => {
     if (!db) return res.status(500).json({ success: false, message: "No db" });
     const rows = await db.select({ rc: candidates.rejectedCountries }).from(candidates).where(eq(candidates.id, req.params.id)).limit(1);
     if (!rows.length) return res.status(404).json({ success: false, message: "Candidate not found" });
+    // security 2026-07-07 (A01-8): per-candidate ownership (admins bypass inside).
+    if (!(await userOwnsCandidate(db, req.user as any, req.params.id))) {
+      return res.status(403).json({ success: false, message: "You can only update rejections for candidates on your own jobs." });
+    }
     const nextList = (rows[0].rc || []).filter((c: string) => c !== country);
     await db.update(candidates).set({ rejectedCountries: nextList }).where(eq(candidates.id, req.params.id));
     res.json({ success: true, data: { rejectedCountries: nextList } });

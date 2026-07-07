@@ -154,6 +154,29 @@ router.patch("/interviews/:id/feedback", async (req, res, next) => {
       updates.scorecard = Object.keys(clean).length ? clean : null;
     }
 
+    // security 2026-07-07 (A01-4): ownership guard, same model as sibling
+    // respond-reschedule — previously any agent/employer could overwrite the
+    // rating/scorecard/recommendation on ANY interview by ID (IDOR).
+    const [target] = await storage.db
+      .select({ interview: interviews, job: jobs })
+      .from(interviews)
+      .innerJoin(applications, eq(interviews.applicationId, applications.id))
+      .innerJoin(jobs, eq(applications.jobId, jobs.id))
+      .where(eq(interviews.id, req.params.id)).limit(1);
+    if (!target) return res.status(404).json({ success: false, message: "Interview not found" });
+    if (user.role === "agent" && target.job.agentId !== user.id) {
+      return res.status(403).json({ success: false, message: "Not your interview" });
+    }
+    if (user.role === "employer") {
+      let owns = target.job.employerId === user.id;
+      if (!owns && target.job.parentRequisitionId) {
+        const [parent] = await storage.db.select({ employerId: jobs.employerId }).from(jobs)
+          .where(eq(jobs.id, target.job.parentRequisitionId)).limit(1);
+        owns = !!parent && parent.employerId === user.id;
+      }
+      if (!owns) return res.status(403).json({ success: false, message: "Not your interview" });
+    }
+
     const [row] = await storage.db.update(interviews).set(updates).where(eq(interviews.id, req.params.id)).returning();
     res.json({ success: true, data: row });
   } catch (err) { next(err); }
@@ -432,6 +455,24 @@ router.get("/interviews/:id.ics", async (req, res, next) => {
     if (!row) return res.status(404).send("");
     const i = row.interview, c = row.candidate, j = row.job;
 
+    // security 2026-07-07 (A01-2): previously only `protect` — any
+    // authenticated user could enumerate interview IDs and pull another
+    // candidate's name/email/job/time/location. Allow: the candidate the
+    // interview is for, the owning agent, the owning employer (direct or via
+    // parent requisition), and admin/superadmin.
+    const user = (req as any).user;
+    const isAdmin = user.role === "admin" || user.role === "superadmin";
+    let allowed = isAdmin
+      || (user.role === "candidate" && c.userId === user.id)
+      || (user.role === "agent" && j.agentId === user.id)
+      || (user.role === "employer" && j.employerId === user.id);
+    if (!allowed && user.role === "employer" && j.parentRequisitionId) {
+      const [parent] = await storage.db.select({ employerId: jobs.employerId }).from(jobs)
+        .where(eq(jobs.id, j.parentRequisitionId)).limit(1);
+      allowed = !!parent && parent.employerId === user.id;
+    }
+    if (!allowed) return res.status(403).send("");
+
     const dt = (d: Date) => d.toISOString().replace(/[-:]|\.\d{3}/g, "");
     const start = new Date(i.scheduledAt);
     const end = new Date(start.getTime() + 60 * 60 * 1000); // 1-hour default
@@ -468,11 +509,22 @@ router.get("/placements/:id/offer-letter.pdf", async (req, res, next) => {
     if (!row) return res.status(404).send("");
 
     const p = row.placement, c = row.candidate, j = row.job;
-    // Candidate can download their own offer; agents/employers/admin can download any.
-    const isOwner = c.userId === user.id;
-    if (!isOwner && !["agent", "employer", "admin", "superadmin"].includes(user.role)) {
-      return res.status(403).send("");
+    // security 2026-07-07 (A01-6): previously ANY agent/employer could download
+    // ANY placement's offer letter (candidate name, salary, start date —
+    // cross-tenant). Now: the candidate it belongs to, the owning agent, the
+    // owning employer (direct or via parent requisition), and admin/superadmin —
+    // same ownership model as the sibling appointment-letter routes.
+    const isAdmin = user.role === "admin" || user.role === "superadmin";
+    let allowed = isAdmin
+      || (user.role === "candidate" && c.userId === user.id)
+      || (user.role === "agent" && j.agentId === user.id)
+      || (user.role === "employer" && j.employerId === user.id);
+    if (!allowed && user.role === "employer" && j.parentRequisitionId) {
+      const [parent] = await storage.db.select({ employerId: jobs.employerId }).from(jobs)
+        .where(eq(jobs.id, j.parentRequisitionId)).limit(1);
+      allowed = !!parent && parent.employerId === user.id;
     }
+    if (!allowed) return res.status(403).send("");
 
     res.setHeader("Content-Type", "application/pdf");
     // v0.4.16: inline so mobile browsers preview the PDF in-place instead
@@ -820,6 +872,29 @@ router.patch("/placements/:id/welfare", async (req, res, next) => {
     set[`welfare${milestone}Day`] = status;
     set[`welfare${milestone}DayAt`] = new Date();
     set[`welfare${milestone}DayNotes`] = notes || null;
+
+    // security 2026-07-07 (A01-5): ownership guard, same model as sibling
+    // visa-status — previously any agent/employer could stamp 30/60/90-day
+    // welfare status on ANY placement (falsifying welfare-compliance records).
+    const [target] = await storage.db
+      .select({ placement: placements, job: jobs })
+      .from(placements)
+      .innerJoin(applications, eq(placements.applicationId, applications.id))
+      .innerJoin(jobs, eq(applications.jobId, jobs.id))
+      .where(eq(placements.id, req.params.id)).limit(1);
+    if (!target) return res.status(404).json({ success: false, message: "Placement not found" });
+    if (user.role === "agent" && target.job.agentId !== user.id) {
+      return res.status(403).json({ success: false, message: "Not your placement" });
+    }
+    if (user.role === "employer") {
+      let owns = target.job.employerId === user.id;
+      if (!owns && target.job.parentRequisitionId) {
+        const [parent] = await storage.db.select({ employerId: jobs.employerId }).from(jobs)
+          .where(eq(jobs.id, target.job.parentRequisitionId)).limit(1);
+        owns = !!parent && parent.employerId === user.id;
+      }
+      if (!owns) return res.status(403).json({ success: false, message: "Not your placement" });
+    }
 
     const [row] = await storage.db.update(placements).set(set).where(eq(placements.id, req.params.id)).returning();
     logger.info(`Welfare ${milestone}-day recorded for placement ${req.params.id}: ${status}`);

@@ -21,11 +21,22 @@ export function errorHandler(
     logger.warn(`[${req.method}] ${req.path} >> StatusCode:: ${status}, Message:: ${message}`);
   }
 
+  // security 2026-07-07 (A05-1): never echo internal error detail to the
+  // client for 5xx — raw err.message leaks DB/stack internals. The real
+  // message + stack are logged above; the client gets a generic message.
+  // 4xx messages are client-safe (set deliberately by handlers) and pass
+  // through unchanged. In development the real message still surfaces to
+  // keep debugging fast.
+  const clientMessage =
+    status >= 500 && process.env.NODE_ENV !== "development"
+      ? "Internal server error"
+      : message;
+
   res.status(status).json({
     success: false,
     error: {
       code,
-      message,
+      message: clientMessage,
       ...(process.env.NODE_ENV === "development" && { stack: err.stack }),
     },
   });

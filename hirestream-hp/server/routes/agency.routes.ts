@@ -117,6 +117,26 @@ router.get("/candidates", protect, async (req, res, next) => {
     const { skill, location } = req.query;
     let filtered = allCandidates;
 
+    // security 2026-07-07 (A01-1): mirror the `:id` S6 fix on the LIST route.
+    // Employers are foreign companies — previously this returned every
+    // candidate's full row (incl. passport + Aadhaar) to any employer. Scope
+    // employers to candidates who applied to their jobs (direct or via parent
+    // requisition). Agents/admins are HPSEDC staff and keep full access.
+    const actor = req.user as any;
+    if (actor.role === "employer") {
+      const { or, inArray } = await import("drizzle-orm");
+      const { alias } = await import("drizzle-orm/pg-core");
+      const parentJobs = alias(jobs, "parent_jobs");
+      const appRows = await storage.db
+        .select({ candidateId: applications.candidateId })
+        .from(applications)
+        .innerJoin(jobs, eq(applications.jobId, jobs.id))
+        .leftJoin(parentJobs, eq(jobs.parentRequisitionId, parentJobs.id))
+        .where(or(eq(jobs.employerId, actor.id), eq(parentJobs.employerId, actor.id)));
+      const myApplicantIds = new Set(appRows.map((r: any) => r.candidateId).filter(Boolean));
+      filtered = filtered.filter((c: any) => myApplicantIds.has(c.id));
+    }
+
     if (skill && typeof skill === "string") {
       const s = skill.toLowerCase();
       filtered = filtered.filter((c: any) =>
@@ -129,6 +149,16 @@ router.get("/candidates", protect, async (req, res, next) => {
       filtered = filtered.filter((c: any) =>
         c.location?.toLowerCase().includes(l)
       );
+    }
+
+    // security 2026-07-07 (A01-1): minimise PII for employers on every row —
+    // no passport or Aadhaar numbers in the browse list (same rule as S6 on
+    // the detail route). Agents/admins (HPSEDC staff) see the full rows.
+    if (actor.role === "employer") {
+      filtered = filtered.map((c: any) => {
+        const { passportNumber, aadhaarNumber, ...safe } = c;
+        return safe;
+      });
     }
 
     res.json({ success: true, data: filtered, total: filtered.length });

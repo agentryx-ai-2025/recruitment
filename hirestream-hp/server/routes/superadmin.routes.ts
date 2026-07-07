@@ -1,6 +1,7 @@
 import { Router } from "express";
 import bcrypt from "bcrypt";
 import { auditAction } from "../middleware/audit.middleware";
+import { sanitizeUser } from "../lib/safeUser";
 
 const router = Router();
 
@@ -31,8 +32,10 @@ router.get("/users", async (req, res) => {
       ? await storage.db.select().from(users).where(eq(users.role, role))
       : await storage.db.select().from(users);
 
-    // Strip password hashes from response
-    const safe = allUsers.map(({ password, ...rest }: any) => rest);
+    // security 2026-07-07 (A02-3): shared serializer — strips password AND
+    // twoFactorSecret/twoFactorRecoveryCodes, masks Aadhaar. Previously only
+    // the password hash was removed, leaking every user's TOTP seed.
+    const safe = allUsers.map((u: any) => sanitizeUser(u));
     res.json({ success: true, data: safe, total: safe.length });
   } catch (err) {
     res.status(500).json({ success: false, message: "Failed to fetch users" });
@@ -60,7 +63,8 @@ router.post("/users", async (req, res) => {
       username, email, password: hashedPw, role,
     }).returning();
 
-    const { password: _, ...safe } = newUser;
+    // security 2026-07-07 (A02-3): shared serializer — never emit 2FA secrets.
+    const safe = sanitizeUser(newUser);
     res.json({ success: true, data: safe });
   } catch (err: any) {
     if (err.message?.includes("duplicate")) {
@@ -91,7 +95,8 @@ router.patch("/users/:id/role", async (req, res) => {
       .returning();
 
     if (!updated) return res.status(404).json({ success: false, message: "User not found" });
-    const { password: _, ...safe } = updated;
+    // security 2026-07-07 (A02-3): shared serializer — never emit 2FA secrets.
+    const safe = sanitizeUser(updated);
     res.json({ success: true, data: safe });
   } catch (err) {
     res.status(500).json({ success: false, message: "Failed to update user role" });
@@ -118,7 +123,8 @@ router.patch("/users/:id/active", async (req, res) => {
       .returning();
 
     if (!updated) return res.status(404).json({ success: false, message: "User not found" });
-    const { password: _, ...safe } = updated;
+    // security 2026-07-07 (A02-3): shared serializer — never emit 2FA secrets.
+    const safe = sanitizeUser(updated);
     res.json({ success: true, data: safe });
   } catch (err) {
     res.status(500).json({ success: false, message: "Failed to update user status" });
@@ -255,7 +261,12 @@ const DEFAULT_FLAGS = [
   { key: "feature.agency_reviews_enabled", value: true, description: "Candidates can post agency reviews", category: "feature_flag" },
   { key: "feature.registration_enabled", value: true, description: "Public registration open", category: "feature_flag" },
   { key: "feature.dark_mode_enabled", value: true, description: "Dark mode toggle visible in header", category: "feature_flag" },
-  { key: "feature.quick_login_enabled", value: true, description: "Quick role login on auth page (dev/testing only). Disable before production.", category: "feature_flag" },
+  // security 2026-07-07 (A04-1): default OFF. The previous default (true) was
+  // auto-inserted the first time the Feature Flags page loaded, silently
+  // re-enabling password-less demo login + demo-reset. The routes are also
+  // hard-blocked when NODE_ENV=production (auth.routes.ts); this flag now only
+  // opts-in quick login on dev/staging.
+  { key: "feature.quick_login_enabled", value: false, description: "Quick role login on auth page (dev/testing only). Off by default; never active in production.", category: "feature_flag" },
   { key: "system.maintenance_mode", value: false, description: "Portal in read-only/maintenance. When ON, non-superadmin users see 503.", category: "maintenance" },
   { key: "system.maintenance_message", value: "HireStream is undergoing scheduled maintenance. Please try again shortly.", description: "Message shown during maintenance", category: "maintenance" },
 ];

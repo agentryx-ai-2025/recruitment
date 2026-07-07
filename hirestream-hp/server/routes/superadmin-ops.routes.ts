@@ -6,6 +6,7 @@ import {
   agencyReviews,
 } from "@shared/schema";
 import { sql, desc, eq, and, or, lt, isNotNull, isNull, ilike } from "drizzle-orm";
+import { sanitizeUser } from "../lib/safeUser";
 
 const router = Router();
 
@@ -520,8 +521,9 @@ router.get("/lookup", async (req, res) => {
       )).limit(5),
     ]);
 
-    // Strip passwords from users
-    const safeUsers = usersFound.map(({ password, ...u }: any) => u);
+    // security 2026-07-07 (A02-3): shared serializer — strips password AND
+    // twoFactorSecret/twoFactorRecoveryCodes, masks Aadhaar.
+    const safeUsers = usersFound.map((u: any) => sanitizeUser(u));
 
     res.json({
       success: true,

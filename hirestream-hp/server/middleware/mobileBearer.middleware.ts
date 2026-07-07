@@ -41,8 +41,18 @@ export async function mobileBearer(req: Request, res: Response, next: NextFuncti
   // we additionally set no-store + no-referrer headers on responses
   // that serve media via this path. See /api/v1/me/placements/:id/
   // offer-letter.pdf for one consumer.
+  // security 2026-07-07 (A-CERT-1): tokens in query strings leak via browser
+  // history, Referer headers, and proxy/access logs. Previously `?token=` was
+  // accepted on EVERY route; now it is accepted ONLY on the media-download
+  // routes the mobile app must open in the device browser (Linking.openURL
+  // can't attach an Authorization header). Everything else requires the
+  // `Authorization: Bearer` header.
+  const QUERY_TOKEN_PATHS = /^\/api\/v1\/(me|agent)\/placements\/[^/]+\/offer-letter\.pdf$/;
   const header = req.headers.authorization;
-  const queryToken = typeof req.query.token === "string" ? req.query.token : null;
+  const queryToken =
+    typeof req.query.token === "string" && QUERY_TOKEN_PATHS.test(req.path)
+      ? req.query.token
+      : null;
 
   let rawToken: string | null = null;
   if (header?.startsWith("Bearer ")) {

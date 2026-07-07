@@ -29,6 +29,7 @@ import { loginSchema, registerSchema } from "@shared/validators";
 import { env } from "../config/env.config";
 import { logger } from "../config/logger.config";
 import { notify } from "../services/notification.service";
+import { sanitizeUser } from "../lib/safeUser";
 
 const router = Router();
 
@@ -103,9 +104,10 @@ async function issueTokenPair(userId: string, role: string, req: any) {
 }
 
 /** Strip password from user object before returning to client */
+// security 2026-07-07 (A02-3): delegate to the shared serializer so the
+// mobile responses also mask users.aadhaarNumber (was returned raw).
 function safeUser(user: any) {
-  const { password: _, twoFactorSecret: _s, twoFactorRecoveryCodes: _r, ...safe } = user;
-  return safe;
+  return sanitizeUser(user);
 }
 
 // ── POST /login ─────────────────────────────────────────────────────

@@ -70,7 +70,11 @@ describe('POST /api/v1/auth/register', () => {
     expect(res.status).toBe(400);
   });
 
-  it('rejects duplicate email → 409', async () => {
+  // security 2026-07-07 (A07-1): duplicate registration no longer returns a
+  // distinguishable 409 "User already exists" (email enumeration). It returns
+  // the same 201 success shape WITHOUT a user object or session, and the
+  // duplicate is still not created.
+  it('duplicate email → neutral 201, no session, no account created/changed', async () => {
     await request(app)
       .post('/api/v1/auth/register')
       .send({ email: 'dup@example.com', password: 'Test@123', role: 'candidate' });
@@ -79,7 +83,19 @@ describe('POST /api/v1/auth/register', () => {
       .post('/api/v1/auth/register')
       .send({ email: 'dup@example.com', password: 'Other@456', role: 'agent' });
 
-    expect(res.status).toBe(409);
+    expect(res.status).toBe(201);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data?.id).toBeUndefined(); // no user object → no login
+
+    // The original account is untouched: old password works, new one doesn't.
+    const okLogin = await request(app)
+      .post('/api/v1/auth/login')
+      .send({ username: 'dup@example.com', password: 'Test@123' });
+    expect(okLogin.status).toBe(200);
+    const badLogin = await request(app)
+      .post('/api/v1/auth/login')
+      .send({ username: 'dup@example.com', password: 'Other@456' });
+    expect(badLogin.status).toBe(401);
   });
 
   it('accepts all three public roles', async () => {

@@ -8,6 +8,7 @@ import {
   grievances, notifications, documents, countryInfo,
 } from "@shared/schema";
 import { eq, count, sql, desc, and } from "drizzle-orm";
+import { sanitizeUser } from "../../lib/safeUser";
 
 const router = Router();
 router.use(protect);
@@ -379,11 +380,12 @@ router.get("/export/:entity.csv", async (req, res, next) => {
 
     const rows = await db.select().from(table);
 
-    // Strip password fields if present
-    const safeRows = rows.map((r: any) => {
-      const { password, ...rest } = r;
-      return rest;
-    });
+    // security 2026-07-07 (A02-2): the old strip-only-`password` export leaked
+    // twoFactorSecret + twoFactorRecoveryCodes + raw Aadhaar for every user
+    // (users.csv) — exporting the TOTP seed defeats 2FA portal-wide. The
+    // shared serializer removes credential/2FA secrets and masks Aadhaar on
+    // any entity that carries those columns; all other columns still export.
+    const safeRows = rows.map((r: any) => sanitizeUser(r));
 
     const csv = toCSV(safeRows);
     const filename = `${req.params.entity}-${new Date().toISOString().slice(0, 10)}.csv`;

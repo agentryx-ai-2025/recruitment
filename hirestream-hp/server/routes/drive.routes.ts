@@ -191,13 +191,29 @@ router.get("/upcoming", protect, async (req, res, next) => {
 });
 
 // ── Get Single Drive ────────────────────────────────────────────────
-router.get("/:id", async (req, res, next) => {
+// security 2026-07-07 (A01-7): was unauthenticated and unfiltered — anyone
+// could read pending/rejected/cancelled drives incl. rejectionReason. Now
+// requires auth; non-approved drives are only visible to admin/superadmin
+// and the owning agency (who need them for the review/edit flow).
+router.get("/:id", protect, async (req, res, next) => {
   try {
     const db = storage.db;
     if (!db) return res.status(500).json({ success: false, error: { code: 500, message: "Database not available" } });
 
     const rows = await db.select().from(recruitmentDrives).where(eq(recruitmentDrives.id, req.params.id)).limit(1);
     if (!rows.length) return res.status(404).json({ success: false, error: { code: 404, message: "Drive not found" } });
+
+    const user = req.user as any;
+    if (rows[0].status !== "approved") {
+      const isAdmin = user.role === "admin" || user.role === "superadmin";
+      if (!isAdmin) {
+        const [myAgency] = await db.select().from(recruitmentAgents).where(eq(recruitmentAgents.userId, user.id)).limit(1);
+        if (!myAgency || myAgency.id !== rows[0].agencyId) {
+          // 404 (not 403) so non-staff can't confirm a hidden drive exists.
+          return res.status(404).json({ success: false, error: { code: 404, message: "Drive not found" } });
+        }
+      }
+    }
 
     res.json({ success: true, data: rows[0] });
   } catch (error) {
@@ -480,6 +496,19 @@ router.get("/:driveId/interviews", protect, async (req, res, next) => {
   try {
     const db = storage.db;
     if (!db) return res.status(500).json({ success: false, error: { code: 500, message: "Database not available" } });
+
+    // security 2026-07-07 (A01-3): previously only `protect` — any
+    // authenticated user (incl. candidates) could list every interview on any
+    // drive with candidate name/email/skills. Reuse the admin-or-owning-agency
+    // check from GET /:id/registrations.
+    const user = req.user as any;
+    const [drive] = await db.select().from(recruitmentDrives).where(eq(recruitmentDrives.id, req.params.driveId)).limit(1);
+    if (!drive) return res.status(404).json({ success: false, error: { code: 404, message: "Drive not found" } });
+    const isAdmin = user.role === "admin" || user.role === "superadmin";
+    const [myAgency] = await db.select().from(recruitmentAgents).where(eq(recruitmentAgents.userId, user.id)).limit(1);
+    if (!isAdmin && (!myAgency || myAgency.id !== drive.agencyId)) {
+      return res.status(403).json({ success: false, error: { code: 403, message: "Not your drive" } });
+    }
 
     const rows = await db
       .select({ interview: interviews, application: applications, candidate: candidates, job: jobs })

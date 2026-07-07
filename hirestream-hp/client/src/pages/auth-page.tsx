@@ -421,6 +421,15 @@ function RegisterForm() {
       return;
     }
     registerMutation.mutate({ ...data, username: data.email }, {
+      // security 2026-07-07 (A07-1): the register API no longer reveals
+      // "user already exists" (enumeration). When it returns the neutral
+      // success (no user object / no session), surface its guidance instead
+      // of silently doing nothing.
+      onSuccess: (res: any) => {
+        if (!res?.data?.id && res?.data?.message) {
+          toast({ title: t("auth.registerTitle", "Registration"), description: res.data.message });
+        }
+      },
       onError: (err: any) => {
         toast({ title: t("auth.registrationFailed"), description: err.message, variant: "destructive" });
       },

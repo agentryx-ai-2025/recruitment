@@ -60,7 +60,7 @@ router.get("/config", (_req, res) => {
 // `candidates.full_name`. The endpoint silently fell back to username
 // (email) and the mobile UI never displayed the real name. Fixed in
 // v0.4.11.0 — joins the role-specific table to return canonical data.
-router.get("/profile", async (req: any, res) => {
+router.get("/profile", async (req: any, res, next: any) => {
   if (!req.user) {
     return res.status(401).json({ success: false, error: { code: 401, message: "Not authenticated" } });
   }
@@ -113,14 +113,16 @@ router.get("/profile", async (req: any, res) => {
       },
     });
   } catch (err: any) {
-    res.status(500).json({ success: false, error: { code: 500, message: err.message || "Internal error" } });
+    // security 2026-07-07 (A05-1): route through the global handler — raw
+    // err.message leaked DB/internal detail to the client.
+    next(err);
   }
 });
 
 // ── GET /notifications ──────────────────────────────────────────────
 // Returns the authenticated user's notifications from the database,
 // ordered by most recent first.
-router.get("/notifications", async (req: any, res) => {
+router.get("/notifications", async (req: any, res, next: any) => {
   if (!req.user) {
     return res.status(401).json({ success: false, error: { code: 401, message: "Not authenticated" } });
   }
@@ -178,7 +180,9 @@ router.get("/notifications", async (req: any, res) => {
 
     res.json({ success: true, data: { notifications: mapped } });
   } catch (err: any) {
-    res.status(500).json({ success: false, error: { code: 500, message: err.message || "Internal error" } });
+    // security 2026-07-07 (A05-1): route through the global handler — raw
+    // err.message leaked DB/internal detail to the client.
+    next(err);
   }
 });
 // ── PATCH /profile ──────────────────────────────────────────────────
@@ -192,7 +196,7 @@ router.get("/notifications", async (req: any, res) => {
 // against a column that doesn't exist. Drizzle silently no-op'd, the
 // endpoint returned success, and the mobile UI showed "Saved" while the
 // DB row never changed. Fixed by routing each field to its canonical table.
-router.patch("/profile", async (req: any, res) => {
+router.patch("/profile", async (req: any, res, next: any) => {
   if (!req.user) {
     return res.status(401).json({ success: false, error: { code: 401, message: "Not authenticated" } });
   }
@@ -268,13 +272,15 @@ router.patch("/profile", async (req: any, res) => {
       },
     });
   } catch (err: any) {
-    res.status(500).json({ success: false, error: { code: 500, message: err.message || "Internal error" } });
+    // security 2026-07-07 (A05-1): route through the global handler — raw
+    // err.message leaked DB/internal detail to the client.
+    next(err);
   }
 });
 
 // ── PATCH /notifications/read-all ───────────────────────────────────
 // Mark ALL notifications for the authenticated user as read.
-router.patch("/notifications/read-all", async (req: any, res) => {
+router.patch("/notifications/read-all", async (req: any, res, next: any) => {
   if (!req.user) {
     return res.status(401).json({ success: false, error: { code: 401, message: "Not authenticated" } });
   }
@@ -291,13 +297,15 @@ router.patch("/notifications/read-all", async (req: any, res) => {
 
     res.json({ success: true, data: { message: "All notifications marked as read" } });
   } catch (err: any) {
-    res.status(500).json({ success: false, error: { code: 500, message: err.message || "Internal error" } });
+    // security 2026-07-07 (A05-1): route through the global handler — raw
+    // err.message leaked DB/internal detail to the client.
+    next(err);
   }
 });
 
 // ── PATCH /notifications/:id/read ───────────────────────────────────
 // Mark a notification as read in the database.
-router.patch("/notifications/:id/read", async (req: any, res) => {
+router.patch("/notifications/:id/read", async (req: any, res, next: any) => {
   if (!req.user) {
     return res.status(401).json({ success: false, error: { code: 401, message: "Not authenticated" } });
   }
@@ -314,7 +322,9 @@ router.patch("/notifications/:id/read", async (req: any, res) => {
 
     res.json({ success: true, data: { id: req.params.id, isRead: true } });
   } catch (err: any) {
-    res.status(500).json({ success: false, error: { code: 500, message: err.message || "Internal error" } });
+    // security 2026-07-07 (A05-1): route through the global handler — raw
+    // err.message leaked DB/internal detail to the client.
+    next(err);
   }
 });
 
@@ -328,7 +338,7 @@ router.patch("/notifications/:id/read", async (req: any, res) => {
 // fields, so the candidate's real name + phone survived on the
 // `candidates` row after "deletion". This was a real PII / Play Store
 // compliance issue. Now: anonymize both users AND the role-specific row.
-router.delete("/account", async (req: any, res) => {
+router.delete("/account", async (req: any, res, next: any) => {
   if (!req.user) {
     return res.status(401).json({ success: false, error: { code: 401, message: "Not authenticated" } });
   }
@@ -373,7 +383,9 @@ router.delete("/account", async (req: any, res) => {
 
     res.json({ success: true, data: { message: "Account deleted successfully" } });
   } catch (err: any) {
-    res.status(500).json({ success: false, error: { code: 500, message: err.message || "Internal error" } });
+    // security 2026-07-07 (A05-1): route through the global handler — raw
+    // err.message leaked DB/internal detail to the client.
+    next(err);
   }
 });
 

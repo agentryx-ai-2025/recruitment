@@ -6,7 +6,7 @@ const router = Router();
 
 // POST /api/v1/resume/parse — parse resume text and extract structured data
 // Simple heuristic-based parser. Replace with GPT/Claude integration in production.
-router.post("/parse", protect, async (req, res) => {
+router.post("/parse", protect, async (req, res, next) => {
   try {
     const { text } = req.body;
     if (!text || typeof text !== "string") {
@@ -123,7 +123,9 @@ router.post("/parse", protect, async (req, res) => {
       },
     });
   } catch (err: any) {
-    res.status(500).json({ success: false, message: "Parse failed", error: err.message });
+    // security 2026-07-07 (A05-1): route through the global handler — raw
+    // err.message leaked internal detail to the client.
+    next(err);
   }
 });
 
