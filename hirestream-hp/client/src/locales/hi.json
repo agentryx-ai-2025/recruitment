@@ -443,7 +443,7 @@
     "callbackCardTitle": "HPSEDC से मुझे कॉल करने को कहें",
     "callbackCardSub": "इसमें ज़्यादा समय लगता है। हो सके तो फ़ॉर्म खुद भरें — परिवार का सदस्य या कॉमन सर्विस सेंटर मदद कर सकता है।",
     "continueProfile": "जहां छोड़ा था वहीं से जारी रखें",
-    "changeRegister": "पंजीकरण का तरीका बदलें",
+    "changeRegister": "पंजीकरण प्रकार बदलें",
     "callbackPending": "HPSEDC आपको {{phone}} पर कॉल करेगा। आपको कुछ नहीं करना है।",
     "callbackPendingNoPhone": "HPSEDC पंजीकरण में मदद के लिए आपको कॉल करेगा। आपको कुछ नहीं करना है।",
     "fillMyself": "मैं खुद फ़ॉर्म भरूंगा",

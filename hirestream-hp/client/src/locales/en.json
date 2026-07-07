@@ -440,7 +440,7 @@
     "callbackCardTitle": "Ask HPSEDC to call me",
     "callbackCardSub": "This takes longer. If you can, fill the form yourself — a family member or Common Service Centre can help.",
     "continueProfile": "Continue where you left off",
-    "changeRegister": "Change how you register",
+    "changeRegister": "Change registration type",
     "callbackPending": "HPSEDC will call you on {{phone}}. You don't need to do anything.",
     "callbackPendingNoPhone": "HPSEDC will call you to help you register. You don't need to do anything.",
     "fillMyself": "Fill the form myself instead",

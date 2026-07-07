@@ -16,7 +16,7 @@ import {
   Clock, Shield, ChevronDown, ChevronUp, ArrowUpDown, Sparkles,
   LayoutDashboard, ClipboardList, XCircle, Calendar, ArrowRight,
   Bookmark, BookmarkCheck, Heart, TrendingUp, Globe, Award, Eye, Route, Trash2, Flag, Zap, Upload, Tag, Plane,
-  Home, Phone, MessageCircleQuestion, ShieldCheck, ShieldAlert, PanelLeftClose, IdCard, BookUser, FileSearch, CalendarCheck, RotateCcw,
+  Home, Phone, MessageCircleQuestion, ShieldCheck, ShieldAlert, PanelLeftClose, IdCard, BookUser, FileSearch, CalendarCheck, RotateCcw, Repeat,
 } from "lucide-react";
 import { ReportJobDialog } from "@/components/shared/report-job-dialog";
 import { PhotoAvatar } from "@/components/shared/PhotoAvatar";
@@ -323,10 +323,12 @@ export default function CandidateDashboard() {
                 <User className="w-3.5 h-3.5 mr-1.5" /> Edit Profile
               </Button>
             )}
-            {/* Change registration route — visible once a tier is chosen and the profile isn't complete. */}
+            {/* Change registration route — visible once a tier is chosen and the profile isn't complete.
+                audit 2026-07-07 (UI): was a tiny [11px] grey underline nobody noticed —
+                promoted to a bordered chip with an icon so it reads as a real secondary action. */}
             {!ready && (profile.registrationTier === "standard" || profile.registrationTier === "professional") && (
-              <button onClick={() => setLocation("/start")} className="w-full text-center text-[11px] text-slate-500 hover:text-blue-700 underline underline-offset-2 mt-2 py-1">
-                {t("simpleDash.changeRegister")}
+              <button onClick={() => setLocation("/start")} className="w-full flex items-center justify-center gap-1.5 rounded-lg border border-slate-200 text-slate-600 hover:border-blue-300 hover:text-blue-700 hover:bg-blue-50/50 text-xs font-semibold py-2.5 mt-2 transition-colors">
+                <Repeat className="w-3.5 h-3.5" /> {t("simpleDash.changeRegister")}
               </button>
             )}
           </div>
@@ -536,7 +538,7 @@ function MinimalOverview({ profile, completion, applications, setActiveView, set
               // A path is already chosen — continue it, or switch route.
               <>
                 <Button onClick={() => setLocation(tier === "professional" ? "/apply/pro" : "/apply")} className={`${BIG} mt-4 bg-blue-700 hover:bg-blue-800 text-white`}>{t("minDash.continueProfile")} <ArrowRight className="w-5 h-5 ml-2" /></Button>
-                <button onClick={() => setLocation("/start")} className="mt-2 w-full text-sm text-slate-500 hover:text-blue-700 underline underline-offset-2 py-2">{t("simpleDash.changeRegister")}</button>
+                <button onClick={() => setLocation("/start")} className="mt-2 w-full flex items-center justify-center gap-1.5 rounded-lg border border-slate-200 text-slate-600 hover:border-blue-300 hover:text-blue-700 hover:bg-blue-50/50 text-sm font-semibold py-2.5 transition-colors"><Repeat className="w-4 h-4" /> {t("simpleDash.changeRegister")}</button>
               </>
             ) : (() => {
               // First time (no tier yet): show only the registration routes admin
