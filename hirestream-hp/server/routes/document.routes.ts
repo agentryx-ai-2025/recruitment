@@ -159,6 +159,68 @@ router.get("/:id/download", async (req, res, next) => {
   }
 });
 
+// ── Verify / Un-verify Document ─────────────────────────────────────
+// audit 2026-07-06 (Batch 4B): documents.verified/verifiedBy existed in the
+// schema but nothing ever wrote them. Staff (agent who owns the candidate,
+// or admin/superadmin) mark a doc verified after eyeballing it — the ✓ then
+// shows on the agent candidate-detail + admin views (which spread the row).
+router.patch("/:id/verify", async (req, res, next) => {
+  try {
+    const db = storage.db;
+    if (!db) return res.status(500).json({ success: false, error: { code: 500, message: "Database not available" } });
+
+    const user = req.user as any;
+    if (!["agent", "admin", "superadmin"].includes(user.role)) {
+      return res.status(403).json({ success: false, error: { code: 403, message: "Only HPSEDC staff can verify documents" } });
+    }
+    if (typeof req.body?.verified !== "boolean") {
+      return res.status(400).json({ success: false, error: { code: 400, message: "Body must include { verified: boolean }" } });
+    }
+    const verified: boolean = req.body.verified;
+
+    const docRows = await db.select().from(documents).where(eq(documents.id, req.params.id)).limit(1);
+    if (docRows.length === 0 || !docRows[0].candidateId) {
+      return res.status(404).json({ success: false, error: { code: 404, message: "Document not found" } });
+    }
+    const doc = docRows[0];
+
+    // Agents may only verify docs of candidates on their own jobs.
+    const { userOwnsCandidate } = await import("../lib/ownership");
+    if (!(await userOwnsCandidate(db, user, doc.candidateId!))) {
+      return res.status(403).json({ success: false, error: { code: 403, message: "You can only verify documents of your own candidates" } });
+    }
+
+    const [updated] = await db.update(documents)
+      .set(verified
+        ? { verified: true, verifiedBy: user.id, verifiedAt: new Date() }
+        : { verified: false, verifiedBy: null, verifiedAt: null })
+      .where(eq(documents.id, doc.id))
+      .returning();
+
+    // Tell the candidate their document was checked (verify only — silently
+    // clearing a ✓ is a staff-side correction, not a candidate event).
+    if (verified) {
+      const candRows = await db.select().from(candidates).where(eq(candidates.id, doc.candidateId!)).limit(1);
+      if (candRows.length && candRows[0].userId) {
+        const { notify } = await import("../services/notification.service");
+        notify({
+          userId: candRows[0].userId,
+          type: "system",
+          title: "Document verified",
+          message: `Your ${doc.type.replace(/_/g, " ")} document "${doc.fileName}" has been verified by HPSEDC.`,
+          severity: "positive",
+          metadata: { documentId: doc.id },
+        }).catch(() => {});
+      }
+    }
+
+    logger.info(`Document ${doc.id} ${verified ? "verified" : "un-verified"} by ${user.role} ${user.id}`);
+    res.json({ success: true, data: updated });
+  } catch (error) {
+    next(error);
+  }
+});
+
 // ── Delete Document ─────────────────────────────────────────────────
 router.delete("/:id", async (req, res, next) => {
   try {

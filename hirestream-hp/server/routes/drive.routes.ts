@@ -637,6 +637,26 @@ router.post("/placements", protect, async (req, res, next) => {
       return res.status(400).json({ success: false, error: { code: 400, message: "Application must be in 'selected' status to create placement" } });
     }
 
+    // audit 2026-07-06 (Batch 4B): ECR candidates cannot have a travel/start
+    // date until PDO + PBBY are done (Emigration Act). Gate only when a start
+    // date is being set — the offer itself can be issued without one.
+    if (startDate) {
+      const gateOn: boolean = await (await import("../services/settings.service")).getSetting("compliance.gate_travel_on_pdo_pbby");
+      if (gateOn && guard.app.candidateId) {
+        const [cand] = await db.select().from(candidates).where(eq(candidates.id, guard.app.candidateId)).limit(1);
+        const { ecrTravelGateIssue } = await import("../services/deployment.service");
+        const missing = cand ? ecrTravelGateIssue(cand) : null;
+        if (missing) {
+          return res.status(400).json({ success: false, error: { code: 400, message: `This candidate holds an ECR passport — complete ${missing} before setting a travel/start date. (Create the offer without a start date, or update the candidate's compliance record.)` } });
+        }
+      }
+    }
+
+    // audit 2026-07-06 (Batch 4B): stamp the offer's validity deadline so a
+    // stale offer can't be accepted months later. 0 days = no expiry.
+    const validityDays: number = await (await import("../services/settings.service")).getSetting("placement.offer_validity_days");
+    const offerExpiresAt = validityDays > 0 ? new Date(Date.now() + validityDays * 86400_000) : null;
+
     const result = await db.insert(placements).values({
       applicationId,
       country,
@@ -644,6 +664,7 @@ router.post("/placements", protect, async (req, res, next) => {
       startDate: startDate ? new Date(startDate) : null,
       appointmentLetterUrl: appointmentLetterUrl || null,
       status: "offered",
+      offerExpiresAt,
     }).returning();
 
     // PWS §8: audit placement lifecycle (v0.4.17 — was missing before)
@@ -756,6 +777,22 @@ router.patch("/placements/:id/accept", protect, async (req, res, next) => {
       return res.status(400).json({ success: false, error: { code: 400, message: "Can only accept an offered placement" } });
     }
 
+    // audit 2026-07-06 (Batch 4B): compliance gates on accept. Admins bypass
+    // both (supervisory override — e.g. letter handed over on paper).
+    const isSupervisor = user.role === "admin" || user.role === "superadmin";
+    if (!isSupervisor) {
+      const { getSetting } = await import("../services/settings.service");
+      // (a) No accept without the appointment letter on file.
+      const requireLetter: boolean = await getSetting("placement.require_letter_to_accept");
+      if (requireLetter && !rows[0].appointmentLetterUrl) {
+        return res.status(400).json({ success: false, error: { code: 400, message: "This offer cannot be accepted yet — the appointment letter has not been uploaded. Please ask HPSEDC to attach it first." } });
+      }
+      // (b) No accept past the offer's validity deadline.
+      if (rows[0].offerExpiresAt && new Date() > new Date(rows[0].offerExpiresAt)) {
+        return res.status(400).json({ success: false, error: { code: 400, message: `This offer expired on ${new Date(rows[0].offerExpiresAt).toLocaleDateString("en-IN")} and can no longer be accepted. Please contact HPSEDC if you still want this placement.` } });
+      }
+    }
+
     const result = await db.update(placements)
       .set({ status: "accepted", candidateResponse: "accepted" })
       .where(eq(placements.id, req.params.id))
@@ -826,6 +863,91 @@ router.patch("/placements/:id/decline", protect, async (req, res, next) => {
     } catch (e: any) { logger.warn(`audit on placement decline failed: ${e?.message}`); }
 
     res.json({ success: true, data: result[0] });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ── Staff: placement lifecycle tail (active → completed) ────────────
+// audit 2026-07-06 (Batch 4B): after a candidate accepts, nothing ever moved
+// the placement to 'active' (deployed/working) or 'completed' (contract done)
+// even though welfare tracking + agent stats already read those states. Legal
+// transitions: accepted → active → completed; anything else is rejected.
+// Mounted under /api/v1/drives, same as the other placement endpoints.
+router.patch("/placements/:id/lifecycle", protect, async (req, res, next) => {
+  try {
+    const db = storage.db;
+    if (!db) return res.status(500).json({ success: false, error: { code: 500, message: "Database not available" } });
+
+    const user = req.user as any;
+    if (!["agent", "admin", "superadmin"].includes(user.role)) {
+      return res.status(403).json({ success: false, error: { code: 403, message: "Only HPSEDC staff can update the placement lifecycle" } });
+    }
+    const nextStatus = String(req.body?.status ?? "");
+    if (!["active", "completed"].includes(nextStatus)) {
+      return res.status(400).json({ success: false, error: { code: 400, message: "status must be \"active\" or \"completed\"" } });
+    }
+
+    // Resolve placement + owning job for the agent ownership check.
+    const [row] = await db
+      .select({ placement: placements, app: applications, job: jobs })
+      .from(placements)
+      .innerJoin(applications, eq(placements.applicationId, applications.id))
+      .innerJoin(jobs, eq(applications.jobId, jobs.id))
+      .where(eq(placements.id, req.params.id))
+      .limit(1);
+    if (!row) return res.status(404).json({ success: false, error: { code: 404, message: "Placement not found" } });
+
+    const isSupervisor = user.role === "admin" || user.role === "superadmin";
+    if (!isSupervisor && !(user.role === "agent" && row.job.agentId === user.id)) {
+      return res.status(403).json({ success: false, error: { code: 403, message: "You can only update placements on your own jobs" } });
+    }
+
+    // Transition validation: accepted → active → completed. (Applications show
+    // 'placed' after accept; the placement row itself is 'accepted'.)
+    const from = row.placement.status ?? "offered";
+    const legal: Record<string, string[]> = { active: ["accepted"], completed: ["active"] };
+    if (!legal[nextStatus].includes(from)) {
+      return res.status(400).json({
+        success: false,
+        error: { code: 400, message: `Cannot move a '${from}' placement to '${nextStatus}'. Legal order: accepted → active → completed.` },
+      });
+    }
+
+    const [updated] = await db.update(placements)
+      .set({ status: nextStatus })
+      .where(eq(placements.id, req.params.id))
+      .returning();
+
+    // PWS §8: audit the lifecycle transition like the other placement moves.
+    try {
+      const { logTransition } = await import("../services/audit-transitions.service");
+      await logTransition({
+        actorUserId: user.id, actorRole: user.role,
+        entityType: "placement", entityId: req.params.id, action: "status_change",
+        fromState: from, toState: nextStatus,
+        ipAddress: req.ip,
+        extra: { applicationId: row.placement.applicationId },
+      });
+    } catch (e: any) { logger.warn(`audit on placement lifecycle failed: ${e?.message}`); }
+
+    // Tell the candidate their placement moved (best-effort).
+    const [cand] = await db.select().from(candidates).where(eq(candidates.id, row.app.candidateId!)).limit(1);
+    if (cand?.userId) {
+      notify({
+        userId: cand.userId,
+        type: "application_update",
+        title: nextStatus === "active" ? "Placement is now active" : "Placement completed",
+        message: nextStatus === "active"
+          ? `Your placement for "${row.job.title}" in ${row.placement.country} is now active. HPSEDC will follow up with welfare check-ins.`
+          : `Your placement for "${row.job.title}" in ${row.placement.country} has been marked completed. Thank you — please share any feedback with HPSEDC.`,
+        severity: "positive",
+        metadata: { placementId: req.params.id, applicationId: row.placement.applicationId },
+      }).catch(() => {});
+    }
+
+    logger.info(`Placement ${req.params.id} lifecycle ${from} → ${nextStatus} by ${user.role} ${user.id}`);
+    res.json({ success: true, data: updated });
   } catch (error) {
     next(error);
   }

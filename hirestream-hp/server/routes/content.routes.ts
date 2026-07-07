@@ -385,6 +385,9 @@ router.put("/countries/:code", protect, requireRole(["admin"]), async (req, res,
     }
     if (typeof body.visaTimelineDays === "number") patch.visaTimelineDays = body.visaTimelineDays;
     if (typeof body.isActive === "boolean") patch.isActive = body.isActive;
+    // audit 2026-07-06 (Batch 4B): ECR-destination flag (foundation for the
+    // eMigrate/PoE checklist step + reporting export in Wave 2).
+    if (typeof body.isEcrCountry === "boolean") patch.isEcrCountry = body.isEcrCountry;
 
     // Guard: reject creating "India" as a destination — overseas portal scope.
     const nameForCheck = String(patch.name ?? "").trim().toLowerCase();

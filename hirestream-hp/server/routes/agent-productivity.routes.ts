@@ -601,6 +601,28 @@ router.patch("/placements/:id", async (req, res, next) => {
       }
     }
 
+    // audit 2026-07-06 (Batch 4B): ECR candidates cannot have a travel/start
+    // date set until PDO is completed AND PBBY insurance is enrolled
+    // (Emigration Act). Gated by compliance.gate_travel_on_pdo_pbby so HPSEDC
+    // can relax it if these are tracked outside the portal. Clearing the date
+    // (null) is always allowed.
+    if (updates.startDate instanceof Date) {
+      const gateOn: boolean = await getSetting("compliance.gate_travel_on_pdo_pbby");
+      if (gateOn) {
+        const [candRow] = await db
+          .select({ cand: candidates })
+          .from(applications)
+          .innerJoin(candidates, eq(applications.candidateId, candidates.id))
+          .where(eq(applications.id, row.placement.applicationId))
+          .limit(1);
+        const { ecrTravelGateIssue } = await import("../services/deployment.service");
+        const missing = candRow ? ecrTravelGateIssue(candRow.cand) : null;
+        if (missing) {
+          return res.status(400).json({ success: false, message: `This candidate holds an ECR passport — complete ${missing} before setting a travel/start date. Update the candidate's compliance record first.` });
+        }
+      }
+    }
+
     const [updated] = await db.update(placements)
       .set(updates)
       .where(eq(placements.id, req.params.id))

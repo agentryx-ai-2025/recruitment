@@ -2540,6 +2540,8 @@ function SystemConfigPanel() {
     lifecycle:     { label: "Application Lifecycle", icon: <Clock className="w-5 h-5" />,        color: "from-teal-500 to-teal-700",       subtitle: "When applications expire and who is eligible to apply." },
     uploads:       { label: "File Uploads",         icon: <FileText className="w-5 h-5" />,      color: "from-violet-500 to-violet-700",   subtitle: "Document size and type restrictions." },
     security:      { label: "Security & Sessions", icon: <Shield className="w-5 h-5" />,         color: "from-slate-700 to-slate-900",     subtitle: "Session timeouts, password policy, rate limits. Changes recommended to be reviewed with HPSEDC security." },
+    // audit 2026-07-06 (Batch 4B): emigration-compliance gates (passport validity, PDO/PBBY, offer letter + expiry).
+    compliance:    { label: "Emigration Compliance", icon: <Shield className="w-5 h-5" />,       color: "from-cyan-600 to-sky-800",        subtitle: "Passport-validity, PDO/PBBY and offer-letter gates required for overseas placement." },
   };
 
   return (

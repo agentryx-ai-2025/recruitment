@@ -11,7 +11,7 @@ import { logger } from "../config/logger.config";
  * Add new keys to DEFAULTS below; call `getSetting(key)` from any endpoint.
  */
 
-export type SettingCategory = "pipeline" | "rejection" | "access" | "notifications" | "matching" | "lifecycle" | "uploads" | "security" | "capability" | "contact";
+export type SettingCategory = "pipeline" | "rejection" | "access" | "notifications" | "matching" | "lifecycle" | "uploads" | "security" | "capability" | "contact" | "compliance";
 
 export interface SettingSpec {
   key: string;
@@ -554,6 +554,42 @@ export const SETTING_SPECS: SettingSpec[] = [
     type: "string",
     default: "either",
     options: ["agent_only", "employer_only", "either"],
+  },
+
+  // ── Compliance & placement gates (audit 2026-07-06, Batch 4B) ────────
+  {
+    key: "compliance.enforce_passport_validity",
+    category: "compliance",
+    label: "Block applications on <6-month passport validity",
+    description: "Most destinations require 6 months of passport validity. OFF (default) = the candidate sees a warning but can still apply. ON = applications are blocked until the passport is renewed.",
+    type: "boolean",
+    default: false,
+  },
+  {
+    key: "compliance.gate_travel_on_pdo_pbby",
+    category: "compliance",
+    label: "ECR candidates: require PDO + PBBY before travel date",
+    description: "For ECR-passport candidates, a travel/start date cannot be set until Pre-Departure Orientation is completed AND PBBY insurance is enrolled (Emigration Act requirement). Turn OFF only if HPSEDC tracks these outside the portal.",
+    type: "boolean",
+    default: true,
+  },
+  {
+    key: "placement.require_letter_to_accept",
+    category: "compliance",
+    label: "Require appointment letter before offer accept",
+    description: "Candidates cannot accept a placement offer until the appointment letter is uploaded (protects against undocumented verbal offers). Admins can still accept on the candidate's behalf as an override.",
+    type: "boolean",
+    default: true,
+  },
+  {
+    key: "placement.offer_validity_days",
+    category: "compliance",
+    label: "Offer validity (days)",
+    description: "Placement offers expire this many days after they are issued; expired offers cannot be accepted (admin override allowed). Set 0 to disable expiry on new offers.",
+    type: "number",
+    default: 7,
+    min: 0,
+    max: 90,
   },
 
   // ── Contact (public) ─────────────────────────────────────────────────

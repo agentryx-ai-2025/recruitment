@@ -97,6 +97,12 @@ export const candidates = pgTable("candidates", {
   pdoDate: date("pdo_date"),
   pbbyInsuranceStatus: text("pbby_insurance_status"), // enrolled | pending | not_required
   pbbyPolicyNumber: text("pbby_policy_number"),
+  // audit 2026-07-06 (Batch 4B): emergency contact / next-of-kin — required by
+  // the MEA emigration paperwork (who does the embassy call if something goes
+  // wrong overseas). All nullable; saved via the candidate profile PATCH.
+  emergencyContactName: text("emergency_contact_name"),
+  emergencyContactPhone: text("emergency_contact_phone"),
+  emergencyContactRelation: text("emergency_contact_relation"),
   // PWS §2: agent outreach opt-in (default controlled by setting candidate.default_open_to_outreach)
   openToOutreach: boolean("open_to_outreach").notNull().default(true),
   // v0.4.33 (Phase 3, HPSEDC Item 2): Matching Engine v2 candidate-side
@@ -126,6 +132,9 @@ export const documents = pgTable("documents", {
   uploadedAt: timestamp("uploaded_at").defaultNow(),
   verified: boolean("verified").default(false),
   verifiedBy: varchar("verified_by").references(() => users.id),
+  // audit 2026-07-06 (Batch 4B): when the doc was verified/unverified. Set by
+  // PATCH /candidates/documents/:id/verify alongside verified + verifiedBy.
+  verifiedAt: timestamp("verified_at"),
 });
 
 export const jobs = pgTable("jobs", {
@@ -562,6 +571,10 @@ export const placements = pgTable("placements", {
   status: text("status").default("offered"), // offered, accepted, declined, active, completed
   candidateResponse: text("candidate_response"), // accepted, declined
   declineReason: text("decline_reason"),
+  // audit 2026-07-06 (Batch 4B): offer validity deadline. Set at offer creation
+  // to now + placement.offer_validity_days; accept is rejected past this
+  // moment (admin override). Nullable = no expiry (pre-existing offers).
+  offerExpiresAt: timestamp("offer_expires_at"),
   visaStatus: text("visa_status"), // not_applied, applied, approved, rejected
   // Post-placement welfare follow-up (MEA requirement)
   welfare30Day: text("welfare_30_day"),             // ok | concerns | no_response | not_applicable
@@ -851,6 +864,16 @@ export const updateCandidateSchema = createInsertSchema(candidates).omit({
   // Aadhaar is optional (skippable) but, when given, must be 12 digits.
   aadhaarNumber: z.string().trim().regex(/^\d{12}$/, { message: "Aadhaar must be 12 digits." }).optional().nullable(),
   pbbyPolicyNumber: z.string().trim().max(60).optional().nullable(),
+  // audit 2026-07-06 (Batch 4B): emergency contact / next-of-kin. Phone reuses
+  // the same shape rule as the candidate's own phone; empty string clears.
+  emergencyContactName: z.string().trim().max(120).optional().nullable(),
+  emergencyContactPhone: z.union([
+    z.literal(""),
+    z.string().trim().regex(phoneRegex, {
+      message: "Emergency contact phone must be digits only (optionally with +country code, spaces, or dashes).",
+    }),
+  ]).optional().nullable().transform((v) => (v === "" ? null : v)),
+  emergencyContactRelation: z.string().trim().max(60).optional().nullable(),
   qualificationLevel: z.string().trim().max(40).optional().nullable(),
   preferredSalaryCurrency: z.string().trim().max(10).optional().nullable(),
   skills: z.array(z.string().trim().max(60)).max(50).optional().nullable(),
@@ -1049,6 +1072,10 @@ export const countryInfo = pgTable("country_info", {
   // job-create dropdowns + rejected by the job-create validator, but the row
   // (and all historical jobs/candidates referencing it) is preserved. Used to
   // pause new postings to a destination without losing audit history.
+  // audit 2026-07-06 (Batch 4B): is this an ECR destination (Emigration Check
+  // Required — the 18 MEA-notified countries)? Drives the eMigrate/PoE
+  // checklist step + reporting export (Wave 2). Admin-editable per country.
+  isEcrCountry: boolean("is_ecr_country").notNull().default(false),
   isActive: boolean("is_active").notNull().default(true),
   updatedAt: timestamp("updated_at").defaultNow(),
   updatedBy: varchar("updated_by").references(() => users.id),

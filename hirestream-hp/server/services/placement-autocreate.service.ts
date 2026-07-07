@@ -73,6 +73,12 @@ export async function ensurePlacementForApplication(
       .where(eq(jobs.id, app.jobId!))
       .limit(1);
 
+    // audit 2026-07-06 (Batch 4B): stamp the offer validity deadline (same
+    // rule as the manual POST /drives/placements path). 0 days = no expiry.
+    const { getSetting } = await import("./settings.service");
+    const validityDays: number = await getSetting("placement.offer_validity_days");
+    const offerExpiresAt = validityDays > 0 ? new Date(Date.now() + validityDays * 86400_000) : null;
+
     const [row] = await db
       .insert(placements)
       .values({
@@ -82,6 +88,7 @@ export async function ensurePlacementForApplication(
         appointmentLetterUrl: null,
         startDate: null,
         status: "offered",
+        offerExpiresAt,
       })
       .returning();
 

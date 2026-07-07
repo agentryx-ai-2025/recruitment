@@ -25,6 +25,41 @@ const VISA_LABEL: Record<string, string> = {
   rejected: "Rejected",
 };
 
+// audit 2026-07-06 (Batch 4B): 6-month passport-validity rule. Most
+// destination countries refuse entry (and eMigrate refuses clearance) when the
+// passport expires within 6 months of travel. Returns:
+//   null               → no issue (or no expiry on file — absence is handled
+//                        by the caller, e.g. the "passport on file" check)
+//   "expired"          → already expired at referenceDate
+//   "within_6_months"  → valid, but expires within 6 months of referenceDate
+export type PassportValidityIssue = null | "expired" | "within_6_months";
+export function passportValidityIssue(
+  passportExpiry: string | Date | null | undefined,
+  referenceDate: string | Date = new Date(),
+): PassportValidityIssue {
+  if (!passportExpiry) return null;
+  const expiry = new Date(passportExpiry);
+  if (Number.isNaN(expiry.getTime())) return null;
+  const ref = new Date(referenceDate);
+  if (expiry < ref) return "expired";
+  const sixMonthsOut = new Date(ref);
+  sixMonthsOut.setMonth(sixMonthsOut.getMonth() + 6);
+  if (expiry < sixMonthsOut) return "within_6_months";
+  return null;
+}
+
+// audit 2026-07-06 (Batch 4B): PDO/PBBY travel gate for ECR candidates
+// (Emigration Act — both are mandatory before an ECR worker departs).
+// Returns a human-readable list of what's missing, or null when clear /
+// not applicable (non-ECR candidates are never gated).
+export function ecrTravelGateIssue(candidate: any): string | null {
+  if (candidate?.ecrStatus !== "ecr") return null;
+  const missing: string[] = [];
+  if (!candidate.pdoCompleted) missing.push("Pre-Departure Orientation (PDO)");
+  if (candidate.pbbyInsuranceStatus !== "enrolled") missing.push("PBBY insurance enrolment");
+  return missing.length ? missing.join(" and ") : null;
+}
+
 export function buildDeploymentChecklist(candidate: any, placement: any): DeployItem[] {
   const c = candidate ?? {};
   const p = placement ?? {};
@@ -36,11 +71,23 @@ export function buildDeploymentChecklist(candidate: any, placement: any): Deploy
       key: "offer", label: "Offer accepted", owner: "you",
       status: offerAccepted ? "done" : "pending",
     },
-    {
-      key: "passport", label: "Passport on file", owner: "you",
-      status: c.passportNumber ? "done" : "action_needed",
-      detail: c.passportExpiry ? `Valid to ${new Date(c.passportExpiry).toLocaleDateString("en-IN")}` : null,
-    },
+    // audit 2026-07-06 (Batch 4B): "passport exists" is not enough — an
+    // expired (or soon-expiring) passport blocks visa + eMigrate clearance.
+    // Surface it as action_needed with a clear label instead of a false "done".
+    (() => {
+      const issue = passportValidityIssue(c.passportExpiry);
+      const validTo = c.passportExpiry ? new Date(c.passportExpiry).toLocaleDateString("en-IN") : null;
+      if (!c.passportNumber) {
+        return { key: "passport", label: "Passport on file", owner: "you" as const, status: "action_needed" as DeployStatus, detail: null };
+      }
+      if (issue === "expired") {
+        return { key: "passport", label: "Passport expired — renew now", owner: "you" as const, status: "action_needed" as DeployStatus, detail: `Expired ${validTo}` };
+      }
+      if (issue === "within_6_months") {
+        return { key: "passport", label: "Passport expires within 6 months — renew", owner: "you" as const, status: "action_needed" as DeployStatus, detail: `Valid to ${validTo} — most countries require 6 months validity` };
+      }
+      return { key: "passport", label: "Passport on file", owner: "you" as const, status: "done" as DeployStatus, detail: validTo ? `Valid to ${validTo}` : null };
+    })(),
     {
       key: "pcc", label: "Police clearance (PCC)", owner: "you",
       status: ["submitted", "verified"].includes(c.pccStatus) ? "done" : "pending",

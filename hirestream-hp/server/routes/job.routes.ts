@@ -945,6 +945,39 @@ router.post("/:id/apply", protect, async (req, res, next) => {
       return res.status(404).json({ success: false, error: { code: 404, message: "Job not found or inactive." } });
     }
 
+    // audit 2026-07-06 (Batch 4B): enforce rejectedCountries at apply-time.
+    // The list-side filter already hides these jobs, but a direct link (or a
+    // country added after browsing) could still let the candidate apply to a
+    // destination they marked as visa-refused. Case-insensitive compare.
+    const jobCountry = (job.country || "").trim().toLowerCase();
+    if (jobCountry && (candidate.rejectedCountries ?? []).some((c: string) => (c || "").trim().toLowerCase() === jobCountry)) {
+      return res.status(400).json({
+        success: false,
+        error: { code: 400, message: `You marked ${job.country} as visa-refused; you cannot apply to jobs in this country. Update your profile if this has changed.` },
+      });
+    }
+
+    // audit 2026-07-06 (Batch 4B): 6-month passport-validity rule. Reference
+    // date is the job's hiring deadline when set (proxy for travel timing),
+    // else today. Default is warn-only; compliance.enforce_passport_validity
+    // flips it to a hard block.
+    const warnings: string[] = [];
+    {
+      const { passportValidityIssue } = await import("../services/deployment.service");
+      const reference = job.hiringDeadline ? new Date(job.hiringDeadline) : new Date();
+      const issue = passportValidityIssue(candidate.passportExpiry, reference);
+      if (issue) {
+        const msg = issue === "expired"
+          ? "Your passport has expired. Overseas placement requires a valid passport — please renew it."
+          : "Your passport expires within 6 months of this job's timeline. Most destination countries require at least 6 months of passport validity — please renew it soon.";
+        const enforce: boolean = await getSetting("compliance.enforce_passport_validity");
+        if (enforce) {
+          return res.status(400).json({ success: false, error: { code: 400, message: msg } });
+        }
+        warnings.push(msg);
+      }
+    }
+
     // Duplicate check — same candidate + same job
     const existing = await db.select().from(applications)
       .where(and(eq(applications.candidateId, candidate.id), eq(applications.jobId, jobId)))
@@ -1018,7 +1051,10 @@ router.post("/:id/apply", protect, async (req, res, next) => {
     }
 
     logger.info(`Application created: ${newApp[0].id} for job ${jobId}`);
-    res.status(201).json({ success: true, data: newApp[0] });
+    // audit 2026-07-06 (Batch 4B): surface soft compliance warnings (e.g.
+    // passport validity) alongside the created application so the UI can toast
+    // them without blocking the apply.
+    res.status(201).json({ success: true, data: newApp[0], ...(warnings.length ? { warnings } : {}) });
   } catch (err) {
     next(err);
   }
