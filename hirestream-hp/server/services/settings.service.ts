@@ -391,6 +391,18 @@ export const SETTING_SPECS: SettingSpec[] = [
     max: 1000,
   },
 
+  {
+    // Smart Job Importer: which agent user owns bulk-imported jobs. Empty
+    // (default) = resolve at commit time — the first verified agency's user
+    // (HPSEDC mega-agency in single mode), else the importing admin.
+    key: "jobimport.default_agent_user_id",
+    category: "access",
+    label: "Job importer — owner agent user id",
+    description: "Agent user_id that owns jobs created by the Smart Job Importer. Leave empty to auto-resolve: the first verified agency (HPSEDC) or, if none, the importing admin.",
+    type: "string",
+    default: "",
+  },
+
   // ── Notifications / SLAs ─────────────────────────────────────────────
   {
     key: "interview.reminder_lead_hours",

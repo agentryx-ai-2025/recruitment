@@ -628,6 +628,22 @@ export const auditLog = pgTable("audit_log", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// ── Job Import Batches ──────────────────────────────────────────────
+// Smart Job Importer (admin bulk-post from Government Excel/CSV files).
+// One row per committed import batch — the audit trail HPSEDC can point to
+// when asked "where did these 300 postings come from?". Per-job provenance
+// stays in audit_log (one entry per batch, resourceId = this row's id).
+export const jobImports = pgTable("job_imports", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  importedBy: varchar("imported_by").references(() => users.id),
+  fileName: text("file_name"),
+  rowCount: integer("row_count").notNull().default(0),
+  createdCount: integer("created_count").notNull().default(0),
+  skippedCount: integer("skipped_count").notNull().default(0),
+  failedCount: integer("failed_count").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // ── FAQ ─────────────────────────────────────────────────────────────
 export const faq = pgTable("faq", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),

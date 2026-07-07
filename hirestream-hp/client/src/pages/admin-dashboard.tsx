@@ -9,7 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import {
   Users, Briefcase, Handshake, Building, Download, Settings,
   UserCheck, BarChart3, Shield, TrendingUp, Activity, AlertTriangle,
-  CheckCircle, Clock, FileText, MessageSquare, MessagesSquare, Send, GraduationCap,
+  CheckCircle, Clock, FileText, FileSpreadsheet, MessageSquare, MessagesSquare, Send, GraduationCap,
   Loader2, Mail, Phone, Fingerprint, KeyRound, FolderLock, PlugZap, XCircle, Globe, LifeBuoy,
   Printer, Cpu, Network, Layers, Sigma, GitBranch, ScrollText,
   Server, Database, Smartphone, Lock, HardDrive, Boxes, Plug, FileCheck, Square,
@@ -26,6 +26,7 @@ import { ISO_COUNTRIES, COMMON_DESTINATION_CODES } from "@/lib/iso-countries";
 import { KYBReviewList } from "@/components/admin/KYBReviewList";
 import { GrievanceThread } from "@/components/shared/GrievanceThread";
 import { MatchingEnginePanel } from "@/components/admin/MatchingEnginePanel";
+import JobImportPanel from "@/components/admin/JobImportPanel";
 
 async function fetchJson(url: string) {
   const res = await fetch(url);
@@ -133,6 +134,7 @@ export default function AdminDashboard() {
       { key: "employers", label: "Employers", icon: Briefcase },
     ]},
     { label: "OPERATIONS", items: [
+      { key: "import_jobs", label: "Import Jobs", icon: FileSpreadsheet },
       { key: "lifecycle", label: "Lifecycle", icon: Clock },
       { key: "drives", label: "Drives", icon: Handshake, count: pendingDrives.length },
       { key: "matching", label: "Matching Engine", icon: Cpu },
@@ -521,6 +523,7 @@ export default function AdminDashboard() {
         </TabsContent>
 
         {/* ── Grievances Tab ────────────────────────────── */}
+        <TabsContent value="import_jobs"><JobImportPanel /></TabsContent>
         <TabsContent value="messages"><SupportInboxPanel /></TabsContent>
         <TabsContent value="grievances">
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">

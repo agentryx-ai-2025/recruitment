@@ -26,6 +26,7 @@ import agentProductivityRouter from "./routes/agent-productivity.routes";
 import candidateSelfServiceRouter from "./routes/candidate-self-service.routes";
 import employerRouter from "./routes/employer.routes";
 import matchingRouter from "./routes/matching.routes";
+import jobImportRouter from "./routes/job-import.routes";
 import adminOversightRouter from "./routes/admin-oversight.routes";
 import systemConfigRouter from "./routes/admin/system-config";
 import operatorConsoleRouter from "./routes/admin/operator-console";
@@ -159,6 +160,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/v1/post-placement", postPlacementRouter);
   app.use("/api/v1/support", supportRouter);
   app.use("/api/v1/employer", employerRouter);
+  app.use("/api/v1/admin/job-import", jobImportRouter);
   app.use("/api/v1/admin/oversight", adminOversightRouter);
   app.use("/api/v1/admin/system-config", systemConfigRouter);
   app.use("/api/v1/admin/operator-console", operatorConsoleRouter);

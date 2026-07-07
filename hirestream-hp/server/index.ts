@@ -70,8 +70,11 @@ app.use((req, res, next) => {
 });
 
 // ── Body parsing ────────────────────────────────────────────────────
-app.use(express.json({ limit: "1mb" }));
-app.use(express.urlencoded({ extended: false, limit: "1mb" }));
+// 2mb (was 1mb): headroom for the Smart Job Importer's max-batch commit
+// (up to ~2000 job rows as JSON). Still small enough to bound body-size DoS,
+// and all write routes are auth-gated + rate-limited.
+app.use(express.json({ limit: "2mb" }));
+app.use(express.urlencoded({ extended: false, limit: "2mb" }));
 
 // ── Input sanitization (XSS defence-in-depth) ───────────────────────
 app.use(sanitizeRequest);
