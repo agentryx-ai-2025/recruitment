@@ -14,7 +14,7 @@ import {
   Plus, Trash2, Upload, CheckCircle, AlertCircle,
   Lightbulb, Loader2, ArrowLeft, ArrowRight, Check, Home,
   X, Search, MapPin, Mail, Phone, Building, Calendar,
-  Award, Sparkles, Shield, Star
+  Award, Sparkles, Shield, Star, Eye, EyeOff
 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { HP_DISTRICTS, INDIAN_STATES, DESTINATION_COUNTRIES, SKILL_CATEGORIES, ALL_SKILLS, JOB_CATEGORIES, QUALIFICATION_LEVELS, jobCategoryLabel } from "@/lib/reference-data";
@@ -427,6 +427,9 @@ function BasicInfoStep({ profile, onNext }: { profile: any; onNext: () => void }
   // HPSEDC testers (and real candidates) see them in the wizard instead of
   // buried in the Compliance panel later.
   const [aadhaarNumber, setAadhaarNumber] = useState(profile.aadhaarNumber || "");
+  // UIDAI/DPDP: mask Aadhaar even on the owner's own edit field (shoulder-surfing
+  // / screen-share). Show last 4 by default; reveal-to-edit via the eye toggle.
+  const [revealAadhaar, setRevealAadhaar] = useState(false);
   const [passportNumber, setPassportNumber] = useState(profile.passportNumber || "");
   const [passportExpiry, setPassportExpiry] = useState(profile.passportExpiry || "");
   const [ecrStatus, setEcrStatus] = useState(profile.ecrStatus || "");
@@ -693,9 +696,20 @@ function BasicInfoStep({ profile, onNext }: { profile: any; onNext: () => void }
         <p className="text-[11px] text-indigo-600 mb-4">Optional now, mandatory before any overseas placement. Filling these early speeds up offer-acceptance.</p>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
           <FormField label="Aadhaar Number" hint="12 digits, as printed on your Aadhaar. Optional; helps HPSEDC verify you.">
-            <Input inputMode="numeric" value={aadhaarNumber} maxLength={12}
-              onChange={e => setAadhaarNumber(e.target.value.replace(/\D/g, ""))} placeholder="12-digit number"
-              className="h-12 rounded-xl border-indigo-200/80 bg-white tracking-widest focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 transition-all" />
+            <div className="relative">
+              {/* Masked by default (UIDAI/DPDP — shoulder-surfing); eye reveals to edit. */}
+              <Input inputMode="numeric" type={revealAadhaar ? "text" : "password"} autoComplete="off"
+                value={aadhaarNumber} maxLength={12}
+                onChange={e => setAadhaarNumber(e.target.value.replace(/\D/g, ""))} placeholder="12-digit number"
+                className="h-12 rounded-xl border-indigo-200/80 bg-white tracking-widest pr-11 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 transition-all" />
+              {aadhaarNumber.length > 0 && (
+                <button type="button" onClick={() => setRevealAadhaar(v => !v)}
+                  aria-label={revealAadhaar ? "Hide Aadhaar number" : "Show Aadhaar number"}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                  {revealAadhaar ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              )}
+            </div>
             {aadhaarNumber.length > 0 && aadhaarNumber.length !== 12 && (
               <p className="mt-1 text-xs text-amber-600">Aadhaar must be 12 digits.</p>
             )}
