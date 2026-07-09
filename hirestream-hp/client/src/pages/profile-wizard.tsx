@@ -426,6 +426,7 @@ function BasicInfoStep({ profile, onNext }: { profile: any; onNext: () => void }
   // v0.4.31 (HPSEDC Item 4 gap A): surface passport + IELTS at top level so
   // HPSEDC testers (and real candidates) see them in the wizard instead of
   // buried in the Compliance panel later.
+  const [aadhaarNumber, setAadhaarNumber] = useState(profile.aadhaarNumber || "");
   const [passportNumber, setPassportNumber] = useState(profile.passportNumber || "");
   const [passportExpiry, setPassportExpiry] = useState(profile.passportExpiry || "");
   const [ecrStatus, setEcrStatus] = useState(profile.ecrStatus || "");
@@ -452,6 +453,7 @@ function BasicInfoStep({ profile, onNext }: { profile: any; onNext: () => void }
     if (profile.permanentAddressLine2) setPermAddressLine2(profile.permanentAddressLine2);
     if (profile.permanentCity) setPermCity(profile.permanentCity);
     if (profile.permanentPinCode) setPermPinCode(profile.permanentPinCode);
+    if (profile.aadhaarNumber) setAadhaarNumber(profile.aadhaarNumber);
     if (profile.passportNumber) setPassportNumber(profile.passportNumber);
     if (profile.passportExpiry) setPassportExpiry(profile.passportExpiry);
     if (profile.ecrStatus) setEcrStatus(profile.ecrStatus);
@@ -488,6 +490,9 @@ function BasicInfoStep({ profile, onNext }: { profile: any; onNext: () => void }
           permanentAddressLine2: permAddressLine2 || null,
           permanentCity: permCity || null,
           permanentPinCode: permPinCode || null,
+          // Only persist a complete 12-digit Aadhaar; a partial entry saves null
+          // (mirrors the simple-apply flow).
+          aadhaarNumber: aadhaarNumber.length === 12 ? aadhaarNumber : null,
           passportNumber: passportNumber || null,
           passportExpiry: passportExpiry || null,
           ecrStatus: ecrStatus || null,
@@ -687,6 +692,14 @@ function BasicInfoStep({ profile, onNext }: { profile: any; onNext: () => void }
         </p>
         <p className="text-[11px] text-indigo-600 mb-4">Optional now, mandatory before any overseas placement. Filling these early speeds up offer-acceptance.</p>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          <FormField label="Aadhaar Number" hint="12 digits, as printed on your Aadhaar. Optional; helps HPSEDC verify you.">
+            <Input inputMode="numeric" value={aadhaarNumber} maxLength={12}
+              onChange={e => setAadhaarNumber(e.target.value.replace(/\D/g, ""))} placeholder="12-digit number"
+              className="h-12 rounded-xl border-indigo-200/80 bg-white tracking-widest focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 transition-all" />
+            {aadhaarNumber.length > 0 && aadhaarNumber.length !== 12 && (
+              <p className="mt-1 text-xs text-amber-600">Aadhaar must be 12 digits.</p>
+            )}
+          </FormField>
           <FormField label="Passport Number" hint="Letters and digits, as printed on the data page">
             <Input value={passportNumber} onChange={e => setPassportNumber(e.target.value.toUpperCase())} placeholder="e.g. M1234567" maxLength={20}
               className="h-12 rounded-xl border-indigo-200/80 bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 transition-all" />
