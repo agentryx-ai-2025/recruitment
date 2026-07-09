@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm";
 import { pgTable, text, varchar, integer, timestamp, boolean, jsonb, decimal, date, index, uniqueIndex } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
+import { isValidAadhaar } from "./aadhaar";
 
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -885,8 +886,13 @@ export const updateCandidateSchema = createInsertSchema(candidates).omit({
     }),
     z.null(),
   ]).optional(),
-  // Aadhaar is optional (skippable) but, when given, must be 12 digits.
-  aadhaarNumber: z.string().trim().regex(/^\d{12}$/, { message: "Aadhaar must be 12 digits." }).optional().nullable(),
+  // Aadhaar is optional (skippable) but, when given, must be 12 digits AND pass
+  // the Verhoeff checksum (HPSEDC 2026-07-07). Digits-only is normalised first
+  // so a client that forgot to strip display spaces still validates.
+  aadhaarNumber: z.preprocess(
+    (v) => { if (typeof v !== "string") return v; const d = v.replace(/\D/g, ""); return d === "" ? undefined : d; },
+    z.string().refine((v) => isValidAadhaar(v), { message: "Enter a valid 12-digit Aadhaar number." }).optional().nullable(),
+  ),
   pbbyPolicyNumber: z.string().trim().max(60).optional().nullable(),
   // audit 2026-07-06 (Batch 4B): emergency contact / next-of-kin. Phone reuses
   // the same shape rule as the candidate's own phone; empty string clears.

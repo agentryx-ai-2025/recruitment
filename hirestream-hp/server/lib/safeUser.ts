@@ -13,13 +13,10 @@
  * `const { password, ...rest } = user` pattern.
  */
 
-/** Mask an Aadhaar (or any ID) number down to its last 4 digits: XXXX-XXXX-1234. */
-export function maskAadhaar(value: string | null | undefined): string | null {
-  if (!value) return null;
-  const digits = String(value).replace(/\D/g, "");
-  const last4 = digits.slice(-4) || String(value).slice(-4);
-  return `XXXX-XXXX-${last4}`;
-}
+// Aadhaar masking lives in @shared/aadhaar ("XXXX XXXX 1234", per HPSEDC).
+// Re-exported here so existing server imports (`../lib/safeUser`) keep working.
+export { maskAadhaar } from "@shared/aadhaar";
+import { maskAadhaar } from "@shared/aadhaar";
 
 /** Strip credential/2FA secrets and mask Aadhaar on a users row. */
 export function sanitizeUser<T extends Record<string, any>>(user: T): Omit<T, "password" | "twoFactorSecret" | "twoFactorRecoveryCodes"> {

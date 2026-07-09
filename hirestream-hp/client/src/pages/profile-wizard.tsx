@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { HP_DISTRICTS, INDIAN_STATES, DESTINATION_COUNTRIES, SKILL_CATEGORIES, ALL_SKILLS, JOB_CATEGORIES, QUALIFICATION_LEVELS, jobCategoryLabel } from "@/lib/reference-data";
+import { formatAadhaar, stripAadhaar, isValidAadhaar } from "@shared/aadhaar";
 
 async function fetchJson(url: string) {
   const res = await fetch(url);
@@ -493,9 +494,9 @@ function BasicInfoStep({ profile, onNext }: { profile: any; onNext: () => void }
           permanentAddressLine2: permAddressLine2 || null,
           permanentCity: permCity || null,
           permanentPinCode: permPinCode || null,
-          // Only persist a complete 12-digit Aadhaar; a partial entry saves null
-          // (mirrors the simple-apply flow).
-          aadhaarNumber: aadhaarNumber.length === 12 ? aadhaarNumber : null,
+          // Only persist a complete, checksum-valid Aadhaar; anything else saves
+          // null (the Save button is also blocked while an invalid one is present).
+          aadhaarNumber: (aadhaarNumber.length === 12 && isValidAadhaar(aadhaarNumber)) ? aadhaarNumber : null,
           passportNumber: passportNumber || null,
           passportExpiry: passportExpiry || null,
           ecrStatus: ecrStatus || null,
@@ -697,10 +698,11 @@ function BasicInfoStep({ profile, onNext }: { profile: any; onNext: () => void }
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
           <FormField label="Aadhaar Number" hint="12 digits, as printed on your Aadhaar. Optional; helps HPSEDC verify you.">
             <div className="relative">
-              {/* Masked by default (UIDAI/DPDP — shoulder-surfing); eye reveals to edit. */}
+              {/* Masked by default (UIDAI/DPDP — shoulder-surfing); eye reveals to
+                  edit. Shown grouped "1234 5678 9012" when revealed. */}
               <Input inputMode="numeric" type={revealAadhaar ? "text" : "password"} autoComplete="off"
-                value={aadhaarNumber} maxLength={12}
-                onChange={e => setAadhaarNumber(e.target.value.replace(/\D/g, ""))} placeholder="12-digit number"
+                value={formatAadhaar(aadhaarNumber)} maxLength={14}
+                onChange={e => setAadhaarNumber(stripAadhaar(e.target.value))} placeholder="1234 5678 9012"
                 className="h-12 rounded-xl border-indigo-200/80 bg-white tracking-widest pr-11 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 transition-all" />
               {aadhaarNumber.length > 0 && (
                 <button type="button" onClick={() => setRevealAadhaar(v => !v)}
@@ -712,6 +714,9 @@ function BasicInfoStep({ profile, onNext }: { profile: any; onNext: () => void }
             </div>
             {aadhaarNumber.length > 0 && aadhaarNumber.length !== 12 && (
               <p className="mt-1 text-xs text-amber-600">Aadhaar must be 12 digits.</p>
+            )}
+            {aadhaarNumber.length === 12 && !isValidAadhaar(aadhaarNumber) && (
+              <p className="mt-1 text-xs text-rose-600">This Aadhaar number is not valid. Please check and re-enter.</p>
             )}
           </FormField>
           <FormField label="Passport Number" hint="Letters and digits, as printed on the data page">
@@ -742,7 +747,7 @@ function BasicInfoStep({ profile, onNext }: { profile: any; onNext: () => void }
 
       {/* UAT-03 Item 4: Identity section is mandatory — Gender + Father's +
           Mother's name are required to continue past this step. */}
-      <StepNav onNext={() => mutation.mutate()} loading={mutation.isPending} disabled={!fullName || !email || !sex || !fatherName.trim() || !motherName.trim()} />
+      <StepNav onNext={() => mutation.mutate()} loading={mutation.isPending} disabled={!fullName || !email || !sex || !fatherName.trim() || !motherName.trim() || (aadhaarNumber.length > 0 && !isValidAadhaar(aadhaarNumber))} />
     </motion.div>
   );
 }

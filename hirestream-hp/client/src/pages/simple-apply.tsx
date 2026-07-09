@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { Check, X, Plus, Minus, Pencil, ShieldCheck, GraduationCap, ArrowRight } from "lucide-react";
+import { formatAadhaar, maskAadhaar, stripAadhaar, isValidAadhaar } from "@shared/aadhaar";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -367,16 +368,21 @@ export default function SimpleApplyPage() {
 
   // ── Screen 7: ID details (DOB required, Aadhaar optional) ──────────────
   const idInput = "h-14 w-full rounded-xl border border-blue-200/80 bg-white px-4 text-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all";
-  const aadhaarPartial = aadhaar.length > 0 && aadhaar.length !== 12;
+  // HPSEDC 2026-07-07: 12 digits + Verhoeff checksum. Block Next when an Aadhaar
+  // is entered but not valid; show a specific message (length vs checksum).
+  const aadhaarWrongLen = aadhaar.length > 0 && aadhaar.length !== 12;
+  const aadhaarBadChecksum = aadhaar.length === 12 && !isValidAadhaar(aadhaar);
+  const aadhaarInvalid = aadhaarWrongLen || aadhaarBadChecksum;
   const IdScreen = () => (
     <QuestionShell step={7} totalSteps={TOTAL} question={t("simpleApply.qId")} help={t("simpleApply.helpId")}
-      onBack={() => go(6)} onNext={() => save({ dateOfBirth: dob || null, aadhaarNumber: aadhaar.length === 12 ? aadhaar : null }, 8)}
-      nextDisabled={!dob || aadhaarPartial} loading={saving}>
+      onBack={() => go(6)} onNext={() => save({ dateOfBirth: dob || null, aadhaarNumber: (aadhaar.length === 12 && isValidAadhaar(aadhaar)) ? aadhaar : null }, 8)}
+      nextDisabled={!dob || aadhaarInvalid} loading={saving}>
       <label className="block text-sm font-semibold text-slate-600 mb-1.5">{t("simpleApply.labelDob")}</label>
       <input type="date" value={dob} max={today} onChange={(e) => setDob(e.target.value)} className={idInput} />
       <label className="block text-sm font-semibold text-slate-600 mt-5 mb-1.5">{t("simpleApply.labelAadhaar")} <span className="text-slate-400 font-normal">{t("start.optional")}</span></label>
-      <input inputMode="numeric" value={aadhaar} maxLength={12} onChange={(e) => setAadhaar(e.target.value.replace(/\D/g, ""))} placeholder={t("simpleApply.phAadhaar")} className={`${idInput} tracking-widest`} />
-      {aadhaarPartial && <p className="mt-2 text-sm text-amber-600">{t("simpleApply.aadhaarLen")}</p>}
+      <input inputMode="numeric" value={formatAadhaar(aadhaar)} maxLength={14} onChange={(e) => setAadhaar(stripAadhaar(e.target.value))} placeholder={t("simpleApply.phAadhaar")} className={`${idInput} tracking-widest`} />
+      {aadhaarWrongLen && <p className="mt-2 text-sm text-amber-600">{t("simpleApply.aadhaarLen")}</p>}
+      {aadhaarBadChecksum && <p className="mt-2 text-sm text-rose-600">{t("simpleApply.aadhaarInvalid")}</p>}
     </QuestionShell>
   );
 
@@ -416,7 +422,7 @@ export default function SimpleApplyPage() {
           <Row label={t("simpleApply.rowDob")} value={dob} onEdit={() => go(7)} />
           {/* UIDAI/DPDP best practice: show only the last 4 digits of Aadhaar,
               even on the user's own review — they can tap Edit to see/change it. */}
-          {aadhaar ? <Row label={t("simpleApply.rowAadhaar")} value={`•••• •••• ${aadhaar.slice(-4)}`} onEdit={() => go(7)} /> : null}
+          {aadhaar ? <Row label={t("simpleApply.rowAadhaar")} value={maskAadhaar(aadhaar) || ""} onEdit={() => go(7)} /> : null}
           {passportNumber ? <Row label={t("simpleApply.rowPassport")} value={passportNumber} onEdit={() => go(8)} /> : null}
         </div>
         <div className="mt-4 rounded-xl bg-emerald-50/70 border border-emerald-100 p-4 flex items-start gap-2.5">

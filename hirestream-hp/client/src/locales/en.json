@@ -640,6 +640,7 @@
     "labelAadhaar": "Aadhaar number",
     "phAadhaar": "12-digit number",
     "aadhaarLen": "Aadhaar must be 12 digits.",
+    "aadhaarInvalid": "This Aadhaar number is not valid. Please check and re-enter.",
     "qPassport": "Do you have a passport?",
     "helpPassport": "Skip if you don't have one yet — you can add it later.",
     "labelPassportNum": "Passport number",
