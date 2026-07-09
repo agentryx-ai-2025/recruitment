@@ -10,7 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import {
   ArrowLeft, MapPin, Mail, Phone, GraduationCap, Briefcase, FileText,
   Globe, Star, Award, Loader2, Download, CheckCircle, Shield, ShieldAlert,
-  Plane, Heart, BookOpen, Save, Eye,
+  Plane, Heart, BookOpen, Save, Eye, IdCard,
 } from "lucide-react";
 import { PhotoAvatar } from "@/components/shared/PhotoAvatar";
 
@@ -279,6 +279,21 @@ function ComplianceAndWelfarePanel({ candidate, applications }: { candidate: any
       </div>
 
       <div className="p-5 grid md:grid-cols-2 gap-x-6 gap-y-4">
+        {/* Aadhaar — identity anchor. Candidate-provided (read-only here); shown
+            masked to the last 4 (server already masks it for staff) so the agent
+            can cross-check the uploaded ID without seeing the full number. */}
+        <div>
+          <div className="flex items-center gap-2 mb-2">
+            <IdCard className="w-4 h-4 text-violet-600" />
+            <h3 className="text-sm font-bold text-slate-900">Aadhaar (identity)</h3>
+            {candidate.aadhaarNumber && <Badge variant="outline" className="text-[10px] bg-emerald-50 text-emerald-700 border-emerald-200">On file</Badge>}
+          </div>
+          <div className="h-9 flex items-center px-3 rounded-md border border-slate-200 bg-slate-50 text-sm text-slate-700 tracking-widest">
+            {candidate.aadhaarNumber || <span className="text-slate-400 tracking-normal">Not provided</span>}
+          </div>
+          <p className="text-[10px] text-slate-400 mt-1">Masked · provided by candidate · verify against the uploaded ID</p>
+        </div>
+
         {/* Passport */}
         <div>
           <div className="flex items-center gap-2 mb-2">
