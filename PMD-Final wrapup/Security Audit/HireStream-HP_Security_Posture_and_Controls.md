@@ -23,8 +23,10 @@ preserved).
   this pass) closed all identified unguarded mutations and cross-tenant data reads;
   a shared ownership layer (`server/lib/ownership.ts`) now gates them uniformly.
 - **Sensitive data exposure:** 2FA secrets and recovery codes are never serialized;
-  Aadhaar is masked in all user-serialising responses; documents are per-user
-  access-controlled; secrets are not in the repository.
+  **Aadhaar is masked to the last 4 digits everywhere it is displayed** (staff
+  candidate detail, admin duplicates panel, candidate's own review) and stripped
+  entirely from browse lists and the employer view — per UIDAI/DPDP; documents are
+  per-user access-controlled; secrets are not in the repository.
 - **Platform hardening:** Helmet (CSP, HSTS-preload, frame-ancestors `none`, nosniff,
   referrer-policy), strict CORS allowlist, session hardening, rate limiting, and
   magic-byte file-upload validation are all in place and verified.
