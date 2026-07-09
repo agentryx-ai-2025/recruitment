@@ -9,6 +9,7 @@ import { insertRecruitmentAgentSchema, recruitmentAgents, candidates, agencyRevi
   agencyDocuments, placements, auditLog } from "@shared/schema";
 import { eq, and } from "drizzle-orm";
 import { userOwnsCandidate } from "../lib/ownership";
+import { maskAadhaar } from "../lib/safeUser";
 import {
   agencyDocUpload, verifyUploadedFile, handleUploadErrors,
   HS_AGENCY_DOCS_DIR, UPLOAD_DIR,
@@ -151,15 +152,14 @@ router.get("/candidates", protect, async (req, res, next) => {
       );
     }
 
-    // security 2026-07-07 (A01-1): minimise PII for employers on every row —
-    // no passport or Aadhaar numbers in the browse list (same rule as S6 on
-    // the detail route). Agents/admins (HPSEDC staff) see the full rows.
-    if (actor.role === "employer") {
-      filtered = filtered.map((c: any) => {
-        const { passportNumber, aadhaarNumber, ...safe } = c;
-        return safe;
-      });
-    }
+    // security 2026-07-07 (A01-1 + Aadhaar-masking): a browse LIST never needs
+    // identity numbers. Strip passport + Aadhaar from every row for every viewer
+    // (employers, agents, admins) — the full/masked Aadhaar is available only on
+    // the candidate DETAIL view, and only to staff, masked to the last 4 digits.
+    filtered = filtered.map((c: any) => {
+      const { passportNumber, aadhaarNumber, ...safe } = c;
+      return safe;
+    });
 
     res.json({ success: true, data: filtered, total: filtered.length });
   } catch (err) {
@@ -251,12 +251,16 @@ router.get("/candidates/:id", protect, async (req, res, next) => {
     }
 
     // S6: minimise PII for employers — no raw identity documents, passport, or
-    // Aadhaar numbers. Agents/admins (HPSEDC staff) see the full file.
+    // Aadhaar numbers.
+    // best practice 2026-07-07 (UIDAI/DPDP): staff never need the FULL Aadhaar —
+    // agents/admins see it masked to the last 4 digits; employers see none.
     const isEmployer = actor.role === "employer";
     const safeCandidate: any = { ...candidate };
     if (isEmployer) {
       delete safeCandidate.passportNumber;
       delete safeCandidate.aadhaarNumber;
+    } else {
+      safeCandidate.aadhaarNumber = maskAadhaar(safeCandidate.aadhaarNumber);
     }
 
     res.json({

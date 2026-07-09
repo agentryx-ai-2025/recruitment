@@ -414,7 +414,9 @@ export default function SimpleApplyPage() {
           <Row label={t("simpleApply.rowPhone")} value={phone} onEdit={() => go(6)} />
           {homeLocation ? <Row label={t("simpleApply.rowTown")} value={homeLocation} onEdit={() => go(6)} /> : null}
           <Row label={t("simpleApply.rowDob")} value={dob} onEdit={() => go(7)} />
-          {aadhaar ? <Row label={t("simpleApply.rowAadhaar")} value={aadhaar} onEdit={() => go(7)} /> : null}
+          {/* UIDAI/DPDP best practice: show only the last 4 digits of Aadhaar,
+              even on the user's own review — they can tap Edit to see/change it. */}
+          {aadhaar ? <Row label={t("simpleApply.rowAadhaar")} value={`•••• •••• ${aadhaar.slice(-4)}`} onEdit={() => go(7)} /> : null}
           {passportNumber ? <Row label={t("simpleApply.rowPassport")} value={passportNumber} onEdit={() => go(8)} /> : null}
         </div>
         <div className="mt-4 rounded-xl bg-emerald-50/70 border border-emerald-100 p-4 flex items-start gap-2.5">

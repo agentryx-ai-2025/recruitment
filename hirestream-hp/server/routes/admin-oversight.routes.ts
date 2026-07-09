@@ -14,6 +14,7 @@ import {
 } from "@shared/schema";
 import { eq, and, or, sql, isNull, lt, desc, count } from "drizzle-orm";
 import { getSetting } from "../services/settings.service";
+import { maskAadhaar } from "../lib/safeUser";
 
 const router = Router();
 router.use(protect);
@@ -450,6 +451,13 @@ router.get("/duplicate-candidates", async (_req, res, next) => {
       ORDER BY match_type
     `);
     const groups = Array.isArray(rows) ? rows : (rows as any).rows ?? [];
+    // best practice 2026-07-07 (UIDAI/DPDP): never surface a full Aadhaar in the
+    // UI. Grouping/detection above uses the raw value in SQL; the response only
+    // ever shows the last 4 digits (XXXX-XXXX-1234).
+    for (const g of groups as any[]) {
+      if (g.match_type === "aadhaar") g.match_value = maskAadhaar(g.match_value);
+      if (Array.isArray(g.candidates)) g.candidates.forEach((c: any) => { c.aadhaar = maskAadhaar(c.aadhaar); });
+    }
     res.json({ success: true, data: groups });
   } catch (err) { next(err); }
 });
