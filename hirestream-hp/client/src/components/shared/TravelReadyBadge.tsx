@@ -1,4 +1,4 @@
-import { Plane } from "lucide-react";
+import { Plane, CheckCircle2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 // readiness 2026-07-07: shared stage vocabulary — mirrors ReadinessStage in
@@ -31,6 +31,19 @@ export function TravelReadyBadge({ stage, isTravelReady, size = "md" }: TravelRe
       <span className={`inline-flex items-center rounded-full border font-semibold whitespace-nowrap bg-emerald-50 text-emerald-700 border-emerald-300 dark:bg-emerald-950 dark:text-emerald-300 dark:border-emerald-700 ${sizing}`}>
         <Plane className={iconCls} aria-hidden="true" />
         {t("readiness.travelReady")}
+      </span>
+    );
+  }
+
+  // readiness 2026-07-07: a 100%-compliance candidate (all documents done, but
+  // not yet placed) reaches the "compliance" stage — a real green milestone,
+  // distinct from travel-ready. Give it its own teal "Compliance Cleared" badge
+  // so 100% never shows without a badge.
+  if (stage === "compliance") {
+    return (
+      <span className={`inline-flex items-center rounded-full border font-semibold whitespace-nowrap bg-teal-50 text-teal-700 border-teal-300 dark:bg-teal-950 dark:text-teal-300 dark:border-teal-700 ${sizing}`}>
+        <CheckCircle2 className={iconCls} aria-hidden="true" />
+        {t("readiness.complianceCleared")}
       </span>
     );
   }

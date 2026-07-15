@@ -1084,6 +1084,8 @@
     "title": "Deployment Readiness",
     "caption": "ready",
     "captionReady": "Ready",
+    "captionCleared": "Cleared",
+    "complianceCleared": "Compliance Cleared",
     "captionOnTrack": "On track",
     "captionProgress": "Progress",
     "captionBlocked": "Attention",
