@@ -46,16 +46,23 @@ export function ReadinessRing({ pct, size = "md", label, isTravelReady, blockers
     return () => cancelAnimationFrame(id);
   }, [clamped]);
 
+  // readiness 2026-07-07: GREEN + "Ready" is reserved for actual travel-readiness
+  // (all cleared AND an accepted offer). A candidate at 100% of the items that
+  // apply *now* but without an offer yet is "compliance complete, not deployed" —
+  // shown BLUE + "On track" so the ring never falsely reads "READY" at stage 3.
   const hardBlockers = blockers ?? actionNeeded ?? 0;
-  const ready = !!isTravelReady || (clamped === 100 && (actionNeeded ?? 0) === 0);
+  const ready = !!isTravelReady;
   const blocked = !ready && hardBlockers > 0;   // red only on hard blockers; warnings stay amber
+  const phaseComplete = !ready && !blocked && clamped === 100 && (actionNeeded ?? 0) === 0;
   const tone = ready
-    ? { arc: "text-emerald-600 dark:text-emerald-400", num: "text-emerald-700 dark:text-emerald-300" }
+    ? { arc: "text-emerald-600 dark:text-emerald-400", num: "text-emerald-700 dark:text-emerald-300", cap: "readiness.captionReady" }
     : blocked
-      ? { arc: "text-rose-600 dark:text-rose-400", num: "text-rose-700 dark:text-rose-300" }
-      : clamped > 0
-        ? { arc: "text-amber-500 dark:text-amber-400", num: "text-amber-700 dark:text-amber-300" }
-        : { arc: "text-slate-400 dark:text-slate-500", num: "text-slate-600 dark:text-slate-300" };
+      ? { arc: "text-rose-600 dark:text-rose-400", num: "text-rose-700 dark:text-rose-300", cap: "readiness.captionBlocked" }
+      : phaseComplete
+        ? { arc: "text-sky-600 dark:text-sky-400", num: "text-sky-700 dark:text-sky-300", cap: "readiness.captionOnTrack" }
+        : clamped > 0
+          ? { arc: "text-amber-500 dark:text-amber-400", num: "text-amber-700 dark:text-amber-300", cap: "readiness.captionProgress" }
+          : { arc: "text-slate-400 dark:text-slate-500", num: "text-slate-600 dark:text-slate-300", cap: "readiness.captionIdle" };
 
   return (
     <div
@@ -81,7 +88,7 @@ export function ReadinessRing({ pct, size = "md", label, isTravelReady, blockers
         <span className={`font-bold tabular-nums leading-none ${s.pctCls} ${tone.num}`}>{clamped}%</span>
         {size !== "sm" && (
           <span className={`mt-0.5 font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 ${s.captionCls}`}>
-            {label ?? t("readiness.caption")}
+            {label ?? t(tone.cap)}
           </span>
         )}
       </div>

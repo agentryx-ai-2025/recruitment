@@ -1086,6 +1086,11 @@
   "readiness": {
     "title": "तैनाती की तैयारी",
     "caption": "तैयार",
+    "captionReady": "तैयार",
+    "captionOnTrack": "प्रगति पर",
+    "captionProgress": "जारी",
+    "captionBlocked": "ध्यान दें",
+    "captionIdle": "शुरू नहीं",
     "aria": "तैनाती की तैयारी {{pct}} प्रतिशत",
     "travelReady": "तैनाती के लिए स्वीकृत",
     "whatsLeft": "क्या बाकी है",

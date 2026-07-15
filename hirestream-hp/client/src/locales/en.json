@@ -1083,6 +1083,11 @@
   "readiness": {
     "title": "Deployment Readiness",
     "caption": "ready",
+    "captionReady": "Ready",
+    "captionOnTrack": "On track",
+    "captionProgress": "In progress",
+    "captionBlocked": "Action needed",
+    "captionIdle": "Not started",
     "aria": "Deployment readiness {{pct}} percent",
     "travelReady": "Cleared for Deployment",
     "whatsLeft": "What's left",
