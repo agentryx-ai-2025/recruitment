@@ -6,6 +6,7 @@ import { logger } from "../config/logger.config";
 import { recruitmentDrives, recruitmentAgents, interviews, applications, candidates, jobs, placements, driveRegistrations } from "@shared/schema";
 import { eq, and, desc, gte, count, ne, inArray } from "drizzle-orm";
 import { notify } from "../services/notification.service";
+import { maybeNotifyDeploymentReady } from "../services/deployment-notify.service";
 
 const router = Router();
 
@@ -841,6 +842,10 @@ router.patch("/placements/:id/accept", protect, async (req, res, next) => {
       });
     } catch (e: any) { logger.warn(`audit on placement accept failed: ${e?.message}`); }
 
+    // readiness 2026-07-07: accepting the offer can be the last gate — announce
+    // the one-time "cleared for deployment" if everything else was already done.
+    maybeNotifyDeploymentReady(db, req.params.id).catch(() => {});
+
     res.json({ success: true, data: result[0] });
   } catch (error) {
     next(error);
@@ -974,6 +979,11 @@ router.patch("/placements/:id/lifecycle", protect, async (req, res, next) => {
         metadata: { placementId: req.params.id, applicationId: row.placement.applicationId },
       }).catch(() => {});
     }
+
+    // readiness 2026-07-07: lifecycle moves keep the placement in the offer-
+    // accepted family — re-check so a never-announced placement still gets its
+    // one-time "cleared for deployment" (best-effort).
+    maybeNotifyDeploymentReady(db, req.params.id).catch(() => {});
 
     logger.info(`Placement ${req.params.id} lifecycle ${from} → ${nextStatus} by ${user.role} ${user.id}`);
     res.json({ success: true, data: updated });

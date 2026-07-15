@@ -10,11 +10,12 @@ import { requireRole } from "../middleware/rbac.middleware";
 import { storage } from "../storage";
 import {
   candidates, placements, applications, jobs, grievances, auditLog, users,
-  recruitmentAgents,
+  recruitmentAgents, countryInfo,
 } from "@shared/schema";
 import { eq, and, or, sql, isNull, lt, desc, count } from "drizzle-orm";
 import { getSetting } from "../services/settings.service";
 import { maskAadhaar } from "../lib/safeUser";
+import { computeReadiness, type Readiness } from "../services/deployment.service";
 
 const router = Router();
 router.use(protect);
@@ -546,6 +547,121 @@ router.get("/fraud-watchlist", async (_req, res, next) => {
         flaggedAgencies: Array.isArray(agencyCounts) ? agencyCounts : (agencyCounts as any).rows ?? [],
       },
     });
+  } catch (err) { next(err); }
+});
+
+// ── Deployment-readiness fleet view (HPSEDC cohort) ──────────────────
+// readiness 2026-07-07: one readiness object per placement-holding candidate
+// (placements ARE the deployment-relevant set — a candidate with no offer has
+// nothing to deploy against). Primary placement = an accepted/active/completed
+// one if present, else the most recent — same rule as the agent candidate-
+// detail view, so both surfaces show the same number.
+async function computeReadinessFleet(db: NonNullable<typeof storage.db>) {
+  const rows = await db
+    .select({ placement: placements, candidate: candidates })
+    .from(placements)
+    .innerJoin(applications, eq(placements.applicationId, applications.id))
+    .innerJoin(candidates, eq(applications.candidateId, candidates.id));
+
+  // Batch-load the ECR destination flags once (no per-row country lookups).
+  const ciRows = await db.select({ name: countryInfo.name, isEcr: countryInfo.isEcrCountry }).from(countryInfo);
+  const ecrByCountry = new Map<string, boolean>(ciRows.map((r: any) => [r.name, !!r.isEcr]));
+
+  // Group placements per candidate, then score the primary one.
+  const byCandidate = new Map<string, { candidate: any; placementRows: any[] }>();
+  for (const r of rows as any[]) {
+    const entry = byCandidate.get(r.candidate.id) ?? { candidate: r.candidate, placementRows: [] };
+    entry.placementRows.push(r.placement);
+    byCandidate.set(r.candidate.id, entry);
+  }
+
+  const PREFERRED = ["accepted", "active", "completed"];
+  const fleet = Array.from(byCandidate.values()).map(({ candidate: c, placementRows: ps }) => {
+    ps.sort((a: any, b: any) => new Date(b.createdAt ?? 0).getTime() - new Date(a.createdAt ?? 0).getTime());
+    const primary = ps.find((p: any) => PREFERRED.includes(p.status)) ?? ps[0];
+    const readiness: Readiness = computeReadiness(c, primary, {
+      destinationIsEcr: ecrByCountry.get(primary.country) === true,
+    });
+    return { candidateId: c.id, fullName: c.fullName, destination: primary.country, readiness };
+  });
+
+  // Travel-ready first, then most-complete first.
+  fleet.sort((a, b) =>
+    Number(b.readiness.isTravelReady) - Number(a.readiness.isTravelReady)
+    || b.readiness.pct - a.readiness.pct);
+  return fleet;
+}
+
+router.get("/deployment-readiness", async (_req, res, next) => {
+  try {
+    const db = storage.db;
+    if (!db) return res.status(500).json({ success: false });
+    const fleet = await computeReadinessFleet(db);
+
+    const counts = {
+      travelReady: fleet.filter((f) => f.readiness.isTravelReady).length,
+      inCompliance: fleet.filter((f) => f.readiness.isComplianceReady).length,
+      blocked: fleet.filter((f) => f.readiness.actionNeeded > 0).length, // e.g. expired passport
+      total: fleet.length,
+    };
+    const byStage: Record<string, number> = {
+      registered: 0, documents: 0, compliance: 0, deployment: 0, travel_ready: 0,
+    };
+    for (const f of fleet) byStage[f.readiness.stage] = (byStage[f.readiness.stage] ?? 0) + 1;
+
+    res.json({
+      success: true,
+      data: {
+        counts,
+        byStage,
+        candidates: fleet.map((f) => ({
+          candidateId: f.candidateId,
+          fullName: f.fullName,
+          destination: f.destination,
+          pct: f.readiness.pct,
+          stage: f.readiness.stage,
+          isTravelReady: f.readiness.isTravelReady,
+          actionNeeded: f.readiness.actionNeeded,
+          pending: f.readiness.pending.map((p) => p.label),
+        })),
+      },
+    });
+  } catch (err) { next(err); }
+});
+
+// CSV export of the same fleet — spreadsheet-ready for the HPSEDC deployment
+// cell. CSV-injection defense mirrors admin/reports.ts defuseCsvCell: strip
+// leading formula-trigger characters so cells are inert in Excel/Sheets.
+function defuseCsvCell(v: any): string {
+  if (v === null || v === undefined) return "";
+  return String(v).replace(/^[=+\-@\t\r]+/, "");
+}
+
+router.get("/deployment-readiness/export.csv", async (_req, res, next) => {
+  try {
+    const db = storage.db;
+    if (!db) return res.status(500).send("db unavailable");
+    const fleet = await computeReadinessFleet(db);
+
+    const escape = (s: string) => (/[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s);
+    const lines = [
+      ["candidate_name", "destination_country", "readiness_pct", "stage", "travel_ready", "pending_items"].join(","),
+    ];
+    for (const f of fleet) {
+      lines.push([
+        escape(defuseCsvCell(f.fullName)),
+        escape(defuseCsvCell(f.destination)),
+        String(f.readiness.pct),
+        f.readiness.stage,
+        f.readiness.isTravelReady ? "yes" : "no",
+        escape(defuseCsvCell(f.readiness.pending.map((p) => p.label).join("; "))),
+      ].join(","));
+    }
+
+    const filename = `deployment-readiness-${new Date().toISOString().slice(0, 10)}.csv`;
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.send(lines.join("\n"));
   } catch (err) { next(err); }
 });
 

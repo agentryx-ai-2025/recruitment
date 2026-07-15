@@ -593,6 +593,11 @@ export const placements = pgTable("placements", {
   // there is no live eMigrate API; HPSEDC staff record the outcome they obtained
   // on the government eMigrate portal. null = not yet assessed.
   emigrationClearanceStatus: text("emigration_clearance_status"), // not_required | pending | cleared
+  // readiness 2026-07-07: one-time "cleared for deployment" announcement marker.
+  // Stamped (with a NULL guard) the first time computeReadiness() reports
+  // isTravelReady for this placement; NULL = not yet announced. Prevents the
+  // candidate/agent being re-notified every time a compliance field is touched.
+  deploymentReadyNotifiedAt: timestamp("deployment_ready_notified_at"),
   // audit 2026-07-06 (Batch 4B-2): welfare-prompt cron state. Maps milestone →
   // ISO date the automated "How are you?" prompt was sent, e.g. {"30": "2026-07-07"}.
   // A milestone is prompted at most once per placement (idempotency marker).

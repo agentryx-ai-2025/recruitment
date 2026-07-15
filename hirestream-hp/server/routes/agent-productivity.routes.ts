@@ -25,7 +25,8 @@ import PDFDocument from "pdfkit";
 import { logger } from "../config/logger.config";
 import { getSetting } from "../services/settings.service";
 import { notify } from "../services/notification.service";
-import { buildDeploymentChecklist, readinessSummary } from "../services/deployment.service";
+import { computeReadiness, readinessSummary } from "../services/deployment.service";
+import { maybeNotifyDeploymentReady, maybeNotifyDeploymentReadyForCandidate } from "../services/deployment-notify.service";
 import { userOwnsApplication, userOwnsCandidate } from "../lib/ownership";
 import { placementDocUpload, verifyUploadedFile, handleUploadErrors, HS_PLACEMENT_DOCS_DIR, UPLOAD_DIR } from "../middleware/upload.middleware";
 import fs from "fs/promises";
@@ -814,10 +815,12 @@ router.get("/placements", async (req, res, next) => {
       .where(eq(countryInfo.isEcrCountry, true));
     const ecrCountryNames = new Set(ecrRows.map((r: any) => r.name));
     const withReadiness = (rows: any[]) => rows.map((r: any) => {
-      const checklist = buildDeploymentChecklist(r.candidate, r.placement, {
+      // readiness 2026-07-07: full readiness object (ring/badge/stage) per row;
+      // the legacy checklist/summary keys derive from it for existing clients.
+      const readiness = computeReadiness(r.candidate, r.placement, {
         destinationIsEcr: ecrCountryNames.has(r.placement?.country),
       });
-      return { ...r, deployment: { checklist, summary: readinessSummary(checklist) } };
+      return { ...r, deployment: { checklist: readiness.items, summary: readinessSummary(readiness.items), readiness } };
     });
 
     if (user.role === "admin" || user.role === "superadmin") {
@@ -986,6 +989,10 @@ router.patch("/placements/:id/visa-status", async (req, res, next) => {
       }).catch(() => { /* best-effort */ });
     }
 
+    // readiness 2026-07-07: visa approval may be the last gate — announce the
+    // one-time "cleared for deployment" if this flip completed the checklist.
+    maybeNotifyDeploymentReady(db, row.placement.id).catch(() => {});
+
     logger.info(`Visa status for placement ${row.placement.id} set to ${visaStatus} by ${user.role} ${user.id}`);
     res.json({ success: true, data: updated });
   } catch (err) { next(err); }
@@ -1055,6 +1062,10 @@ router.patch("/placements/:id/emigration-clearance", async (req, res, next) => {
       }).catch(() => { /* best-effort */ });
     }
 
+    // readiness 2026-07-07: PoE clearance may be the last gate — announce the
+    // one-time "cleared for deployment" if this flip completed the checklist.
+    maybeNotifyDeploymentReady(db, row.placement.id).catch(() => {});
+
     logger.info(`Emigration clearance for placement ${row.placement.id} set to ${emigrationClearanceStatus} by ${user.role} ${user.id}`);
     res.json({ success: true, data: updated });
   } catch (err) { next(err); }
@@ -1095,6 +1106,12 @@ router.patch("/candidates/:id/compliance", async (req, res, next) => {
     }
 
     const [row] = await storage.db.update(candidates).set(set).where(eq(candidates.id, req.params.id)).returning();
+
+    // readiness 2026-07-07: compliance edits are candidate-level and feed every
+    // placement's readiness — re-check each of the candidate's placements for
+    // the one-time "cleared for deployment" announcement (best-effort).
+    maybeNotifyDeploymentReadyForCandidate(storage.db, req.params.id).catch(() => {});
+
     res.json({ success: true, data: row });
   } catch (err) { next(err); }
 });

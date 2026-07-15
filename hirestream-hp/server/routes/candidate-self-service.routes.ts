@@ -16,7 +16,7 @@ import {
   candidateReferences, placements, applications, interviews, jobs,
   countryInfo, auditLog,
 } from "@shared/schema";
-import { buildDeploymentChecklist, readinessSummary } from "../services/deployment.service";
+import { computeReadiness, readinessSummary } from "../services/deployment.service";
 import { eq, and, desc } from "drizzle-orm";
 import PDFDocument from "pdfkit";
 import { logger } from "../config/logger.config";
@@ -234,7 +234,10 @@ router.get("/placements/:id/deployment", async (req, res, next) => {
 
     // audit 2026-07-06 (Batch 4B-2): destination ECR flag drives the
     // conditional eMigrate/PoE checklist step for ECR candidates.
-    const checklist = buildDeploymentChecklist(cand, p, { destinationIsEcr: !!ci?.isEcrCountry });
+    // readiness 2026-07-07: single readiness object (ring/badge/stage) — the
+    // legacy checklist/summary keys below derive from it so existing clients
+    // keep working unchanged.
+    const readiness = computeReadiness(cand, p, { destinationIsEcr: !!ci?.isEcrCountry });
 
     res.json({
       success: true,
@@ -244,8 +247,9 @@ router.get("/placements/:id/deployment", async (req, res, next) => {
           startDate: p.startDate, appointmentLetterUrl: p.appointmentLetterUrl,
         },
         jobTitle: row.j.title, company: row.j.company,
-        checklist,
-        summary: readinessSummary(checklist),
+        checklist: readiness.items,
+        summary: readinessSummary(readiness.items),
+        readiness,
         visa: {
           status: p.visaStatus ?? "not_applied",
           timelineDays: ci?.visaTimelineDays ?? null,

@@ -6,8 +6,9 @@ import { storage } from "../storage";
 import { logger } from "../config/logger.config";
 import { insertRecruitmentAgentSchema, recruitmentAgents, candidates, agencyReviews,
   candidateEducation, candidateExperience, documents, applications, jobs,
-  agencyDocuments, placements, auditLog } from "@shared/schema";
+  agencyDocuments, placements, auditLog, countryInfo } from "@shared/schema";
 import { eq, and } from "drizzle-orm";
+import { computeReadiness } from "../services/deployment.service";
 import { userOwnsCandidate } from "../lib/ownership";
 import { maskAadhaar } from "../lib/safeUser";
 import {
@@ -250,6 +251,23 @@ router.get("/candidates/:id", protect, async (req, res, next) => {
       }
     }
 
+    // readiness 2026-07-07: deployment readiness for the detail header
+    // (ring / "Cleared for Deployment" badge / stepper). Primary placement =
+    // an accepted/active/completed one if present, else the most recent.
+    // Computed from the RAW candidate row (compliance fields intact) — the
+    // PII-masked copy below is display-only and must not feed the score.
+    const placementRows = apps.map((r: any) => r.placement).filter(Boolean)
+      .sort((a: any, b: any) => new Date(b.createdAt ?? 0).getTime() - new Date(a.createdAt ?? 0).getTime());
+    const primaryPlacement = placementRows
+      .find((p: any) => ["accepted", "active", "completed"].includes(p.status)) ?? placementRows[0] ?? null;
+    let destinationIsEcr = false;
+    if (primaryPlacement?.country) {
+      const [ci] = await storage.db.select({ isEcrCountry: countryInfo.isEcrCountry }).from(countryInfo)
+        .where(eq(countryInfo.name, primaryPlacement.country)).limit(1);
+      destinationIsEcr = !!ci?.isEcrCountry;
+    }
+    const readiness = computeReadiness(candidate, primaryPlacement, { destinationIsEcr });
+
     // S6: minimise PII for employers — no raw identity documents, passport, or
     // Aadhaar numbers.
     // best practice 2026-07-07 (UIDAI/DPDP): staff never need the FULL Aadhaar —
@@ -270,6 +288,7 @@ router.get("/candidates/:id", protect, async (req, res, next) => {
         education, experience,
         documents: isEmployer ? [] : docs,
         applications: applicationsList,
+        readiness, // readiness 2026-07-07: agent/admin/employer all render the same truth
       },
     });
   } catch (err) { next(err); }
