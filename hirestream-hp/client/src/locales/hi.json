@@ -1082,5 +1082,61 @@
     "toastAcceptedDesc": "आपकी वीज़ा प्रक्रिया शुरू होगी। दस्तावेज़ देखें।",
     "toastDeclined": "प्रस्ताव अस्वीकार हुआ",
     "toastDeclinedDesc": "हमें बताने के लिए धन्यवाद।"
+  },
+  "readiness": {
+    "title": "तैनाती की तैयारी",
+    "caption": "तैयार",
+    "aria": "तैनाती की तैयारी {{pct}} प्रतिशत",
+    "travelReady": "तैनाती के लिए स्वीकृत",
+    "whatsLeft": "क्या बाकी है",
+    "ownerYou": "आप",
+    "ownerAgency": "HPSEDC",
+    "actionTitle": "ध्यान देने की ज़रूरत",
+    "allClearTitle": "सब पूरा — तैनाती के लिए तैयार",
+    "allClearBody": "प्रस्थान से पहले की हर ज़रूरत पूरी हो चुकी है।",
+    "candTitle": "आपकी यात्रा की तैयारी",
+    "candLine_one": "आप यात्रा के लिए {{pct}}% तैयार हैं — {{count}} कदम बाकी",
+    "candLine_other": "आप यात्रा के लिए {{pct}}% तैयार हैं — {{count}} कदम बाकी",
+    "candAllSet": "बधाई हो — आप यात्रा के लिए पूरी तरह तैयार हैं!",
+    "candEncourage": "ये कदम पूरे करें — आपकी उड़ान और करीब आ जाएगी।",
+    "candYourSteps": "आपके अगले कदम",
+    "candAgencyHandles_one": "HPSEDC आपके लिए {{count}} कदम संभाल रहा है — आपको वहाँ कुछ नहीं करना है।",
+    "candAgencyHandles_other": "HPSEDC आपके लिए {{count}} कदम संभाल रहा है — आपको वहाँ कुछ नहीं करना है।",
+    "stages": {
+      "registered": "पंजीकृत",
+      "documents": "दस्तावेज़",
+      "compliance": "अनुपालन",
+      "deployment": "तैनाती",
+      "travel_ready": "यात्रा-तैयार"
+    },
+    "items": {
+      "offer": "प्रस्ताव स्वीकृत",
+      "passport": "पासपोर्ट",
+      "pcc": "पुलिस क्लीयरेंस (PCC)",
+      "medical": "मेडिकल फिटनेस",
+      "visa": "वीज़ा",
+      "pdo": "प्रस्थान-पूर्व प्रशिक्षण (PDO)",
+      "pbby": "PBBY बीमा",
+      "emigration": "उत्प्रवास मंज़ूरी (eMigrate)",
+      "appointment": "नियुक्ति पत्र",
+      "travel": "यात्रा / आरंभ तिथि"
+    },
+    "admin": {
+      "navLabel": "तैनाती की तैयारी",
+      "title": "तैनाती की तैयारी",
+      "subtitle": "प्लेसमेंट समूह की प्रस्थान-पूर्व तैयारी — अपने आप ताज़ा होती है।",
+      "exportCsv": "CSV निर्यात",
+      "tileTravelReady": "यात्रा-तैयार",
+      "tileInCompliance": "अनुपालन में",
+      "tileBlocked": "अवरुद्ध",
+      "tileTotal": "कुल उम्मीदवार",
+      "byStage": "चरण के अनुसार उम्मीदवार",
+      "colCandidate": "उम्मीदवार",
+      "colDestination": "गंतव्य",
+      "colReadiness": "तैयारी",
+      "colStage": "चरण",
+      "colPending": "लंबित",
+      "empty": "अभी कोई तैनाती उम्मीदवार नहीं — किसी उम्मीदवार को प्लेसमेंट मिलते ही तैयारी यहाँ दिखेगी।"
+    }
   }
 }

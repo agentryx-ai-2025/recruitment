@@ -1079,5 +1079,61 @@
     "toastAcceptedDesc": "Your visa process will begin. Check documents.",
     "toastDeclined": "Offer declined",
     "toastDeclinedDesc": "Thank you for letting us know."
+  },
+  "readiness": {
+    "title": "Deployment Readiness",
+    "caption": "ready",
+    "aria": "Deployment readiness {{pct}} percent",
+    "travelReady": "Cleared for Deployment",
+    "whatsLeft": "What's left",
+    "ownerYou": "You",
+    "ownerAgency": "HPSEDC",
+    "actionTitle": "Needs attention",
+    "allClearTitle": "All clear — ready for deployment",
+    "allClearBody": "Every pre-departure requirement is complete.",
+    "candTitle": "Your travel readiness",
+    "candLine_one": "You're {{pct}}% ready for travel — {{count}} step left",
+    "candLine_other": "You're {{pct}}% ready for travel — {{count}} steps left",
+    "candAllSet": "You're all set — cleared for travel!",
+    "candEncourage": "Complete these steps to get closer to your flight.",
+    "candYourSteps": "Your next steps",
+    "candAgencyHandles_one": "HPSEDC is handling {{count}} step for you — nothing needed from your side there.",
+    "candAgencyHandles_other": "HPSEDC is handling {{count}} steps for you — nothing needed from your side there.",
+    "stages": {
+      "registered": "Registered",
+      "documents": "Documents",
+      "compliance": "Compliance",
+      "deployment": "Deployment",
+      "travel_ready": "Travel-Ready"
+    },
+    "items": {
+      "offer": "Offer accepted",
+      "passport": "Passport",
+      "pcc": "Police clearance (PCC)",
+      "medical": "Medical fitness",
+      "visa": "Visa",
+      "pdo": "Pre-departure orientation (PDO)",
+      "pbby": "PBBY insurance",
+      "emigration": "Emigration clearance (eMigrate)",
+      "appointment": "Appointment letter",
+      "travel": "Travel / start date"
+    },
+    "admin": {
+      "navLabel": "Deployment Readiness",
+      "title": "Deployment Readiness",
+      "subtitle": "Pre-departure readiness across the placement cohort — refreshes automatically.",
+      "exportCsv": "Export CSV",
+      "tileTravelReady": "Travel-Ready",
+      "tileInCompliance": "In Compliance",
+      "tileBlocked": "Blocked",
+      "tileTotal": "Total Candidates",
+      "byStage": "Candidates by stage",
+      "colCandidate": "Candidate",
+      "colDestination": "Destination",
+      "colReadiness": "Readiness",
+      "colStage": "Stage",
+      "colPending": "Pending",
+      "empty": "No deployment candidates yet — readiness appears once a candidate holds a placement."
+    }
   }
 }

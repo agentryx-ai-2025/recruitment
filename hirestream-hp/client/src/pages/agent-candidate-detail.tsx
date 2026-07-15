@@ -13,6 +13,8 @@ import {
   Plane, Heart, BookOpen, Save, Eye, IdCard,
 } from "lucide-react";
 import { PhotoAvatar } from "@/components/shared/PhotoAvatar";
+import { ReadinessPanel } from "@/components/shared/ReadinessPanel";
+import { TravelReadyBadge } from "@/components/shared/TravelReadyBadge";
 
 async function fetchJson(url: string) {
   const res = await fetch(url);
@@ -70,7 +72,11 @@ export default function AgentCandidateDetailPage() {
           <PhotoAvatar photoUrl={c.photoUrl} name={c.fullName || "?"}
             size="w-20 h-20" rounded="rounded-2xl" textSize="text-3xl" />
           <div className="flex-1 min-w-[240px]">
-            <h1 className="text-2xl font-bold text-slate-900">{c.fullName}</h1>
+            <div className="flex items-center gap-3 flex-wrap">
+              <h1 className="text-2xl font-bold text-slate-900">{c.fullName}</h1>
+              {/* readiness 2026-07-07: at-a-glance deployment stage next to the name */}
+              {c.readiness && <TravelReadyBadge stage={c.readiness.stage} isTravelReady={c.readiness.isTravelReady} size="sm" />}
+            </div>
             <div className="flex flex-wrap items-center gap-4 text-sm text-slate-500 mt-2">
               {c.location && <span className="flex items-center gap-1.5"><MapPin className="w-4 h-4 text-slate-400" />{c.location}</span>}
               {c.experience > 0 && <span className="flex items-center gap-1.5"><Briefcase className="w-4 h-4 text-slate-400" />{c.experience} yrs experience</span>}
@@ -185,6 +191,10 @@ export default function AgentCandidateDetailPage() {
           </div>
         </section>
       )}
+
+      {/* readiness 2026-07-07: deployment-readiness ring + stepper + what's-left,
+          just above the compliance panel that feeds it */}
+      {c.readiness && <ReadinessPanel readiness={c.readiness} className="mt-4" />}
 
       {/* Compliance & pre-departure panel — overseas-placement essential */}
       <ComplianceAndWelfarePanel candidate={c} applications={c.applications ?? []} />

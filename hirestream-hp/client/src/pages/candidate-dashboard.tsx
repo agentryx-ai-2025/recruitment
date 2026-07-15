@@ -24,6 +24,9 @@ import { JOB_CATEGORIES, jobCategoryLabel } from "@/lib/reference-data";
 import { MatchBreakdownPanel } from "@/components/shared/MatchBreakdownPanel";
 import { InterviewActionsPanel } from "@/components/candidate/InterviewActionsPanel";
 import { DrivesView } from "@/components/candidate/DrivesView";
+import { ReadinessRing } from "@/components/shared/ReadinessRing";
+import { TravelReadyBadge } from "@/components/shared/TravelReadyBadge";
+import { OwnerChip, type ReadinessData } from "@/components/shared/ReadinessPanel";
 
 async function fetchJson(url: string) {
   const res = await fetch(url);
@@ -602,6 +605,9 @@ function MinimalOverview({ profile, completion, applications, setActiveView, set
         )}
       </section>
 
+      {/* readiness 2026-07-07: travel-readiness ring — friendly, candidate-owned steps only */}
+      <CandidateReadinessCard minimal />
+
       {/* 4 · Help / safety */}
       <section className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 sm:p-6 space-y-3">
         <Button onClick={() => setLocation("/help")} className={`${BIG} bg-slate-900 hover:bg-slate-800 text-white`}><MessageCircleQuestion className="w-6 h-6 mr-2" /> {t("simpleDash.askHpsedc")}</Button>
@@ -659,6 +665,97 @@ function MinAppStatus({ app, extra, setActiveView, t }: any) {
       {extra > 0 && <button onClick={() => setActiveView("applications")} className="mt-4 w-full min-h-[44px] text-base text-blue-700 font-medium underline underline-offset-2">{t("simpleDash.moreApplications", { count: extra })}</button>}
     </div>
   );
+}
+
+// ── Candidate travel-readiness card ─────────────────────────────────
+// readiness 2026-07-07: candidate-facing ring driven by GET /api/v1/me/
+// readiness (works with or without an offer — pre-offer the score reflects
+// document compliance only). Rendered in BOTH the minimal (blue-collar)
+// overview and the advanced dashboard; `minimal` scales everything up and
+// hides staff-ish chrome for low-literacy users. Fails quiet: no data, no card.
+function CandidateReadinessCard({ minimal }: { minimal: boolean }) {
+  const { t } = useTranslation();
+  const { data: res } = useQuery({
+    queryKey: ["/api/v1/me/readiness"],
+    queryFn: () => fetchJson("/api/v1/me/readiness"),
+    staleTime: 60_000,
+  });
+  const r: ReadinessData | undefined = res?.data;
+  if (!r || !r.total) return null;
+
+  const mySteps = r.pending.filter((p) => p.owner === "you");
+  const agencySteps = r.pending.filter((p) => p.owner === "agency");
+  const actionItems = (r.items ?? []).filter((i: any) => i.applicable && i.status === "action_needed");
+
+  const card = (
+    <section className={`bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm ${minimal ? "p-5 sm:p-6" : "p-6"}`}>
+      <div className="flex items-center justify-between gap-2 flex-wrap mb-3">
+        <h2 className={`font-bold text-slate-900 dark:text-slate-100 ${minimal ? "text-xl" : "text-base tracking-tight"}`}>
+          {t("readiness.candTitle")}
+        </h2>
+        <TravelReadyBadge stage={r.stage} isTravelReady={r.isTravelReady} size={minimal ? "md" : "sm"} />
+      </div>
+
+      <div className="flex items-center gap-4 sm:gap-5">
+        <ReadinessRing pct={r.pct} size={minimal ? "lg" : "md"} isTravelReady={r.isTravelReady} actionNeeded={r.actionNeeded} />
+        <div className="flex-1 min-w-0">
+          <p className={`font-semibold text-slate-800 dark:text-slate-100 ${minimal ? "text-lg leading-snug" : "text-sm"}`}>
+            {r.isTravelReady
+              ? t("readiness.candAllSet")
+              : t("readiness.candLine", { pct: r.pct, count: r.pending.length })}
+          </p>
+          {!r.isTravelReady && (
+            <p className={`text-slate-500 dark:text-slate-400 mt-1 ${minimal ? "text-sm" : "text-xs"}`}>
+              {t("readiness.candEncourage")}
+            </p>
+          )}
+        </div>
+      </div>
+
+      {/* Blockers first (e.g. expired passport) — the one thing to fix NOW. */}
+      {r.actionNeeded > 0 && (
+        <div className="mt-4 rounded-xl border border-amber-300 bg-amber-50 dark:bg-amber-950/40 dark:border-amber-800 p-3.5 flex items-start gap-2.5">
+          <AlertCircle className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" aria-hidden="true" />
+          <div className="min-w-0">
+            <p className={`font-semibold text-amber-900 dark:text-amber-200 ${minimal ? "text-base" : "text-sm"}`}>{t("readiness.actionTitle")}</p>
+            {actionItems.map((i: any) => (
+              <p key={i.key} className={`text-amber-800 dark:text-amber-300 mt-0.5 ${minimal ? "text-sm" : "text-xs"}`}>
+                {i.label}{i.detail ? ` — ${i.detail}` : ""}
+              </p>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Only the steps the CANDIDATE owns — HPSEDC's steps are a one-line
+          reassurance below, not a to-do list they can't act on. */}
+      {mySteps.length > 0 && (
+        <div className="mt-4">
+          <p className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">
+            {t("readiness.candYourSteps")}
+          </p>
+          <ul className={minimal ? "space-y-2" : "space-y-1"}>
+            {mySteps.map((p) => (
+              <li key={p.key} className={`flex items-center gap-2.5 ${minimal ? "rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/70 dark:bg-slate-800/60 p-3 text-base" : "text-sm"}`}>
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" aria-hidden="true" />
+                <span className="flex-1 min-w-0 font-medium text-slate-800 dark:text-slate-200">
+                  {t(`readiness.items.${p.key}`, { defaultValue: p.label })}
+                </span>
+                {!minimal && <OwnerChip owner="you" />}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {agencySteps.length > 0 && (
+        <p className={`mt-3 text-slate-500 dark:text-slate-400 ${minimal ? "text-sm" : "text-xs"}`}>
+          {t("readiness.candAgencyHandles", { count: agencySteps.length })}
+        </p>
+      )}
+    </section>
+  );
+  return minimal ? card : <motion.div variants={fadeUp}>{card}</motion.div>;
 }
 
 // ── Helper Components ───────────────────────────────────────────────
@@ -807,6 +904,9 @@ function OverviewView({ appCount, shortlisted, docs, savedCount, completion, app
           </motion.div>
         );
       })()}
+
+      {/* readiness 2026-07-07: deployment/travel readiness ring (advanced size) */}
+      <CandidateReadinessCard minimal={false} />
 
       {/* Your Journey — 3 next steps */}
       <JourneyStrip profile={profile} completion={completion} docs={docs} education={education} experience={experience} applications={applications} setActiveView={setActiveView} />

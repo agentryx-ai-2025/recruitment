@@ -12,8 +12,9 @@ import {
   CheckCircle, Clock, FileText, FileSpreadsheet, MessageSquare, MessagesSquare, Send, GraduationCap,
   Loader2, Mail, Phone, Fingerprint, KeyRound, FolderLock, PlugZap, XCircle, Globe, LifeBuoy,
   Printer, Cpu, Network, Layers, Sigma, GitBranch, ScrollText,
-  Server, Database, Smartphone, Lock, HardDrive, Boxes, Plug, FileCheck, Square,
+  Server, Database, Smartphone, Lock, HardDrive, Boxes, Plug, FileCheck, Square, Plane,
 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
@@ -24,6 +25,8 @@ import { ISO_COUNTRIES, COMMON_DESTINATION_CODES } from "@/lib/iso-countries";
 // component is no longer mounted here (superseded by KYBReviewList); the
 // component file itself stays for the e2e tests that import it directly.
 import { KYBReviewList } from "@/components/admin/KYBReviewList";
+import { ReadinessRing } from "@/components/shared/ReadinessRing";
+import { TravelReadyBadge, type ReadinessStage } from "@/components/shared/TravelReadyBadge";
 import { GrievanceThread } from "@/components/shared/GrievanceThread";
 import { MatchingEnginePanel } from "@/components/admin/MatchingEnginePanel";
 import JobImportPanel from "@/components/admin/JobImportPanel";
@@ -37,6 +40,10 @@ async function fetchJson(url: string) {
 export default function AdminDashboard() {
   const { toast } = useToast();
   const { user } = useAuth();
+  // readiness 2026-07-07: only the new Deployment Readiness strings are
+  // translated (readiness.* namespace) — the legacy admin labels stay
+  // hard-coded English like the rest of this staff console.
+  const { t } = useTranslation();
   // HP-3b: slim admin — hide the external employer/agency approval queues when
   // those roles are disabled (single-agency HP). Code stays; just not shown.
   const { capabilities } = useCapabilities();
@@ -138,6 +145,8 @@ export default function AdminDashboard() {
       { key: "lifecycle", label: "Lifecycle", icon: Clock },
       { key: "drives", label: "Drives", icon: Handshake, count: pendingDrives.length },
       { key: "matching", label: "Matching Engine", icon: Cpu },
+      // readiness 2026-07-07: fleet-wide pre-departure readiness (ring/stage/CSV)
+      { key: "deployment_readiness", label: t("readiness.admin.navLabel"), icon: Plane },
       { key: "welfare", label: "Welfare SLA", icon: GraduationCap },
     ]},
     { label: "RISK & COMPLIANCE", items: [
@@ -543,6 +552,11 @@ export default function AdminDashboard() {
         {/* ── Compliance Oversight ─────────────────────── */}
         <TabsContent value="compliance">
           <CompliancePanel />
+        </TabsContent>
+
+        {/* ── Deployment Readiness (fleet view) ────────── */}
+        <TabsContent value="deployment_readiness">
+          <DeploymentReadinessPanel />
         </TabsContent>
 
         {/* ── Welfare SLA Monitor ──────────────────────── */}
@@ -2648,12 +2662,138 @@ function SettingRow({ spec, onChange, saving }: { spec: any; onChange: (v: any) 
   );
 }
 
+// ── Deployment Readiness fleet panel ─────────────────────────────────
+// readiness 2026-07-07: HPSEDC cohort view over GET /admin/oversight/
+// deployment-readiness — stat tiles, a by-stage distribution (plain
+// proportion bars, deliberately no chart lib), and the candidate table
+// (server already sorts travel-ready first). Auto-refreshes.
+const READINESS_STAGES: { key: ReadinessStage; bar: string }[] = [
+  { key: "registered", bar: "bg-slate-400 dark:bg-slate-500" },
+  { key: "documents", bar: "bg-blue-500 dark:bg-blue-400" },
+  { key: "compliance", bar: "bg-violet-500 dark:bg-violet-400" },
+  { key: "deployment", bar: "bg-amber-500 dark:bg-amber-400" },
+  { key: "travel_ready", bar: "bg-emerald-500 dark:bg-emerald-400" },
+];
+
+function DeploymentReadinessPanel() {
+  const { t } = useTranslation();
+  const { data: res, isLoading } = useQuery({
+    queryKey: ["/api/v1/admin/oversight/deployment-readiness"],
+    queryFn: () => fetchJson("/api/v1/admin/oversight/deployment-readiness"),
+    refetchInterval: 30000,
+  });
+  const d = res?.data;
+  const counts = d?.counts ?? { travelReady: 0, inCompliance: 0, blocked: 0, total: 0 };
+  const byStage: Record<string, number> = d?.byStage ?? {};
+  const rows: any[] = d?.candidates ?? [];
+  const stageMax = Math.max(1, counts.total);
+
+  return (
+    <div className="space-y-5">
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <div>
+          <h3 className="text-lg font-semibold text-gray-900 flex items-center">
+            <Plane className="text-blue-600 mr-2 w-5 h-5" /> {t("readiness.admin.title")}
+          </h3>
+          <p className="text-xs text-slate-500 mt-0.5">{t("readiness.admin.subtitle")}</p>
+        </div>
+        <Button variant="outline" size="sm" className="rounded-lg text-xs"
+          onClick={() => window.open("/api/v1/admin/oversight/deployment-readiness/export.csv", "_blank")}>
+          <Download className="mr-1.5 h-3.5 w-3.5" /> {t("readiness.admin.exportCsv")}
+        </Button>
+      </div>
+
+      {/* Stat tiles — same MetricCard as the Overview tab */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <MetricCard icon={<Plane />} color="bg-emerald-600" label={t("readiness.admin.tileTravelReady")} value={counts.travelReady} />
+        <MetricCard icon={<Shield />} color="bg-blue-600" label={t("readiness.admin.tileInCompliance")} value={counts.inCompliance} />
+        <MetricCard icon={<AlertTriangle />} color="bg-rose-600" label={t("readiness.admin.tileBlocked")} value={counts.blocked} />
+        <MetricCard icon={<Users />} color="bg-purple-600" label={t("readiness.admin.tileTotal")} value={counts.total} />
+      </div>
+
+      {/* By-stage distribution — simple horizontal proportion bars */}
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
+        <h4 className="text-sm font-semibold text-slate-900 mb-3">{t("readiness.admin.byStage")}</h4>
+        <div className="space-y-2">
+          {READINESS_STAGES.map(({ key, bar }) => {
+            const n = Number(byStage[key] ?? 0);
+            return (
+              <div key={key} className="flex items-center gap-3">
+                <span className="w-28 shrink-0 text-xs font-medium text-slate-600">{t(`readiness.stages.${key}`)}</span>
+                <div className="flex-1 h-3 bg-slate-100 rounded-full overflow-hidden">
+                  <div className={`h-full rounded-full ${bar} transition-all duration-500`}
+                    style={{ width: `${(n / stageMax) * 100}%` }} />
+                </div>
+                <span className="w-8 shrink-0 text-right text-xs font-bold tabular-nums text-slate-700">{n}</span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Candidate table — travel-ready first (server-sorted) */}
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
+        {isLoading ? (
+          <div className="py-10 text-center"><Loader2 className="w-6 h-6 animate-spin text-blue-600 mx-auto" /></div>
+        ) : rows.length === 0 ? (
+          <div className="text-center py-12 text-gray-500">
+            <Plane className="w-10 h-10 mx-auto mb-3 opacity-30" />
+            <p className="text-sm">{t("readiness.admin.empty")}</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-[11px] uppercase tracking-wider text-slate-400 border-b border-slate-100">
+                  <th className="py-2 pr-3 font-bold">{t("readiness.admin.colCandidate")}</th>
+                  <th className="py-2 pr-3 font-bold">{t("readiness.admin.colDestination")}</th>
+                  <th className="py-2 pr-3 font-bold">{t("readiness.admin.colReadiness")}</th>
+                  <th className="py-2 pr-3 font-bold">{t("readiness.admin.colStage")}</th>
+                  <th className="py-2 font-bold">{t("readiness.admin.colPending")}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((c: any) => (
+                  <tr key={c.candidateId} className="border-b border-slate-50 hover:bg-slate-50/60">
+                    <td className="py-2 pr-3 font-semibold text-slate-900 whitespace-nowrap">{c.fullName}</td>
+                    <td className="py-2 pr-3 text-slate-600 whitespace-nowrap">{c.destination || "—"}</td>
+                    <td className="py-2 pr-3">
+                      <ReadinessRing pct={c.pct} size="sm" isTravelReady={c.isTravelReady} actionNeeded={c.actionNeeded} />
+                    </td>
+                    <td className="py-2 pr-3">
+                      <TravelReadyBadge stage={c.stage} isTravelReady={c.isTravelReady} size="sm" />
+                    </td>
+                    <td className="py-2">
+                      {(c.pending?.length ?? 0) === 0 ? (
+                        <span className="text-xs text-emerald-600 font-semibold">0</span>
+                      ) : (
+                        // Pending labels come from the backend checklist; show the
+                        // count + first items so staff can triage without a click.
+                        <span className="text-xs text-slate-600" title={(c.pending ?? []).join(", ")}>
+                          <span className="font-bold text-amber-600 tabular-nums">{c.pending.length}</span>
+                          <span className="text-slate-400"> · {(c.pending ?? []).slice(0, 2).join(", ")}{c.pending.length > 2 ? "…" : ""}</span>
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function MetricCard({ icon, color, label, value, sub, onClick }: { icon: React.ReactNode; color: string; label: string; value: string | number; sub?: string; onClick?: () => void }) {
   const lightMap: Record<string, string> = {
     "bg-blue-600": "bg-blue-50 text-blue-600",
     "bg-emerald-600": "bg-emerald-50 text-emerald-600",
     "bg-orange-500": "bg-orange-50 text-orange-600",
     "bg-purple-600": "bg-purple-50 text-purple-600",
+    // readiness 2026-07-07: rose tile for the "Blocked" readiness count
+    "bg-rose-600": "bg-rose-50 text-rose-600",
   };
   const light = lightMap[color] || "bg-slate-50 text-slate-600";
   return (

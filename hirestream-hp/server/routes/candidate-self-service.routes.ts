@@ -266,6 +266,45 @@ router.get("/placements/:id/deployment", async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// ── My deployment readiness (candidate-facing ring) ──────────────────
+// readiness 2026-07-07: GET /api/v1/me/readiness — the candidate's own
+// readiness object, computed with the SAME "primary placement" rule as the
+// agent candidate-detail and admin fleet views (prefer accepted/active/
+// completed, else the most recent, else none), so every role sees the same
+// number. Works pre-offer too: with no placement the score reflects only
+// the candidate's document compliance (passport/PCC/medical + PDO/PBBY).
+router.get("/readiness", async (req, res, next) => {
+  try {
+    if (!storage.db) return res.status(500).json({ success: false });
+    const user = (req as any).user;
+    if (user.role !== "candidate") return res.status(403).json({ success: false, message: "Candidate-only" });
+    const candId = await getMyCandidateId(user.id);
+    if (!candId) return res.status(404).json({ success: false, message: "Profile not found" });
+
+    const [cand] = await storage.db.select().from(candidates).where(eq(candidates.id, candId)).limit(1);
+    if (!cand) return res.status(404).json({ success: false, message: "Profile not found" });
+
+    const rows = await storage.db
+      .select({ p: placements })
+      .from(placements)
+      .innerJoin(applications, eq(placements.applicationId, applications.id))
+      .where(eq(applications.candidateId, candId));
+    const ps = rows.map((r: any) => r.p)
+      .sort((a: any, b: any) => new Date(b.createdAt ?? 0).getTime() - new Date(a.createdAt ?? 0).getTime());
+    const primaryPlacement = ps.find((p: any) => ["accepted", "active", "completed"].includes(p.status)) ?? ps[0] ?? null;
+
+    // Destination ECR flag drives the conditional eMigrate/PoE step.
+    let destinationIsEcr = false;
+    if (primaryPlacement?.country) {
+      const [ci] = await storage.db.select({ isEcr: countryInfo.isEcrCountry }).from(countryInfo)
+        .where(eq(countryInfo.name, primaryPlacement.country)).limit(1);
+      destinationIsEcr = !!ci?.isEcr;
+    }
+
+    res.json({ success: true, data: computeReadiness(cand, primaryPlacement, { destinationIsEcr }) });
+  } catch (err) { next(err); }
+});
+
 // ── Download the candidate's own signed appointment letter ───────────
 // Serves the uploaded file, or redirects to an external pasted link.
 router.get("/placements/:id/appointment-letter", async (req, res, next) => {
