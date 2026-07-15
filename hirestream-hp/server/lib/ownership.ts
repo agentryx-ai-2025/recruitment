@@ -14,6 +14,7 @@
  */
 import { eq, and, or } from "drizzle-orm";
 import { jobs, applications } from "@shared/schema";
+import { getSetting } from "../services/settings.service";
 
 type DB = NonNullable<typeof import("../storage")["storage"]["db"]>;
 interface ActorLike { id: string; role: string }
@@ -22,9 +23,29 @@ export function isStaffSupervisor(role: string): boolean {
   return role === "admin" || role === "superadmin";
 }
 
+/**
+ * Single-agency (HPSEDC) deployment fix, 2026-07-07: when agency self-
+ * registration is OFF there is exactly ONE agency, so every `agent` is HPSEDC
+ * staff and may act on ANY candidate/job/application (including candidates who
+ * haven't applied to a job yet — e.g. recording their pre-departure compliance).
+ * The per-job ownership check below only protects agent-vs-agent isolation,
+ * which is meaningless with a single agency. In a multi-agency deployment
+ * (capability ON) this returns false and the strict ownership check applies.
+ */
+async function agentActsAsSoleAgency(role: string): Promise<boolean> {
+  if (role !== "agent") return false;
+  try {
+    const multiAgency = await getSetting<boolean>("capability.agency_self_registration");
+    return multiAgency === false;
+  } catch {
+    return false;
+  }
+}
+
 /** True if `user` owns the given job (see ownership model above). */
 export async function userOwnsJob(db: DB, user: ActorLike, jobId: string): Promise<boolean> {
   if (isStaffSupervisor(user.role)) return true;
+  if (await agentActsAsSoleAgency(user.role)) return true;
   const [job] = await db
     .select({ agentId: jobs.agentId, employerId: jobs.employerId, parentRequisitionId: jobs.parentRequisitionId })
     .from(jobs)
@@ -49,6 +70,7 @@ export async function userOwnsJob(db: DB, user: ActorLike, jobId: string): Promi
 /** True if `user` owns the job behind the given application. */
 export async function userOwnsApplication(db: DB, user: ActorLike, applicationId: string): Promise<boolean> {
   if (isStaffSupervisor(user.role)) return true;
+  if (await agentActsAsSoleAgency(user.role)) return true;
   const [app] = await db
     .select({ jobId: applications.jobId })
     .from(applications)
@@ -64,6 +86,7 @@ export async function userOwnsApplication(db: DB, user: ActorLike, applicationId
  */
 export async function userOwnsCandidate(db: DB, user: ActorLike, candidateId: string): Promise<boolean> {
   if (isStaffSupervisor(user.role)) return true;
+  if (await agentActsAsSoleAgency(user.role)) return true;
   const rows = await db
     .select({ agentId: jobs.agentId, employerId: jobs.employerId, parentRequisitionId: jobs.parentRequisitionId })
     .from(applications)
