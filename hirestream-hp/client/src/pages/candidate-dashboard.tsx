@@ -697,7 +697,7 @@ function CandidateReadinessCard({ minimal }: { minimal: boolean }) {
       </div>
 
       <div className="flex items-center gap-4 sm:gap-5">
-        <ReadinessRing pct={r.pct} size={minimal ? "lg" : "md"} isTravelReady={r.isTravelReady} actionNeeded={r.actionNeeded} />
+        <ReadinessRing pct={r.pct} size={minimal ? "lg" : "md"} isTravelReady={r.isTravelReady} blockers={r.blockers} actionNeeded={r.actionNeeded} />
         <div className="flex-1 min-w-0">
           <p className={`font-semibold text-slate-800 dark:text-slate-100 ${minimal ? "text-lg leading-snug" : "text-sm"}`}>
             {r.isTravelReady

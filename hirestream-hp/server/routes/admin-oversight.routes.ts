@@ -601,7 +601,7 @@ router.get("/deployment-readiness", async (_req, res, next) => {
     const counts = {
       travelReady: fleet.filter((f) => f.readiness.isTravelReady).length,
       inCompliance: fleet.filter((f) => f.readiness.isComplianceReady).length,
-      blocked: fleet.filter((f) => f.readiness.actionNeeded > 0).length, // e.g. expired passport
+      blocked: fleet.filter((f) => f.readiness.blockers > 0).length, // hard blockers (expired passport, visa rejected) — not soft warnings
       total: fleet.length,
     };
     const byStage: Record<string, number> = {
@@ -622,6 +622,8 @@ router.get("/deployment-readiness", async (_req, res, next) => {
           stage: f.readiness.stage,
           isTravelReady: f.readiness.isTravelReady,
           actionNeeded: f.readiness.actionNeeded,
+          blockers: f.readiness.blockers,
+          warnings: f.readiness.warnings,
           pending: f.readiness.pending.map((p) => p.label),
         })),
       },

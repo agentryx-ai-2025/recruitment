@@ -24,6 +24,8 @@ export interface ReadinessData {
   done: number;
   total: number;
   actionNeeded: number;
+  blockers?: number;   // hard problems → red
+  warnings?: number;   // soft problems → amber
   pending: { key: string; label: string; owner: "you" | "agency" }[];
   isTravelReady: boolean;
   isComplianceReady: boolean;
@@ -113,7 +115,7 @@ export function ReadinessPanel({ readiness, className }: { readiness: ReadinessD
       </div>
 
       <div className="flex flex-col sm:flex-row items-center sm:items-start gap-5">
-        <ReadinessRing pct={r.pct} size="md" isTravelReady={r.isTravelReady} actionNeeded={r.actionNeeded} />
+        <ReadinessRing pct={r.pct} size="md" isTravelReady={r.isTravelReady} blockers={r.blockers} actionNeeded={r.actionNeeded} />
 
         <div className="flex-1 min-w-0 w-full space-y-4">
           <ReadinessStepper stage={r.stage} isTravelReady={r.isTravelReady} />
@@ -151,22 +153,31 @@ export function ReadinessPanel({ readiness, className }: { readiness: ReadinessD
         </div>
       </div>
 
-      {r.actionNeeded > 0 && (
-        <div className="mt-4 rounded-xl border border-amber-300 bg-amber-50 dark:bg-amber-950/40 dark:border-amber-800 p-3.5 flex items-start gap-2.5">
-          <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" aria-hidden="true" />
-          <div className="min-w-0">
-            <p className="text-sm font-semibold text-amber-900 dark:text-amber-200">{t("readiness.actionTitle")}</p>
-            {/* The specific blocker text (e.g. "Passport expired — renew now")
-                comes from the backend checklist verbatim. */}
-            {actionItems.map((i) => (
-              <p key={i.key} className="text-sm text-amber-800 dark:text-amber-300 mt-0.5">
-                {i.label}
-                {i.detail ? <span className="text-amber-700/80 dark:text-amber-400"> — {i.detail}</span> : null}
-              </p>
-            ))}
+      {r.actionNeeded > 0 && (() => {
+        // readiness 2026-07-07: a HARD blocker (expired passport, visa rejected)
+        // → rose; a soft warning (passport expiring soon) → amber. Matches the
+        // ring, so a 67%-with-a-warning candidate isn't shown as alarming red.
+        const hasBlocker = (r.blockers ?? 0) > 0;
+        const c = hasBlocker
+          ? { box: "border-rose-300 bg-rose-50 dark:bg-rose-950/40 dark:border-rose-800", icon: "text-rose-600 dark:text-rose-400", title: "text-rose-900 dark:text-rose-200", body: "text-rose-800 dark:text-rose-300", detail: "text-rose-700/80 dark:text-rose-400" }
+          : { box: "border-amber-300 bg-amber-50 dark:bg-amber-950/40 dark:border-amber-800", icon: "text-amber-600 dark:text-amber-400", title: "text-amber-900 dark:text-amber-200", body: "text-amber-800 dark:text-amber-300", detail: "text-amber-700/80 dark:text-amber-400" };
+        return (
+          <div className={`mt-4 rounded-xl border ${c.box} p-3.5 flex items-start gap-2.5`}>
+            <AlertTriangle className={`w-5 h-5 ${c.icon} shrink-0 mt-0.5`} aria-hidden="true" />
+            <div className="min-w-0">
+              <p className={`text-sm font-semibold ${c.title}`}>{t("readiness.actionTitle")}</p>
+              {/* The specific text (e.g. "Passport expired — renew now") comes from
+                  the backend checklist verbatim. */}
+              {actionItems.map((i) => (
+                <p key={i.key} className={`text-sm ${c.body} mt-0.5`}>
+                  {i.label}
+                  {i.detail ? <span className={c.detail}> — {i.detail}</span> : null}
+                </p>
+              ))}
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
     </section>
   );
 }

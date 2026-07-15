@@ -2758,7 +2758,7 @@ function DeploymentReadinessPanel() {
                     <td className="py-2 pr-3 font-semibold text-slate-900 whitespace-nowrap">{c.fullName}</td>
                     <td className="py-2 pr-3 text-slate-600 whitespace-nowrap">{c.destination || "—"}</td>
                     <td className="py-2 pr-3">
-                      <ReadinessRing pct={c.pct} size="sm" isTravelReady={c.isTravelReady} actionNeeded={c.actionNeeded} />
+                      <ReadinessRing pct={c.pct} size="sm" isTravelReady={c.isTravelReady} blockers={c.blockers} actionNeeded={c.actionNeeded} />
                     </td>
                     <td className="py-2 pr-3">
                       <TravelReadyBadge stage={c.stage} isTravelReady={c.isTravelReady} size="sm" />

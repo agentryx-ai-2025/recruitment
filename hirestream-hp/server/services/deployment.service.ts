@@ -22,6 +22,10 @@ export interface DeployItem {
   // travel-date step itself, which is the outcome, not a prerequisite).
   applicable: boolean;
   blocking: boolean;
+  // For action_needed items: "blocker" (hard — passport expired/missing, visa
+  // rejected → red) vs "warning" (soft — passport expiring within 6 months →
+  // amber). Absent on non-action_needed items.
+  severity?: "blocker" | "warning";
 }
 
 const VISA_LABEL: Record<string, string> = {
@@ -102,13 +106,15 @@ export function buildDeploymentChecklist(candidate: any, placement: any, opts?: 
       const validTo = c.passportExpiry ? new Date(c.passportExpiry).toLocaleDateString("en-IN") : null;
       const base = { key: "passport", owner: "you" as const, applicable: true, blocking: true };
       if (!c.passportNumber) {
-        return { ...base, label: "Passport on file", status: "action_needed" as DeployStatus, detail: null };
+        return { ...base, label: "Passport on file", status: "action_needed" as DeployStatus, detail: null, severity: "blocker" as const };
       }
       if (issue === "expired") {
-        return { ...base, label: "Passport expired — renew now", status: "action_needed" as DeployStatus, detail: `Expired ${validTo}` };
+        return { ...base, label: "Passport expired — renew now", status: "action_needed" as DeployStatus, detail: `Expired ${validTo}`, severity: "blocker" as const };
       }
       if (issue === "within_6_months") {
-        return { ...base, label: "Passport expires within 6 months — renew", status: "action_needed" as DeployStatus, detail: `Valid to ${validTo} — most countries require 6 months validity` };
+        // Soft warning — the passport is still valid today, but renew before it
+        // becomes a hard blocker at the 6-month line.
+        return { ...base, label: "Passport expires within 6 months — renew", status: "action_needed" as DeployStatus, detail: `Valid to ${validTo} — most countries require 6 months validity`, severity: "warning" as const };
       }
       return { ...base, label: "Passport on file", status: "done" as DeployStatus, detail: validTo ? `Valid to ${validTo}` : null };
     })(),
@@ -127,6 +133,7 @@ export function buildDeploymentChecklist(candidate: any, placement: any, opts?: 
       status: visa === "approved" ? "done" : visa === "applied" ? "in_progress" : visa === "rejected" ? "action_needed" : "pending",
       detail: visa ? VISA_LABEL[visa] ?? visa : null,
       applicable: hasPlacement, blocking: true,
+      ...(visa === "rejected" ? { severity: "blocker" as const } : {}),
     },
     {
       key: "pdo", label: "Pre-departure orientation (PDO)", owner: "agency",
@@ -198,7 +205,9 @@ export interface Readiness {
   pct: number;                 // 0-100 across applicable blocking items
   done: number;
   total: number;
-  actionNeeded: number;        // e.g. expired passport
+  actionNeeded: number;        // blockers + warnings combined (back-compat)
+  blockers: number;            // hard problems → red ring (expired passport, visa rejected)
+  warnings: number;            // soft problems → amber ring (passport expiring soon)
   pending: { key: string; label: string; owner: "you" | "agency" }[];
   isTravelReady: boolean;      // needs an accepted offer + everything cleared
   isComplianceReady: boolean;  // candidate-level docs done (pre-offer milestone)
@@ -211,7 +220,10 @@ export function computeReadiness(candidate: any, placement: any, opts?: Deployme
   const scored = items.filter((i) => i.applicable && i.blocking);
   const done = scored.filter((i) => i.status === "done").length;
   const total = scored.length;
-  const actionNeeded = scored.filter((i) => i.status === "action_needed").length;
+  const actionItems = scored.filter((i) => i.status === "action_needed");
+  const actionNeeded = actionItems.length;
+  const warnings = actionItems.filter((i) => i.severity === "warning").length;
+  const blockers = actionNeeded - warnings; // hard problems (default when severity absent)
   const pending = scored.filter((i) => i.status !== "done")
     .map((i) => ({ key: i.key, label: i.label, owner: i.owner }));
   const pct = total ? Math.round((done / total) * 100) : 0;
@@ -234,5 +246,5 @@ export function computeReadiness(candidate: any, placement: any, opts?: Deployme
   else if (isComplianceReady) stage = "compliance";
   else if (done > 0) stage = "documents";
 
-  return { pct, done, total, actionNeeded, pending, isTravelReady, isComplianceReady, stage, items };
+  return { pct, done, total, actionNeeded, blockers, warnings, pending, isTravelReady, isComplianceReady, stage, items };
 }

@@ -25,10 +25,14 @@ export interface ReadinessRingProps {
   size?: ReadinessRingSize;
   label?: string;
   isTravelReady?: boolean;
+  // Rose (hard problem) is driven by `blockers` only — passport expired/missing,
+  // visa rejected. A soft `warning` (passport expiring soon) stays amber. Falls
+  // back to actionNeeded for callers that haven't been updated.
+  blockers?: number;
   actionNeeded?: number;
 }
 
-export function ReadinessRing({ pct, size = "md", label, isTravelReady, actionNeeded }: ReadinessRingProps) {
+export function ReadinessRing({ pct, size = "md", label, isTravelReady, blockers, actionNeeded }: ReadinessRingProps) {
   const { t } = useTranslation();
   const clamped = Math.max(0, Math.min(100, Math.round(pct || 0)));
   const s = SIZES[size];
@@ -42,8 +46,9 @@ export function ReadinessRing({ pct, size = "md", label, isTravelReady, actionNe
     return () => cancelAnimationFrame(id);
   }, [clamped]);
 
+  const hardBlockers = blockers ?? actionNeeded ?? 0;
   const ready = !!isTravelReady || (clamped === 100 && (actionNeeded ?? 0) === 0);
-  const blocked = !ready && (actionNeeded ?? 0) > 0;
+  const blocked = !ready && hardBlockers > 0;   // red only on hard blockers; warnings stay amber
   const tone = ready
     ? { arc: "text-emerald-600 dark:text-emerald-400", num: "text-emerald-700 dark:text-emerald-300" }
     : blocked
