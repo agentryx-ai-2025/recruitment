@@ -73,9 +73,13 @@ export default function AgentDashboard() {
     queryKey: ["/api/v1/jobs", "agent", "mine"],
     queryFn: () => fetchJson("/api/v1/jobs?status=all&mine=true&limit=100"),
   });
+  // readiness/search 2026-07-07: fetch the full candidate list once and search
+  // client-side across name + email + skill. Previously the box was wired to the
+  // server `?skill=` filter only, so typing a candidate's NAME (e.g. "Vishal")
+  // filtered them OUT — the server matched skills, not names.
   const { data: candidatesRes, isLoading: candidatesLoading } = useQuery({
-    queryKey: ["/api/v1/agencies/candidates", searchSkill],
-    queryFn: () => fetchJson(`/api/v1/agencies/candidates${searchSkill ? `?skill=${searchSkill}` : ''}`),
+    queryKey: ["/api/v1/agencies/candidates"],
+    queryFn: () => fetchJson("/api/v1/agencies/candidates"),
   });
   const { data: drivesRes } = useQuery({
     queryKey: ["/api/v1/drives/my"],
@@ -641,7 +645,15 @@ function CandidatesContent({ candidates, candidateTotal, loading, searchSkill, s
     if (expBucket === "senior") return y >= 7;
     return true;
   };
+  // Search matches NAME, EMAIL, or SKILL (case-insensitive).
+  const q = (searchSkill || "").trim().toLowerCase();
   const filtered = (candidates || []).filter((c: any) => {
+    if (q) {
+      const inName = (c.fullName || "").toLowerCase().includes(q);
+      const inEmail = (c.email || "").toLowerCase().includes(q);
+      const inSkill = (c.skills || []).some((s: string) => (s || "").toLowerCase().includes(q));
+      if (!inName && !inEmail && !inSkill) return false;
+    }
     if (locationFilter !== "all" && c.location !== locationFilter) return false;
     if (countryFilter !== "all" && !(c.preferredCountries ?? []).includes(countryFilter)) return false;
     if (!expMatch(c)) return false;
@@ -671,7 +683,7 @@ function CandidatesContent({ candidates, candidateTotal, loading, searchSkill, s
       <div className="flex items-center gap-3 mb-4 flex-wrap">
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-          <Input placeholder="Search by skill (e.g. React)" value={searchSkill}
+          <Input placeholder="Search by name, email, or skill" value={searchSkill}
             onChange={(e) => setSearchSkill(e.target.value)} className="pl-10 rounded-lg" />
         </div>
         <p className="text-xs text-slate-400 font-medium">{filtered.length} of {candidateTotal}</p>
