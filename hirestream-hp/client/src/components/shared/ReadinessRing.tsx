@@ -87,7 +87,7 @@ export function ReadinessRing({ pct, size = "md", label, isTravelReady, blockers
       <div className="absolute inset-0 flex flex-col items-center justify-center">
         <span className={`font-bold tabular-nums leading-none ${s.pctCls} ${tone.num}`}>{clamped}%</span>
         {size !== "sm" && (
-          <span className={`mt-0.5 font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 ${s.captionCls}`}>
+          <span className={`mt-0.5 font-semibold uppercase tracking-tight whitespace-nowrap leading-none text-slate-500 dark:text-slate-400 ${s.captionCls}`}>
             {label ?? t(tone.cap)}
           </span>
         )}
