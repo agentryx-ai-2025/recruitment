@@ -2021,7 +2021,7 @@ function RecommendedView({ recommendations, savedJobIds, setActiveView }: { reco
       {recommendations.length === 0 ? (
         <motion.div variants={fadeUp} className="text-center py-16 bg-gradient-to-br from-white to-amber-50/30 rounded-2xl border border-slate-200/80 shadow-sm">
           <Sparkles className="w-12 h-12 mx-auto mb-3 text-slate-300" />
-          <p className="text-slate-500 font-semibold">No recommendations yet</p>
+          <p className="text-slate-500 font-semibold">No jobs matched yet</p>
           <p className="text-sm text-slate-400 mt-1 mb-4">Complete your profile to unlock personalized job matches.</p>
           <Button size="sm" onClick={() => setLocation("/profile")} className="bg-amber-600 hover:bg-amber-700 text-white">
             <User className="w-4 h-4 mr-1.5" /> Complete Profile

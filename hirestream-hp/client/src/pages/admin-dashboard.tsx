@@ -1183,7 +1183,7 @@ function MatchingEngineDoc() {
 
       <ArchSection n={1} title="Purpose" icon={<ScrollText className="w-4 h-4 text-indigo-600" />}>
         <p className="text-sm text-slate-600 leading-relaxed">
-          The engine produces a <b>0–100 fit score</b> for every candidate ↔ job pair. The score drives the candidate's <i>Recommended Jobs</i>, the agent's ranked applicant list, and the match badge on every application. Every score comes with a per-factor breakdown so candidates and agents can see <i>why</i> — the algorithm is <b>fully explainable</b>. All weights, missing-criteria policies and the recommendation threshold are admin-tunable at runtime via the Matching Engine Parameters module (§7) — no code redeploy needed.
+          The engine produces a <b>0–100 fit score</b> for every candidate ↔ job pair. The score drives the candidate's <i>Jobs for You</i>, the agent's ranked applicant list, and the match badge on every application. Every score comes with a per-factor breakdown so candidates and agents can see <i>why</i> — the algorithm is <b>fully explainable</b>. All weights, missing-criteria policies and the recommendation threshold are admin-tunable at runtime via the Matching Engine Parameters module (§7) — no code redeploy needed.
         </p>
       </ArchSection>
 
@@ -1260,7 +1260,7 @@ function MatchingEngineDoc() {
         <div className="grid sm:grid-cols-2 gap-4 text-sm">
           <div>
             <h4 className="font-semibold text-slate-800 mb-1">Recommendation cut-off</h4>
-            <p className="text-slate-600">The candidate's <i>Recommended Jobs</i> view shows only jobs scoring ≥ the configured threshold. Default <b>50</b>; admin adjusts at runtime via <ArchMono>matching.recommendation_threshold_pct</ArchMono>.</p>
+            <p className="text-slate-600">The candidate's <i>Jobs for You</i> view shows only jobs scoring ≥ the configured threshold. Default <b>50</b>; admin adjusts at runtime via <ArchMono>matching.recommendation_threshold_pct</ArchMono>.</p>
             <h4 className="font-semibold text-slate-800 mb-1 mt-3">Sort &amp; tie-break</h4>
             <p className="text-slate-600">Default sort on the agent's per-job list: match score descending; ties broken by <ArchMono>appliedAt</ArchMono> (most recent first). Agent can override via dropdown.</p>
           </div>
