@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>HireStream-HP — Phase II: Proposed Scope</title>
+<style>
+  :root{
+    --navy:#0b1e3b; --navy2:#132a52; --blue:#1d4ed8; --blue2:#2563eb;
+    --saffron:#ff7a00; --green:#0f8a3c; --amber:#d97706; --grey:#64748b;
+    --ink:#0f172a; --sub:#475569; --line:#e2e8f0; --bg:#ffffff; --soft:#f8fafc;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;color:var(--ink);
+    font-family:"Segoe UI",Roboto,-apple-system,Helvetica,Arial,sans-serif;
+    font-size:10pt; line-height:1.45; -webkit-print-color-adjust:exact; print-color-adjust:exact;}
+  h1,h2,h3,h4{margin:0; line-height:1.2; font-weight:700;}
+  p{margin:0 0 7pt;}
+  .page{page-break-after:always; padding:12mm 15mm 6mm;}
+  .page:last-child{page-break-after:auto;}
+  .tricolor{height:5px;border-radius:3px;background:linear-gradient(90deg,var(--saffron) 0 33%,#ffffff 33% 66%,var(--green) 66% 100%);}
+
+  .kicker{color:var(--saffron);font-size:8.5pt;font-weight:700;letter-spacing:2px;text-transform:uppercase;}
+  .h-sec{font-size:19pt;margin:2px 0 4px;color:var(--navy);}
+  .rule{height:3px;width:54px;background:var(--blue);border-radius:2px;margin:7px 0 12px;}
+  .lead{color:var(--sub);font-size:10.5pt;}
+  h3{font-size:11pt;color:var(--navy);margin:10px 0 3px;}
+
+  .hdr{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2px solid var(--line);padding-bottom:8px;margin-bottom:12px;}
+  .hdr .org{font-size:8pt;text-transform:uppercase;letter-spacing:1.2px;color:var(--grey);font-weight:600;}
+  .hdr .ttl{font-size:13pt;font-weight:800;color:var(--navy);}
+  .hdr .meta{font-size:8.5pt;color:var(--grey);text-align:right;}
+
+  table{width:100%;border-collapse:collapse;margin-top:4px;font-size:8.4pt;}
+  thead th{background:var(--navy);color:#fff;text-align:left;padding:5px 7px;font-weight:600;font-size:8pt;letter-spacing:.3px;}
+  thead th:first-child{border-radius:8px 0 0 0;} thead th:last-child{border-radius:0 8px 0 0;}
+  tbody td{padding:4px 7px;border-bottom:1px solid var(--line);vertical-align:top;}
+  tbody tr:nth-child(even){background:var(--soft);}
+  td .n{font-weight:800;color:var(--blue);}
+
+  .note{border:1px solid var(--line);border-left:3px solid var(--amber);border-radius:8px;
+    background:#fffbeb;padding:8px 11px;margin:8px 0;font-size:8.8pt;}
+  .note .t{font-weight:700;color:#92400e;margin-bottom:3px;}
+  .ok{border-left-color:var(--green);background:#f0fdf4;}
+  .ok .t{color:#14532d;}
+  .info{border-left-color:var(--blue);background:#eff6ff;}
+  .info .t{color:#1e3a8a;}
+
+  code{font-family:"Cascadia Mono",Consolas,monospace;font-size:8.5pt;background:#f1f5f9;
+    padding:1px 4px;border-radius:3px;color:#0f172a;}
+  ul{margin:0 0 7pt;padding-left:16px;} li{margin-bottom:3px;}
+  .foot{margin-top:9px;padding-top:6px;border-top:1px solid var(--line);
+    font-size:8pt;color:var(--grey);display:flex;justify-content:space-between;}
+</style>
+</head>
+<body>
+
+<!-- ================= PAGE 1 ================= -->
+<div class="page">
+  <div class="hdr">
+    <div>
+      <div class="org">An initiative of HPSEDC, Government of Himachal Pradesh</div>
+      <div class="ttl">HireStream-HP — Phase II: Proposed Scope</div>
+    </div>
+    <div class="meta">
+      Discussion note · 16 July 2026<br>Build v0.9.47
+    </div>
+  </div>
+  <div class="tricolor" style="width:110px;margin-bottom:12px;"></div>
+
+  <div class="kicker">Position today</div>
+  <div class="h-sec">The portal uses no AI at all</div>
+  <div class="rule"></div>
+  <p class="lead">Every feature delivered to date — matching, compliance, readiness scoring, the job importer —
+  is deterministic, rule-based code. There are no AI or LLM calls anywhere in the running system. This is a
+  deliberate position, not a gap: the rules are auditable, explainable to a regulator, and behave identically
+  every run. Part A below proposes AI only where rules provably cannot reach. Part B covers the two modules HPSEDC carried out of UAT-03.</p>
+
+  <h3>Voice input: what exists today</h3>
+  <p>The blue-collar form and the grievance form already accept <b>voice input</b>, and it is Hindi-aware.
+  It uses the <b>browser's built-in Web Speech API</b> — <code>window.SpeechRecognition</code> — not AI, and not
+  a component we built. It is honest to demonstrate this today. Two limits should be understood before it
+  reaches production:</p>
+
+  <div class="note">
+    <div class="t">Limitation 1 — coverage: not available on iPhone</div>
+    The mic only renders where the browser supports speech recognition (Chrome, Edge). <b>iOS Safari does not.</b>
+    An iPhone candidate sees no mic at all. For a blue-collar audience this is a coverage gap, not a cosmetic one.
+  </div>
+
+  <div class="note">
+    <div class="t">Limitation 2 — data residency: audio leaves the boundary</div>
+    Chrome's implementation of the Web Speech API <b>streams the captured audio to Google's servers</b> for
+    transcription. On an HPSEDC portal, under DPDP, that is a third-party data flow no candidate has consented to.
+    Acceptable for demonstration; it should be closed before production. On-premise speech recognition (item 1
+    overleaf) removes both limits at once.
+  </div>
+
+  <div class="kicker" style="margin-top:16px;">Deployment model</div>
+  <div class="h-sec" style="font-size:15pt;">On-premise, inside the HPSEDC boundary</div>
+  <div class="rule"></div>
+  <p>The candidate data here — Aadhaar, passport, medical fitness, police clearance — must not be sent to a
+  public AI service. Every item proposed below is achievable with a <b>self-hosted, OpenAI-compatible model
+  endpoint</b>, keeping all personal data inside the boundary. Model quality matters less than custody here.</p>
+
+  <div class="note ok">
+    <div class="t">A self-hosted endpoint is already configured in the codebase</div>
+    <code>server/services/system-config.service.ts</code> already carries an <code>llm_triage</code> block pointing at a
+    self-hosted <b>Nexus</b> endpoint (<code>nexus.osipl.dev/v1</code>), running <code>mistral-7b-instruct</code>, marked
+    "no auth (self-hosted)". It is <b>configuration only</b> — the feature is disabled and no code consumes it yet —
+    but the integration shape is already the right one, and Phase II would light it up rather than introduce
+    anything new. <i>To confirm with HPSEDC: whether this is the same on-premise platform intended for Phase II.</i>
+  </div>
+
+  <div class="foot">
+    <span>HireStream-HP · Phase II scope — discussion note</span><span>Page 1 of 2</span>
+  </div>
+</div>
+
+<!-- ================= PAGE 2 ================= -->
+<div class="page">
+  <div class="hdr">
+    <div>
+      <div class="org">An initiative of HPSEDC, Government of Himachal Pradesh</div>
+      <div class="ttl">Phase II — proposed scope</div>
+    </div>
+    <div class="meta">Part A: AI · Part B: carried forward<br>16 July 2026</div>
+  </div>
+
+  <div class="kicker">Part A — where AI adds value</div>
+  <p class="lead" style="margin:4px 0 8px;font-size:9.5pt;">Each area addresses a limit we have actually hit in the
+  delivered system — not a place AI could theoretically be applied.</p>
+
+  <table>
+    <thead>
+      <tr><th style="width:4%;">#</th><th style="width:24%;">Area</th><th style="width:44%;">What it solves</th><th style="width:28%;">Why rules cannot</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="n">1</td>
+        <td><b>Voice-first data entry</b><br><span style="color:var(--grey);font-size:8pt;">On-prem speech recognition, Hindi / Pahari</span></td>
+        <td>A candidate speaks their details instead of typing. Works on <b>every</b> device including iPhone, and the audio never leaves the HPSEDC boundary.</td>
+        <td>The browser API is the constraint: we cannot change its device coverage or where it sends audio.</td>
+      </tr>
+      <tr>
+        <td class="n">2</td>
+        <td><b>Duplicate detection by meaning</b><br><span style="color:var(--grey);font-size:8.5pt;">Education, certifications, skills</span></td>
+        <td>Recognises "First Aid Training" and "Basic First Aid Workshop" as the same thing and stops the second entry.</td>
+        <td>Text normalisation now catches spelling and format ("10th" vs "10th Grade"). It cannot catch meaning. More rules will not close this.</td>
+      </tr>
+      <tr>
+        <td class="n">3</td>
+        <td><b>Job importer auto-mapping</b><br><span style="color:var(--grey);font-size:8.5pt;">Government Excel / CSV intake</span></td>
+        <td>Reads whatever column layout arrives, maps it to portal fields and normalises job titles and countries — with no human mapping each file.</td>
+        <td>Every department sends a different layout. Rules must be written per format, in advance.</td>
+      </tr>
+      <tr>
+        <td class="n">4</td>
+        <td><b>Ask HPSEDC — triage &amp; assisted replies</b><br><span style="color:var(--grey);font-size:8.5pt;">Support desk</span></td>
+        <td>Answers repeat questions instantly, drafts replies for staff to approve, routes genuine grievances to a human.</td>
+        <td>Candidates ask the same question in a hundred phrasings, in two languages.</td>
+      </tr>
+      <tr>
+        <td class="n">5</td>
+        <td><b>Document understanding</b><br><span style="color:var(--grey);font-size:8.5pt;">Passport · Aadhaar · PCC · medical</span></td>
+        <td>Reads uploaded documents, extracts expiry dates and pre-fills the compliance record feeding deployment readiness.</td>
+        <td>Readiness is only as good as hand-typed dates. Today a stale certificate can sit unnoticed behind a "verified" status.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <p style="margin:8px 0 0;font-size:9pt;color:var(--sub);"><b style="color:var(--navy);">If only two are funded: 1 and 4.</b> Item 1 changes <i>who can use the portal</i>; item 4 is closest to shippable — the message thread, unread alerts and staff inbox landed in this build. Both keep data on-premise.</p>
+
+  <div class="kicker" style="margin-top:12px;">Part B — carried forward from UAT-03 · conventional modules, not AI</div>
+
+  <table>
+    <thead>
+      <tr><th style="width:4%;">#</th><th style="width:24%;">Module</th><th style="width:44%;">Phase II intent</th><th style="width:28%;">Status at UAT-03 · what it needs</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="n">20</td>
+        <td><b>WhatsApp notifications</b><br><span style="color:var(--grey);font-size:8.5pt;">"Integrate WhatsApp notifications and communication functionality"</span></td>
+        <td>Status updates, interview reminders and document requests on the channel blue-collar candidates actually read. Today: in-app and email only.</td>
+        <td><b>Deferred to Phase 2</b> — as recorded. Needs Meta WhatsApp-Business verification of the HPSEDC entity, a messaging partner (BSP) and template pre-approval. Externally gated, not a build constraint.</td>
+      </tr>
+      <tr>
+        <td class="n">18</td>
+        <td><b>Fee / payment module</b><br><span style="color:var(--grey);font-size:8.5pt;">"Include a Fee section with relevant details"</span></td>
+        <td>To be defined with HPSEDC. Any fee charged must be transparent, receipted and auditable — a published schedule is itself an anti-fraud control.</td>
+        <td><b>Closed as out of scope</b> — "no candidate-side fee in this government programme". Reopening reverses that position, so the policy question comes before the build.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="note">
+    <div class="t">Item 18 — please settle the policy before the scope</div>
+    HPSEDC's position at UAT-03 was that this programme charges candidates <b>nothing</b>, and the portal matches: no fee
+    exists in it, and the anti-fraud advisory tells candidates anyone demanding money is acting improperly. A payment
+    module <b>reverses that</b> and weakens the advisory unless the two are reconciled. Confirm <i>who pays whom</i> — candidate,
+    employer or agency — before any estimate.
+  </div>
+
+  <div class="foot">
+    <span>Prepared for discussion — not a delivery commitment</span><span>Page 2 of 2</span>
+  </div>
+</div>
+
+</body>
+</html>
