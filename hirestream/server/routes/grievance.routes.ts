@@ -2,7 +2,7 @@ import { Router } from "express";
 import { protect } from "../middleware/auth.middleware";
 import { requireRole } from "../middleware/rbac.middleware";
 import { storage } from "../storage";
-import { grievances, users } from "@shared/schema";
+import { grievances, grievanceComments, users } from "@shared/schema";
 import { eq, and, desc, count, ne } from "drizzle-orm";
 import { notify } from "../services/notification.service";
 import { logger } from "../config/logger.config";
@@ -57,13 +57,22 @@ router.post("/", protect, async (req, res, next) => {
     // we can't pick a specific user (then the admin queue picks it up).
     const route = await autoRouteGrievance(category as any, metadata);
 
+    // Every grievance must have a concrete owner so the complainant has someone
+    // to converse with. If the auto-router can't pick a specific user, fall back
+    // to an admin (HPSEDC staff) instead of leaving it ownerless.
+    let ownerId = route.assignedToUserId;
+    if (!ownerId) {
+      const [admin] = await db.select({ id: users.id }).from(users).where(eq(users.role, "admin")).limit(1);
+      ownerId = admin?.id ?? null;
+    }
+
     const result = await db.insert(grievances).values({
       userId: user.id,
       category,
       subject,
       description,
       status: "submitted",
-      assignedTo: route.assignedToUserId,
+      assignedTo: ownerId,
       adminNotes: route.reason,   // stamps the routing decision so any operator can see why
       metadata,
     }).returning();
@@ -85,10 +94,10 @@ router.post("/", protect, async (req, res, next) => {
 
     // Notify the owner (if any) so they don't have to refresh the dashboard
     // to discover new work. Falls back gracefully — fire-and-forget.
-    if (route.assignedToUserId) {
+    if (ownerId) {
       const slaDays = await slaDaysForCategory(category).catch(() => 7);
       notify({
-        userId: route.assignedToUserId,
+        userId: ownerId,
         type: "system",
         title: `New grievance assigned: ${subject.slice(0, 80)}`,
         message: `Category: ${category}. ${route.reason}. SLA target: ${slaDays} day${slaDays === 1 ? "" : "s"}.`,
@@ -226,8 +235,10 @@ router.patch("/:id", protect, async (req, res, next) => {
     const user = req.user as any;
     const isAdmin = user.role === "admin" || user.role === "superadmin";
     const isOwner = grievance.assignedTo === user.id;
-    if (!isAdmin && !isOwner) {
-      return res.status(403).json({ success: false, error: { code: 403, message: "Only the assigned owner or an admin can update this grievance." } });
+    const isComplainant = grievance.userId === user.id;
+    const isStaff = isAdmin || isOwner;
+    if (!isStaff && !isComplainant) {
+      return res.status(403).json({ success: false, error: { code: 403, message: "Not authorized to update this grievance." } });
     }
 
     const { status, adminNotes, resolutionNotes, assignedTo } = req.body;
@@ -239,15 +250,27 @@ router.patch("/:id", protect, async (req, res, next) => {
       if (!validStatuses.includes(status)) {
         return res.status(400).json({ success: false, error: { code: 400, message: `status must be: ${validStatuses.join(", ")}` } });
       }
+      // The COMPLAINANT closes the loop: they can CLOSE (resolve) their own
+      // grievance at any active stage — confirming a fix, or simply withdrawing
+      // it — and can reopen it after HPSEDC has acted.
+      if (!isStaff) {
+        const canClose = status === "resolved" && grievance.status !== "resolved";
+        const canReopen = status === "under_review" && grievance.status === "action_taken";
+        if (!canClose && !canReopen) {
+          return res.status(403).json({ success: false, error: { code: 403, message: "You can close your grievance, or reopen it after HPSEDC has acted." } });
+        }
+      } else if (status === "resolved") {
+        // Staff drive the work but don't self-resolve — the complainant confirms.
+        return res.status(403).json({ success: false, error: { code: 403, message: "Resolution is confirmed by the complainant. Mark it 'Action Taken' and they'll close it." } });
+      }
       updates.status = status;
       if (status === "resolved") updates.resolvedAt = new Date();
-      // When the owner first moves it to under_review, stamp them as the
-      // current owner so the audit trail clearly attributes who took
-      // action. Skip this for admin who may be acting on someone else's queue.
-      if (status === "under_review" && !grievance.assignedTo) updates.assignedTo = user.id;
+      // When staff first moves it to under_review, stamp them as the owner.
+      if (status === "under_review" && isStaff && !grievance.assignedTo) updates.assignedTo = user.id;
     }
-    if (adminNotes !== undefined) updates.adminNotes = adminNotes;
-    if (resolutionNotes !== undefined) updates.resolutionNotes = resolutionNotes;
+    // Notes + reassignment are staff-only.
+    if (adminNotes !== undefined && isStaff) updates.adminNotes = adminNotes;
+    if (resolutionNotes !== undefined && isStaff) updates.resolutionNotes = resolutionNotes;
     // Reassignment — admin/superadmin only. Pass assignedTo:null to push back
     // to the admin queue. Validate the target user exists.
     let reassignedFrom: string | null = null;
@@ -290,17 +313,32 @@ router.patch("/:id", protect, async (req, res, next) => {
       }).catch(() => {});
     }
 
-    // Notify the grievance submitter on status change so they know the
-    // state of their complaint without polling. Also notify the NEW owner
-    // on reassign so they pick up the work.
+    // Notify the OTHER party on status change. Staff acting → tell the
+    // complainant; complainant acting (resolve/reopen) → tell the owner/admins.
     if (status && status !== fromStatus) {
-      notify({
-        userId: grievance.userId,
-        type: "system",
-        title: `Grievance Update: ${grievance.subject}`,
-        message: `Your grievance status has been updated to "${status}".${resolutionNotes ? ' Resolution: ' + resolutionNotes : ''}`,
-        metadata: { grievanceId: grievance.id },
-      }).catch(() => {});
+      if (isStaff) {
+        notify({
+          userId: grievance.userId,
+          type: "system",
+          title: `Grievance Update: ${grievance.subject}`,
+          message: status === "action_taken"
+            ? `HPSEDC has acted on your grievance — please review and confirm if it's resolved.${resolutionNotes ? ' Note: ' + resolutionNotes : ''}`
+            : `Your grievance status is now "${status.replace(/_/g, " ")}".`,
+          metadata: { grievanceId: grievance.id },
+        }).catch(() => {});
+      } else {
+        const recipients = grievance.assignedTo
+          ? [grievance.assignedTo]
+          : (await db.select({ id: users.id }).from(users).where(eq(users.role, "admin"))).map((u: any) => u.id);
+        for (const rid of recipients) {
+          notify({
+            userId: rid, type: "system",
+            title: status === "resolved" ? `Grievance resolved by complainant: ${grievance.subject.slice(0, 60)}` : `Grievance reopened: ${grievance.subject.slice(0, 60)}`,
+            message: status === "resolved" ? "The complainant confirmed the issue is resolved." : "The complainant reopened the grievance — it needs another look.",
+            metadata: { grievanceId: grievance.id },
+          }).catch(() => {});
+        }
+      }
     }
     if (updates.assignedTo && updates.assignedTo !== grievance.assignedTo) {
       notify({
@@ -316,6 +354,84 @@ router.patch("/:id", protect, async (req, res, next) => {
   } catch (error) {
     next(error);
   }
+});
+
+// ── Grievance discussion thread (two-way: complainant ⇄ owner/admin) ─
+// Access: the complainant, the assigned owner, or any admin/superadmin.
+type ThreadCtx =
+  | { ok: false; code: 404 | 403 }
+  | { ok: true; g: any; isComplainant: boolean; isStaff: boolean };
+async function loadThreadCtx(db: any, id: string, user: any): Promise<ThreadCtx> {
+  const rows = await db.select().from(grievances).where(eq(grievances.id, id)).limit(1);
+  if (!rows.length) return { ok: false, code: 404 };
+  const g = rows[0];
+  const isAdmin = ADMIN_ROLES.includes(user.role);
+  const isOwner = g.assignedTo === user.id;
+  const isComplainant = g.userId === user.id;
+  if (!isAdmin && !isOwner && !isComplainant) return { ok: false, code: 403 };
+  return { ok: true, g, isComplainant, isStaff: isAdmin || isOwner };
+}
+const threadDeny = (res: any, code: 404 | 403) =>
+  res.status(code).json({ success: false, error: { code, message: code === 404 ? "Grievance not found" : "Not authorized" } });
+
+router.get("/:id/comments", protect, async (req, res, next) => {
+  try {
+    const db = storage.db;
+    if (!db) return res.status(500).json({ success: false, error: { code: 500, message: "Database not available" } });
+    const ctx = await loadThreadCtx(db, req.params.id, req.user);
+    if (!ctx.ok) return threadDeny(res, ctx.code);
+
+    const rows = await db.select().from(grievanceComments)
+      .where(eq(grievanceComments.grievanceId, req.params.id))
+      .orderBy(grievanceComments.createdAt);
+    // Enrich with author username; complainant never sees internal staff notes.
+    const visible = (ctx.isStaff ? rows : rows.filter((c: any) => !c.internal)) as any[];
+    const ids: string[] = Array.from(new Set(visible.map((c) => String(c.userId))));
+    const nameMap: Record<string, string> = {};
+    if (ids.length) {
+      const { inArray } = await import("drizzle-orm");
+      const ur = await db.select({ id: users.id, username: users.username }).from(users).where(inArray(users.id, ids));
+      for (const u of ur) nameMap[u.id] = u.username;
+    }
+    res.json({ success: true, data: visible.map((c) => ({ ...c, authorName: nameMap[c.userId] || "User" })) });
+  } catch (e) { next(e); }
+});
+
+router.post("/:id/comments", protect, async (req, res, next) => {
+  try {
+    const db = storage.db;
+    if (!db) return res.status(500).json({ success: false, error: { code: 500, message: "Database not available" } });
+    const user = req.user as any;
+    const ctx = await loadThreadCtx(db, req.params.id, user);
+    if (!ctx.ok) return threadDeny(res, ctx.code);
+    const { g, isStaff, isComplainant } = ctx;
+
+    const body = String(req.body?.body ?? "").trim();
+    if (body.length < 1 || body.length > 3000) {
+      return res.status(400).json({ success: false, error: { code: 400, message: "Message must be 1–3000 characters." } });
+    }
+    const internal = isStaff && req.body?.internal === true; // only staff post internal notes; complainant never
+
+    const [row] = await db.insert(grievanceComments).values({
+      grievanceId: g.id, userId: user.id, authorRole: user.role, body, internal,
+    }).returning();
+
+    // Notify the OTHER party (internal notes don't ping the complainant).
+    if (!internal) {
+      if (isComplainant) {
+        if (g.assignedTo) {
+          notify({ userId: g.assignedTo, type: "system", title: `New reply on grievance: ${g.subject.slice(0, 70)}`, message: body.slice(0, 140), metadata: { grievanceId: g.id } }).catch(() => {});
+        } else {
+          const admins = await db.select({ id: users.id }).from(users).where(eq(users.role, "admin"));
+          for (const a of admins) notify({ userId: a.id, type: "system", title: `New reply on grievance: ${g.subject.slice(0, 70)}`, message: body.slice(0, 140), metadata: { grievanceId: g.id } }).catch(() => {});
+        }
+      } else if (g.userId && g.userId !== user.id) {
+        notify({ userId: g.userId, type: "system", title: `HPSEDC replied to your grievance: ${g.subject.slice(0, 70)}`, message: body.slice(0, 140), metadata: { grievanceId: g.id } }).catch(() => {});
+      }
+    }
+
+    res.status(201).json({ success: true, data: { ...row, authorName: user.username } });
+  } catch (e) { next(e); }
 });
 
 export default router;

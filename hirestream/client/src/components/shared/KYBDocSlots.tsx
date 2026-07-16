@@ -17,7 +17,7 @@ import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Upload, Check, Trash2, FileText, AlertTriangle } from "lucide-react";
+import { Loader2, Upload, Check, Trash2, FileText, AlertTriangle, Eye, Download } from "lucide-react";
 
 export interface KYBSlotDef {
   /** key written to documents.type — must match server allow-list */
@@ -128,9 +128,13 @@ export function KYBDocSlots({ title, subtitle, slots, endpoint, queryKey }: Prop
           )}
         </div>
         <div className="flex items-center gap-1 flex-shrink-0">
+          <Button variant="ghost" size="sm" onClick={() => window.open(`${endpoint}/${doc.id}/download?inline=1`, "_blank")}
+            className="h-7 px-2 text-[10px] rounded-md text-slate-600 hover:text-blue-600" title="Preview in browser">
+            <Eye className="w-3 h-3 mr-1" /> Preview
+          </Button>
           <Button variant="ghost" size="sm" onClick={() => window.open(`${endpoint}/${doc.id}/download`, "_blank")}
-            className="h-7 px-2 text-[10px] rounded-md text-slate-600 hover:text-blue-600">
-            View
+            className="h-7 w-7 p-0 rounded-md text-slate-500 hover:text-blue-600" title="Download">
+            <Download className="w-3 h-3" />
           </Button>
           {doc.status !== "approved" && (
             <Button variant="ghost" size="sm" onClick={() => deleteMutation.mutate(doc.id)}

@@ -1530,7 +1530,7 @@ function SkillsStep({ profile, onNext, onBack }: { profile: any; onNext: () => v
               })}
             </div>
             <p className="text-[10px] text-slate-400 mt-2">
-              Recommended jobs from your preferred categories get full marks on the Category factor (10% weight by default).
+              Jobs for You from your preferred categories get full marks on the Category factor (10% weight by default).
             </p>
           </div>
         </motion.div>

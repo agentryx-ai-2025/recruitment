@@ -91,10 +91,12 @@ app.use((_req, res, next) => {
 // SEPARATE leaf (uploads/hs/candidates/docs/) so the static handler here can
 // never reach them even by accident.
 app.use("/uploads/hs/candidates/photos", express.static(HS_PHOTOS_DIR, {
-  maxAge: "1d",
+  // no-cache → browser revalidates via ETag each load, so a replaced photo
+  // (same filename) is picked up immediately instead of being stuck for a day.
   etag: true,
   index: false,
   fallthrough: false,
+  setHeaders: (res) => { res.setHeader("Cache-Control", "no-cache"); },
 }));
 
 // ── App version (single source of truth) ────────────────────────────

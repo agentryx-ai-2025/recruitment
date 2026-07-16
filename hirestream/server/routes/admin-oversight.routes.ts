@@ -352,13 +352,25 @@ router.get("/funnel", async (req, res, next) => {
         conds.length ? and(...conds) : undefined as any,
       ));
 
+    // CUMULATIVE funnel — every app that reached a later stage also passed
+    // through the earlier ones, so each stage includes all downstream apps
+    // (including `placed`). This keeps the funnel monotonic: Placed ≤ Selected
+    // ≤ … ≤ Submitted. (The old version omitted `placed` from the upstream
+    // stages, which made Placed appear larger than Selected.)
+    const sub = byStatus.submitted ?? 0;
+    const rev = byStatus.reviewed ?? 0;
+    const sho = byStatus.shortlisted ?? 0;
+    const intv = byStatus.interview_scheduled ?? 0;
+    const sel = byStatus.selected ?? 0;
+    const plc = byStatus.placed ?? 0;
+    const rej = byStatus.rejected ?? 0;
     const funnel = [
-      { stage: "submitted",            count: (byStatus.submitted ?? 0) + (byStatus.reviewed ?? 0) + (byStatus.shortlisted ?? 0) + (byStatus.interview_scheduled ?? 0) + (byStatus.selected ?? 0) + (byStatus.rejected ?? 0) },
-      { stage: "reviewed",             count: (byStatus.reviewed ?? 0) + (byStatus.shortlisted ?? 0) + (byStatus.interview_scheduled ?? 0) + (byStatus.selected ?? 0) },
-      { stage: "shortlisted",          count: (byStatus.shortlisted ?? 0) + (byStatus.interview_scheduled ?? 0) + (byStatus.selected ?? 0) },
-      { stage: "interview_scheduled",  count: (byStatus.interview_scheduled ?? 0) + (byStatus.selected ?? 0) },
-      { stage: "selected",             count: (byStatus.selected ?? 0) },
-      { stage: "placed",               count: Number(placementsCount[0]?.c ?? 0) },
+      { stage: "submitted",            count: sub + rev + sho + intv + sel + plc + rej },
+      { stage: "reviewed",             count: rev + sho + intv + sel + plc },
+      { stage: "shortlisted",          count: sho + intv + sel + plc },
+      { stage: "interview_scheduled",  count: intv + sel + plc },
+      { stage: "selected",             count: sel + plc },
+      { stage: "placed",               count: plc },
     ];
     // Attach drop-off % relative to the previous stage.
     for (let i = 0; i < funnel.length; i++) {

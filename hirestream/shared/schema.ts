@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, timestamp, boolean, jsonb, decimal, date, index } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, timestamp, boolean, jsonb, decimal, date, index, uniqueIndex } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -32,6 +32,10 @@ export const candidates = pgTable("candidates", {
   fullName: text("full_name").notNull(),
   email: text("email").notNull(),
   phone: text("phone"),
+  // Sex as printed on the passport — male | female | other. Required downstream
+  // for emigration compliance (passport/visa/eMigrate, gender-specific ECR
+  // rules) and matching; collected in the candidate profile, not at signup.
+  sex: text("sex"),
   location: text("location"),
   experience: integer("experience").default(0),
   skills: text("skills").array(),
@@ -407,6 +411,20 @@ export const recruitmentDrives = pgTable("recruitment_drives", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Candidates register/express interest in an approved recruitment drive (FRS:
+// candidates can join drives). The owning agency sees the registrant list and
+// invites/schedules interviews from it.
+export const driveRegistrations = pgTable("drive_registrations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  driveId: varchar("drive_id").references(() => recruitmentDrives.id, { onDelete: "cascade" }).notNull(),
+  userId: varchar("user_id").references(() => users.id).notNull(),  // the candidate user
+  status: text("status").notNull().default("registered"), // registered | cancelled | invited | attended
+  note: text("note"), // optional message from the candidate
+  createdAt: timestamp("created_at").defaultNow(),
+}, (t) => ({
+  uniqDriveUser: uniqueIndex("drive_registrations_drive_user_idx").on(t.driveId, t.userId),
+}));
+
 // ── Interviews ──────────────────────────────────────────────────────
 export const interviews = pgTable("interviews", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -493,6 +511,19 @@ export const grievances = pgTable("grievances", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Two-way discussion thread on a grievance — between the complainant and the
+// assigned owner (admin/staff). authorRole stamps who said what so the UI can
+// align bubbles. `internal` lets staff add a note the complainant doesn't see.
+export const grievanceComments = pgTable("grievance_comments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  grievanceId: varchar("grievance_id").references(() => grievances.id, { onDelete: "cascade" }).notNull(),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  authorRole: text("author_role").notNull(), // candidate | agent | employer | admin | superadmin
+  body: text("body").notNull(),
+  internal: boolean("internal").notNull().default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // ── Audit Log ───────────────────────────────────────────────────────
 export const auditLog = pgTable("audit_log", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -562,6 +593,13 @@ export const insertUserSchema = createInsertSchema(users).pick({
 export const insertCandidateSchema = createInsertSchema(candidates).omit({
   id: true,
   createdAt: true,
+}).extend({
+  fullName: z.string().trim().min(1).max(120),
+  email: z.string().trim().max(120),
+  sex: z.enum(["male", "female", "other"]).optional().nullable(),
+  location: z.string().trim().max(150).optional().nullable(),
+  skills: z.array(z.string().trim().max(60)).max(50).optional().nullable(),
+  preferredCountries: z.array(z.string().trim().max(60)).max(20).optional().nullable(),
 });
 
 // HTIS BUG-008 — employer "Create Date" (hiring deadline on the requisition
@@ -668,13 +706,38 @@ export const updateCandidateSchema = createInsertSchema(candidates).omit({
     }),
     z.null(),
   ]).optional(),
-  experience: z.number().int().min(0, { message: "Experience cannot be negative." }).optional().nullable(),
+  experience: z.number().int().min(0, { message: "Experience cannot be negative." }).max(60, { message: "Experience looks too high — please check." }).optional().nullable(),
   // v0.4.36.1: `ielts_band` is a Postgres decimal → drizzle-zod infers
   // z.string(), but the wizard sends a NUMBER. That mismatch 400'd the
   // Personal-Info save (and, with no client onError handler, did it
   // silently). Coerce number-or-string → string so either input works.
   ieltsBand: z.union([z.string(), z.number()]).optional().nullable()
     .transform((v) => (v === null || v === undefined || v === "" ? null : String(v))),
+  // Length guardrails — block arbitrarily long input (DB bloat / abuse). Generous
+  // limits; well above any real value. Drizzle only type-checks these otherwise.
+  fullName: z.string().trim().max(120).optional().nullable(),
+  email: z.string().trim().max(120).optional().nullable(),
+  sex: z.enum(["male", "female", "other"]).optional().nullable(),
+  location: z.string().trim().max(150).optional().nullable(),
+  fatherName: z.string().trim().max(120).optional().nullable(),
+  motherName: z.string().trim().max(120).optional().nullable(),
+  addressLine1: z.string().trim().max(200).optional().nullable(),
+  addressLine2: z.string().trim().max(200).optional().nullable(),
+  city: z.string().trim().max(80).optional().nullable(),
+  pinCode: z.string().trim().max(10).optional().nullable(),
+  permanentAddressLine1: z.string().trim().max(200).optional().nullable(),
+  permanentAddressLine2: z.string().trim().max(200).optional().nullable(),
+  permanentCity: z.string().trim().max(80).optional().nullable(),
+  permanentPinCode: z.string().trim().max(10).optional().nullable(),
+  passportNumber: z.string().trim().max(20).optional().nullable(),
+  pbbyPolicyNumber: z.string().trim().max(60).optional().nullable(),
+  qualificationLevel: z.string().trim().max(40).optional().nullable(),
+  preferredSalaryCurrency: z.string().trim().max(10).optional().nullable(),
+  skills: z.array(z.string().trim().max(60)).max(50).optional().nullable(),
+  preferredCountries: z.array(z.string().trim().max(60)).max(20).optional().nullable(),
+  preferredCategories: z.array(z.string().trim().max(60)).max(30).optional().nullable(),
+  preferredSalaryMin: z.number().int().min(0).max(100000000).optional().nullable(),
+  preferredSalaryMax: z.number().int().min(0).max(100000000).optional().nullable(),
 });
 
 export const insertApplicationSchema = createInsertSchema(applications).omit({
@@ -682,12 +745,19 @@ export const insertApplicationSchema = createInsertSchema(applications).omit({
   appliedAt: true,
   status: true,
   matchScore: true,
+}).extend({
+  rejectionFeedback: z.string().trim().max(2000).optional().nullable(),
+  employerDecision: z.string().trim().max(100).optional().nullable(),
+  employerDecisionNotes: z.string().trim().max(2000).optional().nullable(),
 });
 
 export const insertNotificationSchema = createInsertSchema(notifications).omit({
   id: true,
   read: true,
   createdAt: true,
+}).extend({
+  title: z.string().trim().max(200),
+  message: z.string().trim().max(2000),
 });
 
 // ── New table insert schemas ────────────────────────────────────────

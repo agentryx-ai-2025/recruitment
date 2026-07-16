@@ -223,7 +223,7 @@ export function EmployerVerificationForm({ onDone }: { onDone?: () => void }) {
           </Field>
           <Field label="City"><Input value={form.registeredCity ?? ""} onChange={(e) => setForm({ ...form, registeredCity: e.target.value })} maxLength={80} /></Field>
           <Field label="State"><Input value={form.registeredState ?? ""} onChange={(e) => setForm({ ...form, registeredState: e.target.value })} maxLength={80} /></Field>
-          <Field label="PIN code"><Input value={form.registeredPinCode ?? ""} onChange={(e) => setForm({ ...form, registeredPinCode: e.target.value })} maxLength={10} /></Field>
+          <Field label="PIN code"><Input value={form.registeredPinCode ?? ""} onChange={(e) => setForm({ ...form, registeredPinCode: e.target.value })} maxLength={10} inputMode="numeric" /></Field>
           <Field label="Country of operation" required>
             <Select value={form.registeredCountry ?? ""} onValueChange={(v) => setForm({ ...form, registeredCountry: v })}>
               <SelectTrigger><SelectValue placeholder="Select country" /></SelectTrigger>
@@ -244,7 +244,7 @@ export function EmployerVerificationForm({ onDone }: { onDone?: () => void }) {
           </Field>
           <Field label="Contact phone">
             <Input value={form.contactPhone ?? ""} onChange={(e) => setForm({ ...form, contactPhone: e.target.value })}
-              placeholder="+971 50 123 4567" maxLength={20} />
+              placeholder="+971 50 123 4567" maxLength={20} inputMode="tel" />
           </Field>
           <Field label="Signatory name" required>
             <Input value={form.authorisedSignatoryName ?? ""} onChange={(e) => setForm({ ...form, authorisedSignatoryName: e.target.value })}

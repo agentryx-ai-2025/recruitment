@@ -1,19 +1,20 @@
-# HireStream — Live Demo Script (HP IT Department MD + panel)
+# HireStream — Live Demo Script
+### HPSEDC Overseas Placement Portal · for the HP IT Department MD + panel
 
-> **Working draft for review.** Once we agree on content, this becomes a clean, easy-to-follow
-> presenter document. Goal: walk the portal confidently **and** be ready to answer "what is this"
-> and "why is it here" for every feature.
+> **Presenter guide — final.** Walk the portal confidently **and** be ready to answer "what is this"
+> and "why is it here" for every feature. Read the **Why** lines once before the demo — that's your Q&A armour.
 
-**Format of each step:** 🖱 **Do** (what to click) · 🗣 **Say** (the line) · 💡 **Why** (the justification — your Q&A armor).
+**Format of each step:** 🖱 **Do** (what to click) · 🗣 **Say** (the line) · 💡 **Why** (the justification).
 
-**Live URL:** https://hirestream-stg.agentryx.dev · **Total live time:** ~18–20 min + Q&A.
+**Live URL:** https://hirestream-stg.agentryx.dev · **Mobile (Expo Go):** `exp://hirestream-mobile.agentryx.dev` · **Total live time:** ~20–25 min + Q&A.
 
 ---
 
 ## PART 0 — Pre-demo setup (do 15 minutes before)
 
 - [ ] **Network check** — load the staging URL once; confirm it's up.
-- [ ] **Four browser windows pre-logged-in**, one per role, so you switch instantly (no live typing of passwords):
+- [ ] **One-click logins are built in.** On the login page, click **"⚡ Demo Mode"** — it slides down a panel of cast members (Candidates / Agencies / Employers / Admin); tap any name to sign in instantly, **no passwords**. Show this once — it also makes the point that the *normal* login is clean and separate.
+- [ ] **Recommended:** still keep **four browser windows pre-logged-in**, one per role, so you switch instantly with zero risk:
   | Window | Login | Role | Pre-open on |
   |---|---|---|---|
   | 1 | `demo_employer` | Overseas Employer | Employer dashboard |
@@ -21,9 +22,11 @@
   | 3 | `priya_verma` | Job Seeker (100% profile) | Candidate dashboard |
   | 4 | `demo_admin` | HPSEDC Authority | Admin Overview |
   - All passwords `test123`. (Superadmin `superadmin` / `hpsedc@super2026` — **do not** demo this; it has the data-wipe tool.)
+- [ ] **Reset button:** the Demo Mode panel has **"Reset demo data"** — restores the clean seeded set (25 candidates / 10 agencies / 10 employers / 28 jobs). Hit it once before you start so the state is pristine. Safe to use even mid-demo.
+- [ ] **Mobile ready (optional):** have a phone with **Expo Go** open at `exp://hirestream-mobile.agentryx.dev`; its login has the same one-tap demo cast.
 - [ ] **Zoom to ~110%**, light mode, language **English**. Close unrelated tabs.
 - [ ] **Fallback ready:** keep `HireStream_Workflows.mp4` open in a tab. **If anything fails live or the network drops, switch to the video** — never debug in front of the MD.
-- [ ] Seeded demo data is already rich (placements, applicants, welfare, audit history) — **you do not need to create anything live.** We tour existing state, which is the low-risk path.
+- [ ] Seeded demo data is already rich (placements, applicants, drives, welfare, grievances, audit history) — **you do not need to create anything live.** We tour existing state, which is the low-risk path.
 
 ---
 
@@ -92,6 +95,12 @@
 | 🗣 **Say** | "After selection, the agency drives deployment — and stays responsible for the worker after they've gone abroad." |
 | 💡 **Why** | The agency issues the **appointment letter**, tracks **visa/passport**, and records the **mandatory 30/60/90-day post-placement welfare check-ins** — a direct **Emigration Act** obligation. This is the single biggest anti-exploitation feature: the worker isn't forgotten once placed. |
 
+| | |
+|---|---|
+| 🖱 **Do** | Open **Drives** → open the approved "Gulf Skilled Trades Drive" → show **Registered Candidates** → click **Invite** on one, then **Schedule Interview** (pick a role, date) for a registrant. |
+| 🗣 **Say** | "Agencies also run recruitment drives — walk-in job fairs. Candidates register, the agency invites and interviews them on the spot, and it all flows into the same pipeline." |
+| 💡 **Why** | Drives are **FRS-mandated** mass-recruitment events. The full lifecycle is live: HPSEDC **approves** the drive → candidates **register** → agency **invites** (candidate notified) → agency **schedules an on-the-spot interview**, which creates the application and feeds the normal selection → placement pipeline. Nothing happens off-book — every drive interview is auditable. |
+
 ---
 
 ### SECTION C — Job Seeker / Candidate (~4 min) · *window 3*
@@ -100,7 +109,7 @@
 |---|---|
 | 🖱 **Do** | Open the candidate profile → **Personal & passport** section. |
 | 🗣 **Say** | "The profile captures everything the Ministry of External Affairs expects of an emigrant — entered once, carried into every application." |
-| 💡 **Why** | Father's/mother's name, current + permanent address, **passport number + expiry**, **ECR / non-ECR status**, and **English proficiency as an IELTS band**. These are exactly the fields MEA/emigration clearance needs. *(UAT issue #4.)* |
+| 💡 **Why** | **Sex (as per passport)**, father's/mother's name, current + permanent address, **passport number + expiry**, **ECR / non-ECR status**, and **English proficiency as an IELTS band**. These are exactly the fields MEA/emigration clearance needs — sex is captured here (not on the public signup) because visas, eMigrate and the gender-specific provisions of the Emigration Act all require it. *(UAT issue #4.)* |
 
 | | |
 |---|---|
@@ -126,21 +135,41 @@
 | 🗣 **Say** | "When the offer comes, the candidate accepts here — and follows their entire pre-departure journey from their own dashboard." |
 | 💡 **Why** | The 9-step checklist encodes **emigration best practice**: police clearance (PCC), medical, **PDO** (pre-departure orientation), **PBBY** (Pravasi Bharatiya Bima Yojana — mandatory emigrant insurance). The candidate sees their own visa status and welfare check-ins — transparency end-to-end. |
 
+| | |
+|---|---|
+| 🖱 **Do** | Open **Recruitment Drives** → show an approved drive → **Register**; on a drive they've been invited to, point to the **"🎉 You're invited — please attend"** badge. *(Vikram Negi is pre-seeded as invited.)* |
+| 🗣 **Say** | "Candidates can find and register for recruitment drives themselves, and see when an agency invites them." |
+| 💡 **Why** | Closes the loop with the agency's Drives view (Section B): the candidate self-serves registration and gets a clear, notified invite — no middle-man phone calls, fully tracked. |
+
+| | |
+|---|---|
+| 🖱 **Do** | Open **Grievances** → file one, then (as admin in window 4) reply, and back as the candidate **Close** it. |
+| 🗣 **Say** | "Any user can raise a grievance and have a two-way conversation with HPSEDC — and the person who raised it is the one who closes it." |
+| 💡 **Why** | **FRS §2.6 grievance handling**, done properly: a threaded conversation between complainant and HPSEDC, HPSEDC owns and acts, but **only the complainant can mark it resolved** — staff can't silently close a citizen's complaint. Accountability by design. |
+
 ---
 
 ### SECTION D — HPSEDC Authority / Admin (~3 min) · *window 4*
 
 | | |
 |---|---|
-| 🖱 **Do** | Start on **Overview** — open vacancies, candidates, placements, **application funnel**, reports. |
-| 🗣 **Say** | "HPSEDC gets a live, bird's-eye view of overseas recruitment for the whole state." |
-| 💡 **Why** | **FRS §2.6: monitor system activities + generate reports.** CSV exports per entity. This is the regulator's cockpit. |
+| 🖱 **Do** | Start on **Overview** — vacancies, candidates, placements, reports. Then open **Funnel** → show the **Pipeline funnel** and the **Conversion pipeline** (the continuous pipe: Submitted 47 → Placed 9, with pass-through % at each stage). |
+| 🗣 **Say** | "HPSEDC gets a live, bird's-eye view — including exactly where candidates drop off between applied and placed." |
+| 💡 **Why** | **FRS §2.6: monitor activities + generate reports** (CSV exports per entity). The funnel is **cumulative** — each stage counts everyone who reached *at least* that point — and the conversion pipe shows the **pass-through rate at every gate**, so HPSEDC can see which stage leaks. This is the regulator's cockpit. |
 
 | | |
 |---|---|
 | 🖱 **Do** | Open **Agencies** and **Employers** verification queues — show approve/reject. |
 | 🗣 **Say** | "Nothing moves until HPSEDC approves it. Every agency and employer is verified here before they can operate." |
 | 💡 **Why** | **FRS §2.6: review registrations → verify documents → approve/reject.** This is *the* gate that keeps unregulated players out — the platform's core control. |
+
+| | |
+|---|---|
+| | |
+|---|---|
+| 🖱 **Do** | Open **Drives** → show the pending drive awaiting approval → **Approve** it. |
+| 🗣 **Say** | "Recruitment drives don't go live until HPSEDC approves them — same gate as everything else." |
+| 💡 **Why** | The drive a candidate registers for (Section C) and the agency runs (Section B) only becomes visible **after this approval**. One consistent control: HPSEDC signs off agencies, employers, jobs *and* drives. |
 
 | | |
 |---|---|
@@ -160,7 +189,23 @@
 | 🗣 **Say** | "HPSEDC can tune the platform's policy without any code change — and switch on government integrations from here when credentials are provided." |
 | 💡 **Why** | 20+ live settings (pairing mode, verification-required, session timeout, rejection rules…) = the platform adapts to HPSEDC policy. Integrations (HIM SSO, Aadhaar, DigiLocker, Email/SMS) are **pluggable adapters, admin-configurable** — *ready, pending production credentials.* **(Say "ready to activate," not "done.")** |
 
-*(Optional: show **Grievances** — FRS §2.6 grievance handling.)*
+| | |
+|---|---|
+| 🖱 **Do** | Open **System → Architecture** → switch the three sub-tabs: **Matching Engine**, **Tech Stack**, **Infrastructure**. |
+| 🗣 **Say** | "And the platform documents itself. The matching logic, the full technology stack, and the exact infrastructure we need are all built into the admin console." |
+| 💡 **Why** | **This is your strongest card with a technical panel.** *Matching Engine* = the explainable 0–100 score (7 weighted factors, missing-criteria policy, fully admin-tunable). *Tech Stack* = the 3-tier open-source architecture (React / Node / PostgreSQL, RBAC, audit log). *Infrastructure* = the precise STG/PROD provisioning ask. Nothing is a black box — the regulator can see *how* it works and *what it needs to run*. |
+
+*(Grievances are covered in Section C; **Notifications** templates, **Fraud Watch**, **Duplicates** and **Countries** are also here if the panel wants depth.)*
+
+---
+
+### SECTION E — Mobile App (~2 min, optional) · *phone with Expo Go*
+
+| | |
+|---|---|
+| 🖱 **Do** | On the phone, open the HireStream app (Expo Go → `exp://hirestream-mobile.agentryx.dev`). On the login screen tap a **Demo Mode** card (e.g. *Priya Verma*). Show the candidate home, job list, an application, notifications. |
+| 🗣 **Say** | "The same platform runs natively on the phone — built on React Native, talking to the very same API. A candidate in a village can do everything from a handset." |
+| 💡 **Why** | One backend, two front-ends (web + native) — the candidate-facing journey on Android & iOS. **Be precise:** this is running live on the device through **Expo** (the development runtime); the **signed Play Store / App Store builds are the next step** — the build pipeline (EAS profiles) is already configured. *Frame as "running on device today, store release next," not "published."* |
 
 ---
 
@@ -198,7 +243,7 @@
 
 ### Scope, status & maintainability
 - **"Is it finished?"** → Web portal is **built across the full contracted scope and UAT-tested** (UAT Final Report on record); **40% design-approval milestone submitted**. Running live on staging today — everything shown is the real platform.
-- **"Mobile app?"** → The architecture is **API-ready** (React Native + Expo, same REST API). The mobile build is a **planned next phase** — *frame it as roadmap, not delivered.*
+- **"Mobile app?"** → It's **running on the device today** (React Native + Expo, same REST API) — we can demo it live. What's left is the **signed store release** (Play Store / App Store); the build pipeline is already set up. *Frame as "running on device now, store publication next" — not "published."*
 - **"Who maintains it / lock-in?"** → 100% open-source stack, **TypeScript end-to-end**, modular and documented for handover. No proprietary licences, no vendor lock-in.
 
 ### Process / FRS
@@ -216,8 +261,14 @@
 
 ## APPENDIX — Landmines (what NOT to do/say)
 - ❌ Don't claim **integrations are live** — always "ready, pending government credentials."
-- ❌ Don't claim the **mobile app is delivered** — it's architected/planned.
+- ❌ Don't claim the **mobile app is published** — it runs live via **Expo (dev runtime)**; signed store builds are next. Demo it, but say so.
 - ❌ Don't log in as **superadmin** in front of the panel (data-wipe tooling).
 - ❌ Don't debug live. If anything breaks or the network drops → **switch to `HireStream_Workflows.mp4`.**
 - ❌ Don't put the **government emblem** on HTIS materials; brand stays HTIS "Prepared for HPSEDC."
+- ✅ Do **Reset demo data** once before you start (Demo Mode panel) so the state is pristine.
 - ✅ Do keep the **Infrastructure Provisioning PDF** handy — it's the artifact the MD actually authorises.
+- ✅ Do open **System → Architecture** if the panel gets technical — it answers "how does it work / what does it need" on screen.
+
+---
+
+*HireStream — HPSEDC Overseas Placement Portal · Prepared by M/s HTIS Telecom Pvt. Ltd. for HPSEDC · Demo guide v1.0*

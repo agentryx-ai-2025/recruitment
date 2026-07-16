@@ -76,6 +76,13 @@ export function JobCreationForm({ editJob, trigger, controlledOpen, onOpenChange
     onOpenChange?.(v);
   };
   const isEdit = !!editJob;
+  // Unverified employers may save drafts but cannot publish (server enforces this
+  // too). We disable Publish so it's clear up-front rather than a 403 on click.
+  const { data: empProfileRes } = useQuery({
+    queryKey: ["/api/v1/employer/profile"],
+    queryFn: () => fetch("/api/v1/employer/profile", { credentials: "include" }).then((r) => r.json()),
+  });
+  const canPublish = isEdit || !!empProfileRes?.data?.verified;
   const [skillInput, setSkillInput] = useState("");
   const activeCountries = useActiveCountries();
   const initialCountry = editJob?.country ?? "";
@@ -450,8 +457,10 @@ export function JobCreationForm({ editJob, trigger, controlledOpen, onOpenChange
 
           {/* Footer */}
           <div className="flex items-center justify-between gap-3 pt-4 border-t sticky bottom-0 bg-white">
-            <div className="text-xs text-slate-500 hidden sm:block">
-              After publishing, agencies get notified and begin shortlisting candidates against this requisition.
+            <div className="text-xs hidden sm:block max-w-[280px]">
+              {!canPublish
+                ? <span className="text-amber-600 font-medium">⏳ Pending HPSEDC verification — save a draft now; you can publish once your company is approved.</span>
+                : <span className="text-slate-500">After publishing, agencies get notified and begin shortlisting candidates against this requisition.</span>}
             </div>
             <div className="flex gap-2">
               <Button type="button" variant="ghost" onClick={() => setOpen(false)}>Cancel</Button>
@@ -460,8 +469,9 @@ export function JobCreationForm({ editJob, trigger, controlledOpen, onOpenChange
                 title="Save your progress. Only the title is required; fill the rest later.">
                 Save as Draft
               </Button>
-              <Button type="submit" disabled={mutation.isPending}
+              <Button type="submit" disabled={mutation.isPending || !canPublish}
                 className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white shadow-md shadow-purple-500/20"
+                title={!canPublish ? "Your company must be verified by HPSEDC before you can publish. You can save a draft now." : undefined}
                 data-testid="button-submit-job">
                 {mutation.isPending
                   ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> {isEdit ? "Saving…" : "Publishing…"}</>

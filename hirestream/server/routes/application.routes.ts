@@ -395,8 +395,11 @@ router.get("/recommendations/for-me", protect, async (req, res, next) => {
 
     const candidate = candRows[0];
 
-    // Get all active jobs
-    const activeJobs = await db.select().from(jobs).where(eq(jobs.status, "active"));
+    // Get all active, PUBLIC jobs only. agents_only requisitions (employer
+    // demand not yet picked up by an agency) must never be recommended to a
+    // candidate — they can't apply to them ("Job not found or inactive").
+    const activeJobs = await db.select().from(jobs)
+      .where(and(eq(jobs.status, "active"), eq(jobs.visibility, "public")));
 
     // Get jobs candidate already applied to
     const appliedRows = await db

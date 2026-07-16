@@ -42,6 +42,49 @@ export default function AgentDriveDetailPage() {
     queryKey: [`/api/v1/drives/${id}/interviews`],
     queryFn: () => fetchJson(`/api/v1/drives/${id}/interviews`),
   });
+  const { data: regRes } = useQuery({
+    queryKey: [`/api/v1/drives/${id}/registrations`],
+    queryFn: () => fetchJson(`/api/v1/drives/${id}/registrations`),
+  });
+  const regAction = useMutation({
+    mutationFn: async ({ regId, status }: { regId: string; status: string }) => {
+      const res = await fetch(`/api/v1/drives/registrations/${regId}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status }),
+      });
+      if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e?.error?.message || "Action failed"); }
+      return res.json();
+    },
+    onSuccess: (_d, vars) => {
+      qc.invalidateQueries({ queryKey: [`/api/v1/drives/${id}/registrations`] });
+      toast({ title: vars.status === "invited" ? "Candidate invited" : vars.status === "attended" ? "Marked attended" : "Updated" });
+    },
+  });
+  // Agency's own jobs — to pick which role to interview a registrant for.
+  const { data: myJobsRes } = useQuery({
+    queryKey: ["/api/v1/jobs", "mine", "drive"],
+    queryFn: () => fetchJson("/api/v1/jobs?status=all&mine=true&limit=100"),
+  });
+  const myJobs: any[] = (myJobsRes?.data ?? []).filter((j: any) => j.status === "active");
+  const [scheduleReg, setScheduleReg] = useState<any>(null); // the registration being scheduled
+  const [ivJobId, setIvJobId] = useState("");
+  const [ivWhen, setIvWhen] = useState("");
+  const [ivInterviewer, setIvInterviewer] = useState("");
+  const scheduleInterview = useMutation({
+    mutationFn: async () => {
+      const res = await fetch(`/api/v1/drives/${id}/registrations/${scheduleReg.id}/schedule-interview`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ jobId: ivJobId, scheduledAt: ivWhen, interviewerName: ivInterviewer || undefined }),
+      });
+      if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e?.error?.message || "Couldn't schedule interview"); }
+      return res.json();
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: [`/api/v1/drives/${id}/registrations`] });
+      qc.invalidateQueries({ queryKey: [`/api/v1/drives/${id}/interviews`] });
+      setScheduleReg(null); setIvJobId(""); setIvWhen(""); setIvInterviewer("");
+      toast({ title: "Interview scheduled at the drive" });
+    },
+  });
 
   const setResult = useMutation({
     mutationFn: async ({ interviewId, result }: { interviewId: string; result: string }) => {
@@ -90,6 +133,7 @@ export default function AgentDriveDetailPage() {
 
   const d = driveRes?.data;
   const interviews: any[] = intRes?.data ?? [];
+  const registrations: any[] = regRes?.data ?? [];
 
   if (!d) {
     return (
@@ -192,6 +236,63 @@ export default function AgentDriveDetailPage() {
           )}
         </div>
       </motion.div>
+
+      {/* Registrants — candidates who registered for this drive */}
+      <section className="mt-6">
+        <h2 className="text-lg font-semibold text-slate-900 mb-3 flex items-center gap-2">
+          <Users className="w-5 h-5 text-indigo-600" /> Registered Candidates ({registrations.length})
+        </h2>
+        {registrations.length === 0 ? (
+          <div className="bg-white border border-slate-200 rounded-xl p-8 text-center">
+            <Users className="w-10 h-10 mx-auto mb-3 text-slate-300" />
+            <p className="text-sm text-slate-500 font-medium">No registrations yet</p>
+            <p className="text-xs text-slate-400 mt-1">{d.status === "approved" ? "Candidates can register from their dashboard once the drive is approved." : "Registrations open once HPSEDC approves the drive."}</p>
+          </div>
+        ) : (
+          <div className="grid sm:grid-cols-2 gap-3">
+            {registrations.map((r: any) => {
+              const c = r.candidate ?? {};
+              return (
+                <div key={r.id} className="bg-white rounded-xl border border-slate-200 p-3 flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 text-white text-xs font-bold flex items-center justify-center shrink-0">
+                    {(c.name || "?").split(/\s+/).slice(0, 2).map((w: string) => w[0]).join("").toUpperCase()}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold text-slate-900 truncate">{c.name || "Candidate"}</p>
+                    <p className="text-xs text-slate-500 truncate">{c.location || ""}{c.phone ? ` · ${c.phone}` : ""}</p>
+                  </div>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    {r.status === "registered" && (
+                      <Button size="sm" className="h-7 text-xs bg-indigo-600 hover:bg-indigo-700 text-white" disabled={regAction.isPending}
+                        onClick={() => regAction.mutate({ regId: r.id, status: "invited" })}>
+                        Invite
+                      </Button>
+                    )}
+                    {r.status === "invited" && (
+                      <>
+                        <span className="text-[10px] font-semibold text-blue-700 bg-blue-50 border border-blue-200 rounded-full px-2 py-0.5">Invited</span>
+                        <Button size="sm" variant="outline" className="h-7 text-xs" disabled={regAction.isPending}
+                          onClick={() => regAction.mutate({ regId: r.id, status: "attended" })}>
+                          Mark Attended
+                        </Button>
+                      </>
+                    )}
+                    {r.status === "attended" && (
+                      <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-2 py-0.5">Attended</span>
+                    )}
+                    {d.status === "approved" && (
+                      <Button size="sm" variant="outline" className="h-7 text-xs gap-1"
+                        onClick={() => { setScheduleReg(r); setIvJobId(""); setIvWhen(""); setIvInterviewer(""); }}>
+                        <Calendar className="w-3 h-3" /> Interview
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </section>
 
       {/* Interviews list */}
       <section className="mt-6">
@@ -301,6 +402,44 @@ export default function AgentDriveDetailPage() {
           setFeedbackFor(null);
         }}
       />
+
+      {/* Schedule an on-the-spot interview for a registrant */}
+      <Dialog open={!!scheduleReg} onOpenChange={(o) => { if (!o) setScheduleReg(null); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Schedule interview — {scheduleReg?.candidate?.name || "candidate"}</DialogTitle>
+            <DialogDescription>Pick the role and time. This creates the application (if needed) and links the interview to this drive.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div>
+              <label className="text-xs font-medium text-slate-600">Job / role</label>
+              <Select value={ivJobId} onValueChange={setIvJobId}>
+                <SelectTrigger><SelectValue placeholder="Select one of your jobs" /></SelectTrigger>
+                <SelectContent>
+                  {myJobs.map((j: any) => <SelectItem key={j.id} value={j.id}>{j.title} · {j.country}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              {myJobs.length === 0 && <p className="text-[11px] text-amber-600 mt-1">You have no active jobs — pick up a requisition or post a job first.</p>}
+            </div>
+            <div>
+              <label className="text-xs font-medium text-slate-600">Date &amp; time</label>
+              <input type="datetime-local" value={ivWhen} onChange={(e) => setIvWhen(e.target.value)}
+                className="w-full text-sm border rounded-md p-2 focus:outline-none focus:ring-1 focus:ring-blue-400" />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-slate-600">Interviewer (optional)</label>
+              <input type="text" maxLength={100} value={ivInterviewer} onChange={(e) => setIvInterviewer(e.target.value)}
+                placeholder="e.g. Imran Qureshi" className="w-full text-sm border rounded-md p-2 focus:outline-none focus:ring-1 focus:ring-blue-400" />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setScheduleReg(null)}>Cancel</Button>
+            <Button disabled={!ivJobId || !ivWhen || scheduleInterview.isPending} onClick={() => scheduleInterview.mutate()} className="bg-blue-600 hover:bg-blue-700 text-white">
+              {scheduleInterview.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "Schedule"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

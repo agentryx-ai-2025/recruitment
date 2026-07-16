@@ -148,6 +148,11 @@ router.get("/:id/download", async (req, res, next) => {
       return res.status(404).json({ success: false, error: { code: 404, message: "File not found on disk" } });
     }
 
+    // ?inline=1 → preview in the browser (PDF/image viewer) instead of downloading.
+    if (req.query.inline === "1" || req.query.preview === "1") {
+      res.setHeader("Content-Disposition", `inline; filename="${doc.fileName}"`);
+      return res.sendFile(path.resolve(filePath));
+    }
     res.download(filePath, doc.fileName);
   } catch (error) {
     next(error);

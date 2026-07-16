@@ -393,6 +393,8 @@ function BasicInfoStep({ profile, onNext }: { profile: any; onNext: () => void }
   const [email, setEmail] = useState(profile.email || "");
   const [phone, setPhone] = useState(profile.phone || "");
   const [username, setUsername] = useState(profile.username || "");
+  // Sex as per passport — needed for emigration compliance + matching.
+  const [sex, setSex] = useState(profile.sex || "");
   // v0.4.31 (HPSEDC Item 4): family details
   const [fatherName, setFatherName] = useState(profile.fatherName || "");
   const [motherName, setMotherName] = useState(profile.motherName || "");
@@ -422,6 +424,7 @@ function BasicInfoStep({ profile, onNext }: { profile: any; onNext: () => void }
     if (profile.email) setEmail(profile.email);
     if (profile.phone) setPhone(profile.phone);
     if (profile.username) setUsername(profile.username);
+    if (profile.sex) setSex(profile.sex);
     if (profile.fatherName) setFatherName(profile.fatherName);
     if (profile.motherName) setMotherName(profile.motherName);
     if (profile.location) {
@@ -462,6 +465,7 @@ function BasicInfoStep({ profile, onNext }: { profile: any; onNext: () => void }
         method: "PATCH", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           fullName, email, phone, location, username: username || undefined,
+          sex: sex || null,
           fatherName: fatherName || null,
           motherName: motherName || null,
           addressLine1: addressLine1 || null,
@@ -510,11 +514,11 @@ function BasicInfoStep({ profile, onNext }: { profile: any; onNext: () => void }
         </p>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
           <FormField label="Full Name" required icon={User}>
-            <Input value={fullName} onChange={e => setFullName(e.target.value)} placeholder="Your full legal name"
+            <Input value={fullName} onChange={e => setFullName(e.target.value)} placeholder="Your full legal name" maxLength={100}
               className="pl-11 h-12 rounded-xl border-blue-200/80 bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all" />
           </FormField>
           <FormField label="Email" required icon={Mail}>
-            <Input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@example.com"
+            <Input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@example.com" maxLength={120}
               className="pl-11 h-12 rounded-xl border-blue-200/80 bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all" />
           </FormField>
           <FormField label="Username" icon={User} hint="Your unique login ID">
@@ -522,6 +526,7 @@ function BasicInfoStep({ profile, onNext }: { profile: any; onNext: () => void }
               value={username}
               onChange={e => setUsername(e.target.value)}
               placeholder="e.g. mobiletest"
+              maxLength={60}
               className="pl-11 h-12 rounded-xl border-blue-200/80 bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all"
             />
           </FormField>
@@ -537,13 +542,23 @@ function BasicInfoStep({ profile, onNext }: { profile: any; onNext: () => void }
               <p className="text-[11px] text-red-600 mt-1 pl-2">Phone must be digits only.</p>
             )}
           </FormField>
+          {/* Sex as per passport — emigration compliance + matching */}
+          <FormField label="Sex (as per passport)" icon={User} hint="Required for visa & emigration paperwork">
+            <select value={sex} onChange={e => setSex(e.target.value)}
+              className="pl-11 h-12 w-full rounded-xl border border-blue-200/80 bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all appearance-none">
+              <option value="">Select…</option>
+              <option value="male">Male</option>
+              <option value="female">Female</option>
+              <option value="other">Other</option>
+            </select>
+          </FormField>
           {/* v0.4.31 (HPSEDC Item 4): Father / Mother names */}
           <FormField label="Father's Name" icon={User} hint="As on passport / official records">
-            <Input value={fatherName} onChange={e => setFatherName(e.target.value)} placeholder="Father's full name"
+            <Input value={fatherName} onChange={e => setFatherName(e.target.value)} placeholder="Father's full name" maxLength={100}
               className="pl-11 h-12 rounded-xl border-blue-200/80 bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all" />
           </FormField>
           <FormField label="Mother's Name" icon={User} hint="As on passport / official records">
-            <Input value={motherName} onChange={e => setMotherName(e.target.value)} placeholder="Mother's full name"
+            <Input value={motherName} onChange={e => setMotherName(e.target.value)} placeholder="Mother's full name" maxLength={100}
               className="pl-11 h-12 rounded-xl border-blue-200/80 bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all" />
           </FormField>
         </div>
@@ -557,17 +572,17 @@ function BasicInfoStep({ profile, onNext }: { profile: any; onNext: () => void }
         <div className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <FormField label="Address Line 1">
-              <Input value={addressLine1} onChange={e => setAddressLine1(e.target.value)} placeholder="House/Flat No., Street, Colony"
+              <Input value={addressLine1} onChange={e => setAddressLine1(e.target.value)} placeholder="House/Flat No., Street, Colony" maxLength={200}
                 className="h-12 rounded-xl border-emerald-200/80 bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 transition-all" />
             </FormField>
             <FormField label="Address Line 2">
-              <Input value={addressLine2} onChange={e => setAddressLine2(e.target.value)} placeholder="Landmark, Area (optional)"
+              <Input value={addressLine2} onChange={e => setAddressLine2(e.target.value)} placeholder="Landmark, Area (optional)" maxLength={200}
                 className="h-12 rounded-xl border-emerald-200/80 bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 transition-all" />
             </FormField>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <FormField label="City / Town">
-              <Input value={city} onChange={e => setCity(e.target.value)} placeholder="e.g. Shimla"
+              <Input value={city} onChange={e => setCity(e.target.value)} placeholder="e.g. Shimla" maxLength={80}
                 className="h-12 rounded-xl border-emerald-200/80 bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 transition-all" />
             </FormField>
             <FormField label="State">
@@ -595,7 +610,7 @@ function BasicInfoStep({ profile, onNext }: { profile: any; onNext: () => void }
                   </SelectContent>
                 </Select>
               ) : (
-                <Input value={district} onChange={e => setDistrict(e.target.value)} placeholder="Enter your district"
+                <Input value={district} onChange={e => setDistrict(e.target.value)} placeholder="Enter your district" maxLength={80}
                   className="h-12 rounded-xl border-emerald-200/80 bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 transition-all" />
               )}
             </FormField>
@@ -624,19 +639,19 @@ function BasicInfoStep({ profile, onNext }: { profile: any; onNext: () => void }
         <div className={`space-y-4 ${sameAsCurrent ? "opacity-50 pointer-events-none" : ""}`}>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <FormField label="Address Line 1">
-              <Input value={permAddressLine1} onChange={e => setPermAddressLine1(e.target.value)} placeholder="House/Flat No., Street, Colony"
+              <Input value={permAddressLine1} onChange={e => setPermAddressLine1(e.target.value)} placeholder="House/Flat No., Street, Colony" maxLength={200}
                 disabled={sameAsCurrent}
                 className="h-12 rounded-xl border-amber-200/80 bg-white focus:ring-2 focus:ring-amber-500/20 focus:border-amber-400 transition-all" />
             </FormField>
             <FormField label="Address Line 2">
-              <Input value={permAddressLine2} onChange={e => setPermAddressLine2(e.target.value)} placeholder="Landmark, Area (optional)"
+              <Input value={permAddressLine2} onChange={e => setPermAddressLine2(e.target.value)} placeholder="Landmark, Area (optional)" maxLength={200}
                 disabled={sameAsCurrent}
                 className="h-12 rounded-xl border-amber-200/80 bg-white focus:ring-2 focus:ring-amber-500/20 focus:border-amber-400 transition-all" />
             </FormField>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <FormField label="City / Town">
-              <Input value={permCity} onChange={e => setPermCity(e.target.value)} placeholder="e.g. Shimla"
+              <Input value={permCity} onChange={e => setPermCity(e.target.value)} placeholder="e.g. Shimla" maxLength={80}
                 disabled={sameAsCurrent}
                 className="h-12 rounded-xl border-amber-200/80 bg-white focus:ring-2 focus:ring-amber-500/20 focus:border-amber-400 transition-all" />
             </FormField>
@@ -819,16 +834,18 @@ function EducationStep({ onNext, onBack }: { onNext: () => void; onBack: () => v
                     <FormField label={type === "school" ? "Class / Level (e.g. 12th)" : "Degree / Qualification"} required icon={Award}>
                       <Input value={degree} onChange={e => setDegree(e.target.value)}
                         placeholder={type === "school" ? "10th, 12th, ..." : type === "diploma" ? "Polytechnic Diploma" : type === "certification" ? "AWS Solutions Architect" : "B.Tech, MBA, ..."}
+                        maxLength={100}
                         className="pl-11 h-12 rounded-xl border-violet-200/80 bg-white" />
                     </FormField>
                     <FormField label={type === "school" ? "School name" : "Institution"} required icon={Building}>
                       <Input value={institution} onChange={e => setInstitution(e.target.value)}
                         placeholder={type === "school" ? "DAV Public School, ..." : "University / Institute name"}
+                        maxLength={100}
                         className="pl-11 h-12 rounded-xl border-violet-200/80 bg-white" />
                     </FormField>
                     {type === "school" && (
                       <FormField label="Board" icon={Award}>
-                        <Input value={board} onChange={e => setBoard(e.target.value)} placeholder="CBSE / ICSE / HPBSE / Cambridge"
+                        <Input value={board} onChange={e => setBoard(e.target.value)} placeholder="CBSE / ICSE / HPBSE / Cambridge" maxLength={100}
                           className="pl-11 h-12 rounded-xl border-violet-200/80 bg-white" />
                       </FormField>
                     )}
@@ -836,6 +853,7 @@ function EducationStep({ onNext, onBack }: { onNext: () => void; onBack: () => v
                       <FormField label="Subject / Field" icon={Award}>
                         <Input value={subject} onChange={e => setSubject(e.target.value)}
                           placeholder={type === "certification" ? "Cloud / Networking / ..." : "Computer Science, Mechanical, ..."}
+                          maxLength={100}
                           className="pl-11 h-12 rounded-xl border-violet-200/80 bg-white" />
                       </FormField>
                     )}
@@ -975,11 +993,11 @@ function ExperienceStep({ onNext, onBack }: { onNext: () => void; onBack: () => 
                   </p>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <FormField label="Company" required icon={Building}>
-                      <Input value={company} onChange={e => setCompany(e.target.value)} placeholder="TCS, Infosys..."
+                      <Input value={company} onChange={e => setCompany(e.target.value)} placeholder="TCS, Infosys..." maxLength={100}
                         className="pl-11 h-12 rounded-xl border-emerald-200/80 bg-white" />
                     </FormField>
                     <FormField label="Job Role" required icon={Briefcase}>
-                      <Input value={role} onChange={e => setRole(e.target.value)} placeholder="Developer, Nurse..."
+                      <Input value={role} onChange={e => setRole(e.target.value)} placeholder="Developer, Nurse..." maxLength={80}
                         className="pl-11 h-12 rounded-xl border-emerald-200/80 bg-white" />
                     </FormField>
                     <FormField label="Years" icon={Calendar}>
@@ -996,6 +1014,7 @@ function ExperienceStep({ onNext, onBack }: { onNext: () => void; onBack: () => 
                     <textarea
                       className="w-full mt-2 p-4 border border-emerald-200/80 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 min-h-[80px] transition-all"
                       value={description} onChange={e => setDescription(e.target.value)} placeholder="Key responsibilities..."
+                      maxLength={500}
                     />
                   </div>
                   <div className="flex gap-3">
@@ -1462,7 +1481,7 @@ function DocumentsStep({ onBack, onFinish }: { onBack: () => void; onFinish: () 
                           {doc.fileSize && <p className="text-[10px] text-slate-400">{(doc.fileSize / 1024).toFixed(0)} KB</p>}
                         </div>
                         <div className="flex items-center gap-1 flex-shrink-0">
-                          <Button variant="ghost" size="sm" onClick={() => window.open(`/api/v1/candidates/documents/${doc.id}/download`, "_blank")}
+                          <Button variant="ghost" size="sm" onClick={() => window.open(`/api/v1/candidates/documents/${doc.id}/download?inline=1`, "_blank")}
                             className="h-7 px-2 text-[10px] rounded-md text-slate-600 hover:text-rose-600">
                             View
                           </Button>
@@ -1518,7 +1537,7 @@ function DocumentsStep({ onBack, onFinish }: { onBack: () => void; onFinish: () 
                       </div>
                     </div>
                     <div className="flex items-center gap-1 flex-shrink-0">
-                      <Button variant="ghost" size="sm" onClick={() => window.open(`/api/v1/candidates/documents/${doc.id}/download`, "_blank")}
+                      <Button variant="ghost" size="sm" onClick={() => window.open(`/api/v1/candidates/documents/${doc.id}/download?inline=1`, "_blank")}
                         className="h-7 px-2 text-[10px] rounded-md text-slate-600 hover:text-rose-600">
                         View
                       </Button>

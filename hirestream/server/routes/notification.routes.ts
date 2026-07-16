@@ -31,7 +31,10 @@ router.get("/", protect, async (req, res, next) => {
     // View filter (PWS notification drawer)
     const v = (view as string) || "active";
     if (v === "active") {
+      // Active = not dismissed AND not saved. Saving a notification moves it OUT
+      // of the active queue into the Saved tab (it no longer shows in Active).
       conditions.push(isNull(notifications.dismissedAt));
+      conditions.push(isNull(notifications.savedAt));
     } else if (v === "saved") {
       conditions.push(isNull(notifications.dismissedAt));
       conditions.push(isNotNull(notifications.savedAt));
@@ -51,12 +54,14 @@ router.get("/", protect, async (req, res, next) => {
     const totalResult = await db.select({ c: count() }).from(notifications).where(whereClause);
     const total = totalResult[0]?.c ?? 0;
 
-    // Unread count: only active (non-dismissed) unread
+    // Unread count: only ACTIVE (non-dismissed, non-saved) unread — saved items
+    // are triaged aside and shouldn't keep the bell badge lit.
     const unreadResult = await db.select({ c: count() }).from(notifications)
       .where(and(
         eq(notifications.userId, userId),
         eq(notifications.read, false),
         isNull(notifications.dismissedAt),
+        isNull(notifications.savedAt),
       ));
     const unreadCount = unreadResult[0]?.c ?? 0;
 

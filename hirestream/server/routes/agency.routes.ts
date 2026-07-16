@@ -34,8 +34,15 @@ router.post("/register", protect, async (req, res, next) => {
         return res.status(403).json({ success: false, message: "Only agents can register agencies." });
      }
 
-     const validatedData = insertRecruitmentAgentSchema.parse(req.body);
-     
+     const parsed = insertRecruitmentAgentSchema.safeParse(req.body);
+     if (!parsed.success) {
+       return res.status(400).json({
+         success: false,
+         error: { code: 400, message: parsed.error.issues[0]?.message ?? "Invalid input", issues: parsed.error.issues },
+       });
+     }
+     const validatedData = parsed.data;
+
      if (!storage.db) return res.status(500).json({ success: false, message: "No db available" });
 
      const newAgency = await storage.db.insert(recruitmentAgents).values({
@@ -596,6 +603,10 @@ router.get("/documents/:id/download", protect, async (req, res, next) => {
       ? path.join(UPLOAD_DIR, rel)
       : path.join(HS_AGENCY_DOCS_DIR, path.basename(rel));
     try { await fs.access(filePath); } catch { return res.status(404).json({ success: false }); }
+    if (req.query.inline === "1" || req.query.preview === "1") {
+      res.setHeader("Content-Disposition", `inline; filename="${doc.fileName}"`);
+      return res.sendFile(path.resolve(filePath));
+    }
     res.download(filePath, doc.fileName);
   } catch (err) { next(err); }
 });

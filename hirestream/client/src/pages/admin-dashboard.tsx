@@ -10,7 +10,8 @@ import {
   UserCheck, BarChart3, Shield, TrendingUp, Activity, AlertTriangle,
   CheckCircle, Clock, FileText, MessageSquare, GraduationCap,
   Loader2, Mail, Phone, Fingerprint, KeyRound, FolderLock, PlugZap, XCircle, Globe,
-  Printer, Cpu,
+  Printer, Cpu, Network, Layers, Sigma, GitBranch, ScrollText,
+  Server, Database, Smartphone, Lock, HardDrive, Boxes, Plug, FileCheck, Square,
 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -20,6 +21,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { ISO_COUNTRIES, COMMON_DESTINATION_CODES } from "@/lib/iso-countries";
 import { AgencyApprovalList } from "@/components/admin/agency-approval-list";
 import { KYBReviewList } from "@/components/admin/KYBReviewList";
+import { GrievanceThread } from "@/components/shared/GrievanceThread";
 import { MatchingEnginePanel } from "@/components/admin/MatchingEnginePanel";
 
 async function fetchJson(url: string) {
@@ -123,6 +125,7 @@ export default function AdminDashboard() {
       { key: "templates", label: "Notifications", icon: Mail },
     ]},
     { label: "SYSTEM", items: [
+      { key: "architecture", label: "Architecture", icon: Network },
       { key: "integrations", label: "Integrations", icon: PlugZap },
       { key: "countries", label: "Countries", icon: Globe },
       { key: "settings", label: "System Config", icon: Settings },
@@ -516,6 +519,7 @@ export default function AdminDashboard() {
         <TabsContent value="fraud"><FraudWatchlistPanel /></TabsContent>
         <TabsContent value="duplicates"><DuplicatesPanel /></TabsContent>
         <TabsContent value="countries"><CountryInfoAdminPanel /></TabsContent>
+        <TabsContent value="architecture"><ArchitecturePanel /></TabsContent>
 
         <TabsContent value="templates">
           <NotificationTemplatesPanel />
@@ -594,6 +598,562 @@ function AgencyLeaderboardPanel() {
   );
 }
 
+// ── Architecture & Logic: Matching Engine ────────────────────────────
+// Reference page documenting how the candidate↔job match score is built.
+// Mirrors the "HireStream Matching Engine — Logic & Specification" doc.
+function ArchMono({ children }: { children: React.ReactNode }) {
+  return <code className="font-mono text-[12px] bg-slate-100 text-slate-800 rounded px-1.5 py-0.5 break-words">{children}</code>;
+}
+function ArchSection({ n, title, icon, children }: { n: number; title: string; icon: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <section className="bg-white rounded-xl border border-slate-200 shadow-sm p-5 sm:p-6">
+      <h3 className="flex items-center gap-2.5 text-base font-bold text-slate-900 mb-4">
+        <span className="w-7 h-7 rounded-lg bg-indigo-600 text-white flex items-center justify-center text-xs font-bold shrink-0">{n}</span>
+        <span className="flex items-center gap-2">{icon}{title}</span>
+      </h3>
+      {children}
+    </section>
+  );
+}
+function ArchHero({ icon, title, subtitle, badge }: { icon: React.ReactNode; title: string; subtitle: string; badge?: string }) {
+  return (
+    <div className="rounded-xl bg-gradient-to-r from-indigo-600 to-violet-700 text-white p-6 shadow-sm">
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <h2 className="text-xl font-bold flex items-center gap-2">{icon} {title}</h2>
+          <p className="text-indigo-100 text-sm mt-1">{subtitle}</p>
+        </div>
+        {badge && <span className="text-[11px] font-bold bg-white/15 border border-white/30 rounded-full px-3 py-1 whitespace-nowrap">{badge}</span>}
+      </div>
+    </div>
+  );
+}
+function ArchTable({ cols, rows }: { cols: string[]; rows: React.ReactNode[][] }) {
+  return (
+    <div className="overflow-x-auto rounded-lg border border-slate-200">
+      <table className="w-full text-sm">
+        <thead><tr className="bg-slate-50 text-left text-[11px] uppercase tracking-wide text-slate-500">
+          {cols.map((c, i) => <th key={i} className="px-3 py-2 font-semibold">{c}</th>)}
+        </tr></thead>
+        <tbody>
+          {rows.map((r, ri) => (
+            <tr key={ri} className="border-t border-slate-100 align-top">
+              {r.map((cell, ci) => <td key={ci} className={`px-3 py-2 ${ci === 0 ? "font-medium text-slate-800" : "text-slate-600"}`}>{cell}</td>)}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+// Architecture & Logic — sub-tabbed reference hub (Matching · Stack · Infra).
+function ArchitecturePanel() {
+  const [sub, setSub] = useState<"matching" | "stack" | "infra">("matching");
+  const TABS = [
+    { k: "matching", label: "Matching Engine", icon: <Sigma className="w-4 h-4" /> },
+    { k: "stack", label: "Tech Stack", icon: <Layers className="w-4 h-4" /> },
+    { k: "infra", label: "Infrastructure", icon: <Server className="w-4 h-4" /> },
+  ] as const;
+  return (
+    <div className="space-y-5 max-w-5xl">
+      <div className="flex flex-wrap gap-1.5 bg-white rounded-xl border border-slate-200 shadow-sm p-1.5">
+        {TABS.map((t) => (
+          <button key={t.k} onClick={() => setSub(t.k)}
+            className={`flex items-center gap-2 rounded-lg px-3.5 py-2 text-sm font-semibold transition-colors ${sub === t.k ? "bg-indigo-600 text-white shadow-sm" : "text-slate-600 hover:bg-slate-100"}`}>
+            {t.icon}{t.label}
+          </button>
+        ))}
+      </div>
+      {sub === "matching" && <MatchingEngineDoc />}
+      {sub === "stack" && <TechStackDoc />}
+      {sub === "infra" && <InfraDoc />}
+    </div>
+  );
+}
+
+// ── Architecture › Tech Stack ─────────────────────────────────────────
+function TechStackDoc() {
+  return (
+    <div className="space-y-5">
+      <ArchHero icon={<Layers className="w-5 h-5" />} title="Technology Stack"
+        subtitle="Secure, bilingual, cloud-native — built on a modern, proven, open-source stack · HPSEDC" badge="open-source" />
+
+      <ArchSection n={1} title="System Architecture — Three Logical Tiers" icon={<Network className="w-4 h-4 text-indigo-600" />}>
+        <div className="space-y-2">
+          <div className="rounded-lg bg-blue-600 text-white p-3">
+            <div className="text-[11px] font-bold uppercase tracking-wide opacity-80 mb-1">Presentation</div>
+            <div className="text-sm">Responsive Web SPA (React + Vite · Tailwind) &nbsp;•&nbsp; React Native + Expo apps (Android / iOS)</div>
+          </div>
+          <div className="text-center text-[11px] text-slate-400">▼ HTTPS / TLS · REST · JSON · <ArchMono>/api/v1</ArchMono></div>
+          <div className="rounded-lg bg-indigo-600 text-white p-3">
+            <div className="text-[11px] font-bold uppercase tracking-wide opacity-80 mb-1.5">Application — Node.js + Express</div>
+            <div className="flex flex-wrap gap-1.5">
+              {["RBAC & auth", "Domain APIs", "Matching engine", "Notifications", "Security: Helmet · rate-limit · Zod", "Audit log"].map((x) => <span key={x} className="text-[11px] bg-white/15 border border-white/25 rounded px-2 py-0.5">{x}</span>)}
+            </div>
+          </div>
+          <div className="text-center text-[11px] text-slate-400">▼ Drizzle ORM</div>
+          <div className="rounded-lg bg-slate-700 text-white p-3">
+            <div className="text-[11px] font-bold uppercase tracking-wide opacity-80 mb-1">Data — PostgreSQL</div>
+            <div className="text-sm">~36 tables + immutable audit log &nbsp;•&nbsp; namespaced file storage</div>
+          </div>
+          <div className="grid sm:grid-cols-2 gap-2 pt-1">
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3"><div className="font-semibold text-slate-800 text-sm">Nginx · PM2 · Linux</div><div className="text-[12px] text-slate-500">TLS reverse proxy · process mgmt · gov-cloud / SDC</div></div>
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3"><div className="font-semibold text-slate-800 text-sm">Pluggable integrations</div><div className="text-[12px] text-slate-500">HIM SSO · Aadhaar/UIDAI · DigiLocker · Email/SMS</div></div>
+          </div>
+        </div>
+      </ArchSection>
+
+      <ArchSection n={2} title="Web Front-end" icon={<Boxes className="w-4 h-4 text-indigo-600" />}>
+        <ArchTable cols={["Area", "Technology"]} rows={[
+          ["Core", <b>React 18 + Vite + TypeScript</b>],
+          ["Routing & data", "Wouter (routing), TanStack Query (server-state & caching)"],
+          ["Forms & validation", <>React Hook Form + <b>Zod</b> (schema validation)</>],
+          ["UI & styling", <>Radix UI / shadcn components, <b>Tailwind CSS</b>, Recharts (charts)</>],
+          ["Localisation", <><b>i18next</b> — bilingual English + Hindi</>],
+        ]} />
+      </ArchSection>
+
+      <ArchSection n={3} title="Back-end & API" icon={<Server className="w-4 h-4 text-indigo-600" />}>
+        <ArchTable cols={["Area", "Technology"]} rows={[
+          ["Runtime", <b>Node.js + Express + TypeScript</b>],
+          ["API", <>Versioned <b>REST</b> API (<ArchMono>/api/v1</ArchMono>), JSON over HTTPS</>],
+          ["Data access", <><b>Drizzle ORM</b> + drizzle-zod (schema-derived validation)</>],
+          ["Background jobs", "node-cron (digests, SLA checks), Winston (structured logging)"],
+        ]} />
+      </ArchSection>
+
+      <ArchSection n={4} title="Database & Storage" icon={<Database className="w-4 h-4 text-indigo-600" />}>
+        <ArchTable cols={["Area", "Technology"]} rows={[
+          ["Database", <><b>PostgreSQL</b> — ~36 relational tables + an immutable audit log</>],
+          ["Files", "Namespaced document/photo storage; uploads verified by file type & magic-bytes (PDF / JPG / PNG)"],
+        ]} />
+      </ArchSection>
+
+      <ArchSection n={5} title="Security" icon={<Lock className="w-4 h-4 text-indigo-600" />}>
+        <ArchTable cols={["Area", "Technology"]} rows={[
+          ["Access control", <><b>Role-Based Access Control</b> (Candidate / Agency / Employer / Admin)</>],
+          ["Authentication", <>passport + express-session (PostgreSQL-backed, rolling idle timeout), <b>OTP</b> (otplib), <b>JWT</b> for mobile, bcrypt password hashing</>],
+          ["Hardening", "Helmet security headers, rate limiting, input validation, encrypted integration credentials, full audit trail"],
+        ]} />
+      </ArchSection>
+
+      <ArchSection n={6} title="Mobile Application" icon={<Smartphone className="w-4 h-4 text-indigo-600" />}>
+        <ArchTable cols={["Area", "Technology"]} rows={[
+          ["Apps", <><b>React Native + Expo</b> — Android & iOS, consuming the same REST API</>],
+          ["Features", "Mobile auth (refresh tokens), push notifications, offline-tolerant config"],
+        ]} />
+      </ArchSection>
+
+      <ArchSection n={7} title="Documents, Messaging & Integrations" icon={<Plug className="w-4 h-4 text-indigo-600" />}>
+        <ArchTable cols={["Area", "Technology"]} rows={[
+          ["Generation", "PDFKit (PDF), QRCode, Archiver (bulk ZIP export)"],
+          ["Messaging", "In-app notifications, Nodemailer (email), pluggable SMS adapters"],
+        ]} />
+        <div className="mt-3 rounded-lg bg-amber-50 border border-amber-200 p-3 text-[12px] text-amber-900">
+          <b>External integrations — pluggable & admin-configurable.</b> HIM Access SSO · Aadhaar / UIDAI · DigiLocker · Email & SMS gateways are all designed as adapters and activated from the admin console once production credentials are provided. <b>No code change required</b> to switch providers.
+        </div>
+      </ArchSection>
+
+      <ArchSection n={8} title="Infrastructure, Standards & Why This Stack" icon={<HardDrive className="w-4 h-4 text-indigo-600" />}>
+        <ArchTable cols={["Area", "Technology"]} rows={[
+          ["Hosting", <><b>Linux</b> · <b>Nginx</b> (TLS reverse proxy) · <b>PM2</b> process management</>],
+          ["Cloud", <>Deployable to government cloud / <b>State Data Centre</b>; stateless API scales horizontally</>],
+          ["Targets", <>Page load <b>&lt; 3s</b> · <b>5,000</b> concurrent users · <b>99.9%</b> uptime · data backups + health monitoring</>],
+        ]} />
+        <div className="grid sm:grid-cols-2 gap-3 mt-3 text-[12px]">
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+            <div className="font-semibold text-slate-800 mb-1">Standards & compliance</div>
+            <ul className="text-slate-600 space-y-1 list-disc pl-4">
+              <li><b>GIGW</b> — accessibility for divyangjans, State-Government header uniformity</li>
+              <li><b>HTTPS / TLS</b> in transit; sensitive data encrypted at rest</li>
+              <li><b>ISO 27001</b>-aligned security; GDPR / PDPA-equivalent data protection</li>
+            </ul>
+          </div>
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+            <div className="font-semibold text-slate-800 mb-1">Why this stack</div>
+            <ul className="text-slate-600 space-y-1 list-disc pl-4">
+              <li><b>Modern & proven</b> — industry-standard, actively maintained open source</li>
+              <li><b>Secure by design</b> — RBAC, encryption, hardened sessions, audit trails</li>
+              <li><b>Scalable & cloud-ready</b> — stateless API, horizontal scaling</li>
+              <li><b>Maintainable</b> — TypeScript end-to-end, modular, documented for handover</li>
+            </ul>
+          </div>
+        </div>
+      </ArchSection>
+    </div>
+  );
+}
+
+// ── Architecture › Infrastructure Provisioning ────────────────────────
+function InfraDoc() {
+  return (
+    <div className="space-y-5">
+      <ArchHero icon={<Server className="w-5 h-5" />} title="Infrastructure Provisioning Request"
+        subtitle="Hardware · Software · Network · Access — Staging & Production · HPSEDC" badge="STG + PROD" />
+
+      <div className="grid sm:grid-cols-2 gap-3">
+        <div className="rounded-xl bg-rose-50 border border-rose-200 p-4 text-[12px] text-rose-900">
+          <div className="font-bold mb-1 flex items-center gap-1.5"><Lock className="w-3.5 h-3.5" /> Air-gapped</div>
+          The VMs are isolated from the internet, accessed via SSH through a Windows jump host. All §2 software must be pre-installed (or on an internal mirror); HTIS delivers the app + dependencies as a <b>pre-built artifact</b> via the jump host — no online build runs on the server.
+        </div>
+        <div className="rounded-xl bg-blue-50 border border-blue-200 p-4 text-[12px] text-blue-900">
+          <div className="font-bold mb-1 flex items-center gap-1.5"><FileCheck className="w-3.5 h-3.5" /> Assumptions — please confirm</div>
+          HP State Data Centre hosting; PROD sized to the FRS target of <b>5,000 concurrent users</b>; one VM per environment (application + PostgreSQL co-located); 99.9% uptime via a single VM + standard backups (a standby DB replica can be added if a penalty-backed SLA applies).
+        </div>
+      </div>
+
+      <ArchSection n={1} title="Hardware" icon={<Cpu className="w-4 h-4 text-indigo-600" />}>
+        <ArchTable cols={["Resource", "Staging (STG)", "Production (PROD)"]} rows={[
+          ["vCPU", "4", <b>8</b>],
+          ["RAM", "8 GB", <b>16 GB</b>],
+          ["Disk (SSD)", "100 GB", <><b>200 GB</b> (expandable)</>],
+          ["Apps hosted", "HireStream + Verify + DB", "HireStream + DB"],
+        ]} />
+        <p className="text-[11px] text-slate-400 mt-2"><b>Separate VMs.</b> Candidate document uploads grow disk over time — please allow online disk expansion, or provide object storage.</p>
+      </ArchSection>
+
+      <ArchSection n={2} title="Software to Pre-install / Stage on Disk (air-gapped)" icon={<Boxes className="w-4 h-4 text-indigo-600" />}>
+        <ArchTable cols={["Category", "Software", "Version", "Purpose"]} rows={[
+          ["Operating system", <b>Ubuntu Server LTS</b>, "24.04 LTS (Noble)", "Base OS — same as our other deployments"],
+          ["Base & build", "build-essential (gcc, g++, make), python3", "distro", "Native module builds (e.g. bcrypt)"],
+          ["Base & build", "git, curl, wget, unzip, tar, rsync", "distro", "Deployment / artifact transfer"],
+          ["Base & build", "ca-certificates, openssl", "distro", "TLS / crypto"],
+          ["Runtime", <b>Node.js</b>, "20.x LTS (20.20+)", "Application runtime"],
+          ["Runtime", <><b>PM2</b> (global npm)</>, "6.x", "Process manager — clustering + auto-restart"],
+          ["Database", <><b>PostgreSQL</b> server + client + contrib</>, "16.x (16.14+)", "Primary database"],
+          ["Web / proxy", <b>Nginx</b>, "1.24+", "TLS reverse proxy, static serving, rate limiting"],
+          ["Optional", "Redis", "7.x", "Session store / cache"],
+        ]} />
+        <p className="text-[11px] text-slate-400 mt-2">Our application's own npm dependencies are bundled into the delivered artifact, so those are <b>not</b> needed from IT — only the runtime/build tools above.</p>
+      </ArchSection>
+
+      <ArchSection n={3} title="Network & Integration Egress" icon={<Network className="w-4 h-4 text-indigo-600" />}>
+        <p className="text-sm text-slate-600"><b>Ports:</b> 443 (HTTPS in) · 80 → 443 redirect · 22 (SSH, from jump host only) · Node ↔ PostgreSQL on localhost.</p>
+        <p className="text-sm text-slate-600 mt-2">Internet egress is blocked, but the portal needs <b>outbound reachability</b> to these government services (internal network or firewall exception) — otherwise the integrations cannot function:</p>
+        <div className="flex flex-wrap gap-1.5 mt-2">
+          {["HIM Parivar / HIM Access SSO", "Aadhaar / UIDAI", "DigiLocker", "Government Email (SMTP)", "Government SMS gateway"].map((x) => <span key={x} className="text-[11px] font-medium bg-indigo-50 border border-indigo-200 text-indigo-800 rounded px-2 py-0.5">{x}</span>)}
+        </div>
+        <p className="text-[11px] text-slate-400 mt-2">Please advise which are reachable on the internal government network vs. require firewall exceptions.</p>
+      </ArchSection>
+
+      <ArchSection n={4} title="TLS Certificates & Access" icon={<Lock className="w-4 h-4 text-indigo-600" />}>
+        <p className="text-sm text-slate-600 mb-3">Air-gapped, so Let's Encrypt / ACME is not possible. Please provide <b>CA-issued certificates</b> (full chain + private key) for both the PROD and STG domains.</p>
+        <ArchTable cols={["#", "Access", "Detail"]} rows={[
+          ["1", "SSH via jump host", <>Named service account with <b>sudo</b> (app, PM2, Nginx)</>],
+          ["2", "File transfer via jump host", "SCP/SFTP path for the app artifact + updates"],
+          ["3", "PostgreSQL", "Database + role able to create schema / extensions"],
+          ["4", "Backup target", "Location for DB dumps + VM snapshots"],
+        ]} />
+      </ArchSection>
+
+      <ArchSection n={5} title="Deployment, Operations & IT Checklist" icon={<FileCheck className="w-4 h-4 text-indigo-600" />}>
+        <p className="text-sm text-slate-600 mb-3">HTIS builds the release on a matching platform → transfers it via the jump host → runs database migrations → restarts under PM2 (rollback = previous artifact + DB snapshot). Daily PostgreSQL dump + WAL archiving to the backup target supports the 99.9% target.</p>
+        <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+          <div className="font-semibold text-slate-800 text-sm mb-2">Checklist for the IT team</div>
+          <ul className="space-y-1.5 text-[13px] text-slate-700">
+            {[
+              "STG + PROD VMs provisioned (4 / 8 / 100 · 8 / 16 / 200)",
+              "Ubuntu 24.04 LTS + Node 20 + PM2 + PostgreSQL 16 + Nginx (pre-installed or staged offline)",
+              "TLS certificates provided for both domains",
+              "Firewall: 443 / 80 / 22 + integration egress",
+              "SSH service account + SFTP path + PostgreSQL database & role",
+              "Backup target allocated",
+            ].map((x) => <li key={x} className="flex items-start gap-2"><Square className="w-3.5 h-3.5 mt-0.5 text-slate-400 shrink-0" />{x}</li>)}
+          </ul>
+        </div>
+      </ArchSection>
+    </div>
+  );
+}
+
+function MatchingEngineDoc() {
+  const FACTORS = [
+    { tier: "Hard criteria", tierPts: 60, tierColor: "text-rose-700 bg-rose-50", factor: "Skills match", wt: 30, what: "Overlap between job's required skills and candidate's listed skills" },
+    { tier: "", factor: "Experience", wt: 20, what: "Candidate meets job's years-of-experience requirement" },
+    { tier: "", factor: "Qualification", wt: 10, what: "Candidate's education level meets the job's stated minimum" },
+    { tier: "Preferences", tierPts: 25, tierColor: "text-amber-700 bg-amber-50", factor: "Country", wt: 15, what: "Job's destination is in candidate's preferred countries list" },
+    { tier: "", factor: "Language proficiency", wt: 10, what: "Candidate meets job's language requirement (CEFR or IELTS)" },
+    { tier: "Compatibility", tierPts: 15, tierColor: "text-emerald-700 bg-emerald-50", factor: "Job category", wt: 10, what: "Job's role category is in candidate's preferred categories" },
+    { tier: "", factor: "Salary expectation", wt: 5, what: "Job salary falls within candidate's expected range" },
+  ];
+  const LOGIC = [
+    { f: "Skills match", pts: 30, code: "round((matched / required) × 30)", note: <>Case-insensitive overlap of <ArchMono>job.skills[]</ArchMono> against <ArchMono>candidate.skills[]</ArchMono>. Job with no skills listed → neutral 15.</>, c: "border-rose-400" },
+    { f: "Experience", pts: 20, code: "round(min(have/required, 1) × 20)", note: <>Candidate's years vs job's required. Capped at 100% — extra experience not penalised. <ArchMono>required=0</ArchMono> → full 20.</>, c: "border-amber-400" },
+    { f: "Qualification", pts: 10, code: "school < diploma < bachelor < master < doctorate", note: <>Meets/exceeds: 10. One tier below: 5. Two+ below: 0. No requirement on job: 10.</>, c: "border-rose-400" },
+    { f: "Country preference", pts: 15, code: "job.country ∈ candidate.preferred ? 15 : 0", note: <>Hard match against the candidate's preferred destinations. Empty prefs → neutral 7.</>, c: "border-emerald-400" },
+    { f: "Language proficiency", pts: 10, code: "prorated | CEFR for non-English | IELTS band for English", note: <>Each required language scored individually then averaged. For IELTS countries (UK/AUS/NZ/CAN/IE), job stores required overall band; candidate stores actual band. Meets/exceeds = full, one band/level below = half, more below = 0. No requirement → 10.</>, c: "border-emerald-400" },
+    { f: "Job category", pts: 10, code: "job.category ∈ candidate.preferred ? 10 : 0", note: <>Controlled vocabulary (Factory Worker, Construction, Driver, Electrician, Plumber, Helper, Hospitality, Caregiver, Healthcare, IT …). Empty candidate prefs → neutral 5.</>, c: "border-emerald-400" },
+    { f: "Salary expectation", pts: 5, code: "within range → 5 | ≤10% below → 3 | outside → 0 | either blank → 5 (neutral)", note: <>Compares <ArchMono>job.salary</ArchMono> against the candidate's expected range (min/max, currency-normalised). Lowest-weighted because salary in overseas placement is often negotiated post-shortlist.</>, c: "border-emerald-400" },
+  ];
+  const MISSING = [
+    { f: "Skills (30)", job: "Half → 15 pts", cand: "Zero → 0 pts", both: "Half", why: "Job-blank: generous (employer was sloppy). Candidate-blank: 0 — no skills to match." },
+    { f: "Experience (20)", job: "Full → 20 pts", cand: "Zero → 0 pts", both: "Full", why: "Job-blank (0 required): no constraint. Candidate-blank = 0 yrs, scored 0 against any positive requirement." },
+    { f: "Qualification (10)", job: "Full → 10 pts", cand: "Half → 5 pts", both: "Full", why: "Encourages profile completion without blocking." },
+    { f: "Country (15)", job: "n/a*", cand: "Half → 7 pts", both: "Half", why: "Empty prefs ≠ disinterest — neutral instead of zero." },
+    { f: "Language (10)", job: "Full → 10 pts", cand: "Zero → 0 pts", both: "Full", why: "Gaps must surface — candidate hasn't claimed proficiency." },
+    { f: "Category (10)", job: "n/a*", cand: "Half → 5 pts", both: "Half", why: "Candidate may have wide interests." },
+    { f: "Salary (5)", job: "Full → 5 pts", cand: "Full → 5 pts", both: "Full", why: "Salary often disclosed post-shortlist — don't penalise either side." },
+  ];
+  return (
+    <div className="space-y-5 max-w-5xl">
+      {/* hero */}
+      <div className="rounded-xl bg-gradient-to-r from-indigo-600 to-violet-700 text-white p-6 shadow-sm">
+        <div className="flex items-start justify-between gap-4 flex-wrap">
+          <div>
+            <h2 className="text-xl font-bold flex items-center gap-2"><Network className="w-5 h-5" /> Matching Engine — Architecture &amp; Logic</h2>
+            <p className="text-indigo-100 text-sm mt-1">How every candidate ↔ job fit score is built · Government of Himachal Pradesh · HPSEDC Overseas Placement Portal</p>
+          </div>
+          <span className="text-[11px] font-bold bg-white/15 border border-white/30 rounded-full px-3 py-1 whitespace-nowrap">v2 · explainable</span>
+        </div>
+      </div>
+
+      <ArchSection n={1} title="Purpose" icon={<ScrollText className="w-4 h-4 text-indigo-600" />}>
+        <p className="text-sm text-slate-600 leading-relaxed">
+          The engine produces a <b>0–100 fit score</b> for every candidate ↔ job pair. The score drives the candidate's <i>Recommended Jobs</i>, the agent's ranked applicant list, and the match badge on every application. Every score comes with a per-factor breakdown so candidates and agents can see <i>why</i> — the algorithm is <b>fully explainable</b>. All weights, missing-criteria policies and the recommendation threshold are admin-tunable at runtime via the Matching Engine Parameters module (§7) — no code redeploy needed.
+        </p>
+      </ArchSection>
+
+      <ArchSection n={2} title="Scoring Framework" icon={<Sigma className="w-4 h-4 text-indigo-600" />}>
+        <p className="text-sm text-slate-600 mb-3">Total <b>100 points</b> across <b>7 factors</b> in three tiers — Hard criteria (60) gate the match, Preferences (25) rank it, Compatibility (15) breaks ties.</p>
+        <div className="overflow-x-auto rounded-lg border border-slate-200">
+          <table className="w-full text-sm">
+            <thead><tr className="bg-slate-50 text-left text-[11px] uppercase tracking-wide text-slate-500">
+              <th className="px-3 py-2 font-semibold">Tier</th><th className="px-3 py-2 font-semibold">Factor</th><th className="px-3 py-2 font-semibold text-center">Wt</th><th className="px-3 py-2 font-semibold">What it measures</th>
+            </tr></thead>
+            <tbody>
+              {FACTORS.map((r, i) => (
+                <tr key={i} className="border-t border-slate-100">
+                  <td className="px-3 py-2">{r.tier && <span className={`text-[11px] font-bold rounded px-1.5 py-0.5 ${r.tierColor}`}>{r.tier} · {r.tierPts}</span>}</td>
+                  <td className="px-3 py-2 font-medium text-slate-800">{r.factor}</td>
+                  <td className="px-3 py-2 text-center font-bold text-slate-900 tabular-nums">{r.wt}</td>
+                  <td className="px-3 py-2 text-slate-600">{r.what}</td>
+                </tr>
+              ))}
+              <tr className="border-t-2 border-slate-300 bg-slate-900 text-white">
+                <td className="px-3 py-2" /><td className="px-3 py-2 font-bold text-right">TOTAL</td><td className="px-3 py-2 text-center font-extrabold tabular-nums">100</td><td className="px-3 py-2 font-semibold">Final match score (0–100)</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </ArchSection>
+
+      <ArchSection n={3} title="Per-Factor Logic" icon={<GitBranch className="w-4 h-4 text-indigo-600" />}>
+        <div className="grid sm:grid-cols-2 gap-3">
+          {LOGIC.map((l) => (
+            <div key={l.f} className={`rounded-lg border-l-4 ${l.c} bg-slate-50 p-3`}>
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="font-semibold text-slate-800 text-sm">{l.f}</span>
+                <span className="text-[10px] font-bold bg-slate-900 text-white rounded px-1.5 py-0.5">{l.pts} pts</span>
+              </div>
+              <div className="font-mono text-[11px] bg-white border border-slate-200 rounded px-2 py-1 text-slate-700 mb-1.5 break-words">{l.code}</div>
+              <p className="text-[12px] text-slate-600 leading-snug">{l.note}</p>
+            </div>
+          ))}
+        </div>
+        <div className="mt-3 rounded-lg bg-indigo-50 border border-indigo-200 p-3 text-[12px] text-indigo-900">
+          <b>Defaults are baseline only.</b> All seven weights + missing-criteria policies + the recommendation threshold live in <ArchMono>system_settings.matching.*</ArchMono> and are exposed to admin via the Matching Engine Parameters module (§7). The engine reads the live config on every score request — tuning takes effect immediately.
+        </div>
+      </ArchSection>
+
+      <ArchSection n={4} title="Missing-Criteria Behaviour" icon={<Layers className="w-4 h-4 text-indigo-600" />}>
+        <p className="text-sm text-slate-600 mb-3">When a job doesn't specify a criterion, or a candidate hasn't filled a field, the engine applies a per-factor <b>"missing → neutral"</b> policy. Read each cell as <ArchMono>policy → points awarded</ArchMono>.</p>
+        <div className="overflow-x-auto rounded-lg border border-slate-200">
+          <table className="w-full text-sm">
+            <thead><tr className="bg-slate-50 text-left text-[11px] uppercase tracking-wide text-slate-500">
+              <th className="px-3 py-2 font-semibold">Factor</th><th className="px-3 py-2 font-semibold">Job-side missing</th><th className="px-3 py-2 font-semibold">Candidate-side missing</th><th className="px-3 py-2 font-semibold">Both</th><th className="px-3 py-2 font-semibold">Rationale</th>
+            </tr></thead>
+            <tbody>
+              {MISSING.map((m) => (
+                <tr key={m.f} className="border-t border-slate-100 align-top">
+                  <td className="px-3 py-2 font-medium text-slate-800 whitespace-nowrap">{m.f}</td>
+                  <td className="px-3 py-2"><span className="text-[11px] font-semibold text-blue-700">{m.job}</span></td>
+                  <td className="px-3 py-2"><span className="text-[11px] font-semibold text-amber-700">{m.cand}</span></td>
+                  <td className="px-3 py-2"><span className="text-[11px] font-semibold text-slate-600">{m.both}</span></td>
+                  <td className="px-3 py-2 text-[12px] text-slate-600">{m.why}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <p className="text-[11px] text-slate-400 mt-2"><b>Both-missing rule:</b> the engine checks the job side first; the job-side-missing policy applies when both are blank. Each direction is independently tunable from §7. <b>* n/a</b> = a required field on the job (Country, Category) — it can never be blank.</p>
+        <div className="mt-3 rounded-lg bg-emerald-50 border border-emerald-200 p-3 text-[12px] text-emerald-900">
+          <b>Worked example.</b> Job: Software Engineer in UAE, skills [React, Node], 3y experience — no qualification / languages / salary specified. Candidate: skills [React, Node, Python], 5y, preferredCountries=[UAE], no qualification / categories / salary.<br />
+          <span className="font-mono">Skills 30 + Exp 20 + Qual 10 (job missing) + Country 15 + Lang 10 (job missing) + Cat 5 (cand half) + Salary 5 (both missing)</span> = <b>95/100</b>. A partially-filled profile against a partially-filled job still yields a meaningful, defensible score.
+        </div>
+      </ArchSection>
+
+      <ArchSection n={5} title="Threshold, Sort & Explainability" icon={<Cpu className="w-4 h-4 text-indigo-600" />}>
+        <div className="grid sm:grid-cols-2 gap-4 text-sm">
+          <div>
+            <h4 className="font-semibold text-slate-800 mb-1">Recommendation cut-off</h4>
+            <p className="text-slate-600">The candidate's <i>Recommended Jobs</i> view shows only jobs scoring ≥ the configured threshold. Default <b>50</b>; admin adjusts at runtime via <ArchMono>matching.recommendation_threshold_pct</ArchMono>.</p>
+            <h4 className="font-semibold text-slate-800 mb-1 mt-3">Sort &amp; tie-break</h4>
+            <p className="text-slate-600">Default sort on the agent's per-job list: match score descending; ties broken by <ArchMono>appliedAt</ArchMono> (most recent first). Agent can override via dropdown.</p>
+          </div>
+          <div>
+            <h4 className="font-semibold text-slate-800 mb-1">Explainability</h4>
+            <p className="text-slate-600">Every score is returned with a structured per-factor breakdown (score + max + plain-English detail) that the UI renders inline on every match.</p>
+            <p className="text-slate-600 mt-2"><b>Why it matters:</b> HPSEDC is a government scheme — candidates have a right to know why they were or weren't matched. The breakdown avoids grievance escalations and gives agents data to coach candidates ("Add Hindi → you'd jump from 65 to 72").</p>
+          </div>
+        </div>
+      </ArchSection>
+
+      <ArchSection n={6} title="Implementation" icon={<GitBranch className="w-4 h-4 text-indigo-600" />}>
+        <div className="grid sm:grid-cols-2 gap-4 text-sm">
+          <div>
+            <h4 className="font-semibold text-slate-800 mb-1">Where it lives</h4>
+            <ul className="text-slate-600 space-y-1 list-disc pl-4">
+              <li><ArchMono>calculateScoreBreakdown(candidate, job)</ArchMono> in <ArchMono>server/routes/application.routes.ts</ArchMono></li>
+              <li>Cached on <ArchMono>applications.matchScore</ArchMono> at apply-time; recomputed on candidate profile change (toggleable setting)</li>
+              <li>Engine version exposed via <ArchMono>/api/v1/matching/version</ArchMono></li>
+            </ul>
+          </div>
+          <div>
+            <h4 className="font-semibold text-slate-800 mb-1">Backward compatibility</h4>
+            <ul className="text-slate-600 space-y-1 list-disc pl-4">
+              <li>v2 adds four new factors. Each defaults per §4 when its input is missing — v1-era profiles don't lose points unfairly.</li>
+              <li>Old scores in <ArchMono>applications.matchScore</ArchMono> stay valid until next recompute.</li>
+              <li>v2 rolls out without a one-time backfill.</li>
+            </ul>
+          </div>
+        </div>
+      </ArchSection>
+
+      <ArchSection n={7} title="Parameters Module (Admin)" icon={<Settings className="w-4 h-4 text-indigo-600" />}>
+        <p className="text-sm text-slate-600 mb-3">Every parameter the engine uses is admin-tunable from the live <b>Matching Engine</b> tab (Operations → Matching Engine) — no code change required.</p>
+        <div className="grid sm:grid-cols-2 gap-3 text-[12px]">
+          {[
+            ["7.1 · Weight tuner", "Seven vertical sliders (one per factor) — “music equalizer” UI. Sum-to-100 enforced on save; engine reads the live config on every score request."],
+            ["7.2 · Missing-criteria policy", "Each cell in the §4 table is an editable dropdown (Full / Half / Zero) — tighten matching as the candidate pool matures."],
+            ["7.3 · Threshold & engine toggle", "Recommendation threshold slider (0–100, default 50), engine version v1/v2 (rollback safety), recompute-on-profile-change, show-breakdown-to-candidate."],
+            ["7.4 · Live preview", "Pick a candidate + job; the breakdown renders live as weights are dragged — verify a tuning change before saving."],
+            ["7.5 · Audit trail", "Every weight/policy/threshold change writes to audit_log with actor, from, to, timestamp and an optional reason note."],
+          ].map(([t, d]) => (
+            <div key={t} className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+              <div className="font-semibold text-slate-800 mb-0.5">{t}</div>
+              <p className="text-slate-600 leading-snug">{d}</p>
+            </div>
+          ))}
+        </div>
+        <div className="mt-3 rounded-lg bg-amber-50 border border-amber-200 p-3 text-[12px] text-amber-900">
+          <b>Operational guardrail.</b> Weights must sum to exactly 100. The admin UI rejects any non-summing change with "Weights must sum to exactly 100 (current sum: X)." A "Reset to defaults" button restores the v2 baseline.
+        </div>
+      </ArchSection>
+
+      <ArchSection n={8} title="Not in v2 — Future Roadmap" icon={<TrendingUp className="w-4 h-4 text-indigo-600" />}>
+        <div className="grid sm:grid-cols-2 gap-3 text-[12px]">
+          {[
+            ["Soft-skills weighting", "Collaboration, leadership — requires text analysis; deferred until an extractor is in place."],
+            ["Employer reputation", "Placement success rate per employer fed back into the score; needs ≥1000 placements."],
+            ["Freshness decay", "Score halves over 30 days; encourages active candidates."],
+            ["ML-driven re-rank", "Learn optimal weights from (features → placement_success) once enough outcome data exists."],
+          ].map(([t, d]) => (
+            <div key={t} className="rounded-lg border border-dashed border-slate-300 p-3">
+              <div className="font-semibold text-slate-700 mb-0.5">{t}</div>
+              <p className="text-slate-500 leading-snug">{d}</p>
+            </div>
+          ))}
+        </div>
+      </ArchSection>
+    </div>
+  );
+}
+
+// ── Continuous conversion pipeline ───────────────────────────────────
+// One glossy pipe that tapers stage→stage. Each stage is a constant-height
+// block (height ∝ volume) joined by smooth tapers; a gauge at every joint
+// shows the pass-through rate. Pure SVG so it scales crisply.
+function PipelineFlow({ funnel, stageLabel }: { funnel: any[]; stageLabel: Record<string, string> }) {
+  const N = funnel.length;
+  if (!N) return null;
+  const segW = 116, joinW = 56;
+  const W = N * segW + (N - 1) * joinW;
+  const maxHalf = 72;
+  const cyTop = 30;            // space above pipe for the joint gauges
+  const cy = cyTop + maxHalf;  // pipe centre-line
+  const H = cy + maxHalf + 68; // space below for labels (stage · applications · %)
+  const top = funnel[0]?.count || 1;
+  const half = (c: number) => Math.max(13, (c / top) * maxHalf);
+  const X = (i: number) => i * (segW + joinW);
+
+  // Outline: top edge L→R then bottom edge R→L. Straight tapers between the
+  // constant-height stage blocks give a continuous, accurate pipe.
+  const topPts: [number, number][] = [];
+  const botPts: [number, number][] = [];
+  funnel.forEach((s, i) => {
+    const x = X(i), hh = half(s.count);
+    topPts.push([x, cy - hh], [x + segW, cy - hh]);
+    botPts.push([x, cy + hh], [x + segW, cy + hh]);
+  });
+  const d =
+    `M ${topPts[0][0]} ${topPts[0][1]} ` +
+    topPts.slice(1).map((p) => `L ${p[0]} ${p[1]}`).join(" ") + " " +
+    [...botPts].reverse().map((p) => `L ${p[0]} ${p[1]}`).join(" ") + " Z";
+
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} width="100%" preserveAspectRatio="xMidYMid meet" style={{ maxHeight: 280 }} role="img" aria-label="Conversion pipeline">
+      <defs>
+        {/* applicant-blue flowing into placement-green */}
+        <linearGradient id="pipeGrad" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%" stopColor="#6366f1" />
+          <stop offset="38%" stopColor="#3b82f6" />
+          <stop offset="68%" stopColor="#06b6d4" />
+          <stop offset="100%" stopColor="#10b981" />
+        </linearGradient>
+        {/* vertical sheen for a glossy 3-D pipe */}
+        <linearGradient id="pipeSheen" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#ffffff" stopOpacity="0.40" />
+          <stop offset="42%" stopColor="#ffffff" stopOpacity="0.06" />
+          <stop offset="58%" stopColor="#000000" stopOpacity="0" />
+          <stop offset="100%" stopColor="#000000" stopOpacity="0.14" />
+        </linearGradient>
+        <filter id="pipeShadow" x="-5%" y="-20%" width="110%" height="150%">
+          <feDropShadow dx="0" dy="3" stdDeviation="5" floodColor="#0f172a" floodOpacity="0.18" />
+        </filter>
+      </defs>
+
+      <path d={d} fill="url(#pipeGrad)" filter="url(#pipeShadow)" />
+      <path d={d} fill="url(#pipeSheen)" />
+
+      {funnel.map((s, i) => {
+        const cxx = X(i) + segW / 2;
+        const hh = half(s.count);
+        const overall = Math.round((s.count / top) * 100);
+        return (
+          <g key={s.stage}>
+            <text x={cxx} y={cy} textAnchor="middle" dominantBaseline="central" fontSize="22" fontWeight="800" fill="#ffffff">{s.count}</text>
+            {/* tick from pipe down to the label */}
+            <line x1={cxx} y1={cy + hh} x2={cxx} y2={H - 54} stroke="#e2e8f0" strokeWidth="1" strokeDasharray="2 3" />
+            <text x={cxx} y={H - 40} textAnchor="middle" fontSize="13" fontWeight="700" fill="#1e293b">{stageLabel[s.stage] ?? s.stage}</text>
+            <text x={cxx} y={H - 22} textAnchor="middle" fontSize="12" fontWeight="600" fill="#475569">{s.count} application{s.count === 1 ? "" : "s"}</text>
+            <text x={cxx} y={H - 6} textAnchor="middle" fontSize="10.5" fill="#94a3b8">{overall}% of total</text>
+          </g>
+        );
+      })}
+
+      {/* pass-through gauges, aligned in a row above each joint */}
+      {funnel.slice(1).map((s, idx) => {
+        const i = idx + 1;
+        const jointX = X(i) - joinW / 2;
+        const prev = funnel[i - 1].count || 1;
+        const pass = Math.round((s.count / prev) * 100);
+        const stroke = pass >= 60 ? "#059669" : pass >= 40 ? "#d97706" : "#dc2626";
+        const bg = pass >= 60 ? "#ecfdf5" : pass >= 40 ? "#fffbeb" : "#fef2f2";
+        const pillW = 46, pillY = 6, pillH = 21;
+        const pipeTop = cy - Math.min(half(s.count), half(funnel[i - 1].count));
+        return (
+          <g key={s.stage}>
+            <line x1={jointX} y1={pillY + pillH} x2={jointX} y2={pipeTop} stroke={stroke} strokeOpacity="0.3" strokeWidth="1" strokeDasharray="2 3" />
+            <rect x={jointX - pillW / 2} y={pillY} width={pillW} height={pillH} rx={10.5} fill={bg} stroke={stroke} strokeOpacity="0.45" />
+            <text x={jointX} y={pillY + pillH / 2 + 0.5} textAnchor="middle" dominantBaseline="central" fontSize="12" fontWeight="800" fill={stroke}>{pass}%</text>
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
 // ── Funnel Analytics ─────────────────────────────────────────────────
 function FunnelPanel() {
   const [country, setCountry] = useState<string>("all");
@@ -622,23 +1182,35 @@ function FunnelPanel() {
         </div>
       </div>
       {isLoading ? <Skeleton className="h-48 w-full" /> : (
-        <div className="space-y-2">
-          {funnel.map((s: any) => (
-            <div key={s.stage} className="grid grid-cols-[120px_1fr_70px_80px] items-center gap-3 text-sm">
-              <span className="text-slate-700 font-medium">{stageLabel[s.stage] ?? s.stage}</span>
-              <div className="relative h-6 bg-slate-100 rounded overflow-hidden">
-                <div className="absolute left-0 top-0 h-full bg-gradient-to-r from-blue-500 to-purple-600"
-                  style={{ width: `${(s.count / max) * 100}%` }} />
+        <>
+          {/* Funnel — original left-aligned bars (stage · volume · drop-off) */}
+          <div className="space-y-2">
+            {funnel.map((s: any) => (
+              <div key={s.stage} className="grid grid-cols-[120px_1fr_70px_80px] items-center gap-3 text-sm">
+                <span className="text-slate-700 font-medium">{stageLabel[s.stage] ?? s.stage}</span>
+                <div className="relative h-6 bg-slate-100 rounded overflow-hidden">
+                  <div className="absolute left-0 top-0 h-full bg-gradient-to-r from-blue-500 to-purple-600"
+                    style={{ width: `${(s.count / max) * 100}%` }} />
+                </div>
+                <span className="text-right font-semibold tabular-nums">{s.count}</span>
+                <span className={`text-right text-xs tabular-nums ${s.dropPct > 50 ? "text-red-600" : "text-slate-500"}`}>
+                  {s.dropPct > 0 ? `-${s.dropPct}%` : ""}
+                </span>
               </div>
-              <span className="text-right font-semibold tabular-nums">{s.count}</span>
-              <span className={`text-right text-xs tabular-nums ${s.dropPct > 50 ? "text-red-600" : "text-slate-500"}`}>
-                {s.dropPct > 0 ? `-${s.dropPct}%` : ""}
-              </span>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+          <p className="text-[11px] text-slate-400 mt-3">Drop-off % is relative to the previous stage. Filter by country to see regional variations.</p>
+
+          {/* Horizontal conversion pipeline — flow + pass-through ratio between stages */}
+          <div className="mt-7 pt-5 border-t border-slate-100">
+            <h4 className="text-sm font-semibold text-slate-800 flex items-center gap-2">
+              <TrendingUp className="w-4 h-4 text-emerald-600" /> Conversion pipeline
+            </h4>
+            <p className="text-[11px] text-slate-400 mb-2">One continuous pipe — it narrows as candidates drop off. The gauge at each joint is the pass-through rate from the previous stage.</p>
+            <PipelineFlow funnel={funnel} stageLabel={stageLabel} />
+          </div>
+        </>
       )}
-      <p className="text-[11px] text-slate-400 mt-4">Drop-off % is relative to the previous stage. Filter by country to see regional variations.</p>
     </div>
   );
 }
@@ -1916,36 +2488,28 @@ function GrievanceCard({ grievance: g }: { grievance: any }) {
   const [resolving, setResolving] = useState(false);
   const [notes, setNotes] = useState("");
 
-  const resolveMutation = useMutation({
-    mutationFn: async () => {
+  // One mutation for the whole lifecycle. Flow is linear:
+  // submitted → under_review → action_taken → resolved (Resolve is the LAST step).
+  const setStatus = useMutation({
+    mutationFn: async (payload: { status: string; resolutionNotes?: string }) => {
       const res = await fetch(`/api/v1/grievances/${g.id}`, {
-        method: "PATCH", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: "resolved", resolutionNotes: notes }),
+        method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload),
       });
-      if (!res.ok) throw new Error("Failed");
+      if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e?.error?.message || "Update failed"); }
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (_d, vars) => {
       queryClient.invalidateQueries({ queryKey: ["/api/v1/grievances"] });
       setResolving(false);
-      toast({ title: "Grievance Resolved" });
+      toast({ title: vars.status === "resolved" ? "Grievance resolved" : `Marked "${vars.status.replace(/_/g, " ")}"` });
     },
   });
 
-  const reviewMutation = useMutation({
-    mutationFn: async () => {
-      const res = await fetch(`/api/v1/grievances/${g.id}`, {
-        method: "PATCH", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: "under_review" }),
-      });
-      if (!res.ok) throw new Error("Failed");
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/v1/grievances"] });
-      toast({ title: "Marked as Under Review" });
-    },
-  });
+  const statusBadge: Record<string, string> = {
+    resolved: "bg-emerald-600", action_taken: "bg-indigo-600", under_review: "bg-blue-600",
+    escalated: "bg-red-600", submitted: "bg-orange-500",
+  };
+  const isTerminal = g.status === "resolved" || g.status === "escalated";
 
   return (
     <div className="border rounded-lg p-4">
@@ -1955,7 +2519,7 @@ function GrievanceCard({ grievance: g }: { grievance: any }) {
           <p className="text-sm text-gray-500 mt-1">{g.description}</p>
           <div className="flex gap-2 mt-2 flex-wrap">
             <Badge variant="outline" className="text-xs capitalize">{g.category?.replace(/_/g, " ")}</Badge>
-            <Badge className={`text-xs ${g.status === "resolved" ? "bg-emerald-600" : g.status === "under_review" ? "bg-blue-600" : "bg-orange-500"} text-white`}>
+            <Badge className={`text-xs ${statusBadge[g.status] || "bg-orange-500"} text-white`}>
               {g.status?.replace(/_/g, " ")}
             </Badge>
             {/* Submitter + owner badges — surfaces the auto-routing decision
@@ -1984,30 +2548,38 @@ function GrievanceCard({ grievance: g }: { grievance: any }) {
         </div>
         <div className="flex flex-col gap-1 items-end">
           <span className="text-xs text-gray-400">{g.createdAt ? new Date(g.createdAt).toLocaleDateString("en-IN") : ""}</span>
-          {g.status !== "resolved" && (
+          {!isTerminal && (
             <div className="flex gap-1 mt-1">
               {g.status === "submitted" && (
-                <Button size="sm" variant="outline" className="text-xs h-7" onClick={() => reviewMutation.mutate()}>
-                  Review
+                <Button size="sm" variant="outline" className="text-xs h-7" disabled={setStatus.isPending}
+                  onClick={() => setStatus.mutate({ status: "under_review" })}>
+                  Start Review
                 </Button>
               )}
-              <Button size="sm" className="bg-emerald-600 text-white text-xs h-7" onClick={() => setResolving(!resolving)}>
-                Resolve
-              </Button>
+              {g.status === "under_review" && (
+                <Button size="sm" variant="outline" className="text-xs h-7" disabled={setStatus.isPending}
+                  onClick={() => setResolving((v) => !v)}>
+                  Mark Action Taken
+                </Button>
+              )}
+              {g.status === "action_taken" && (
+                <span className="text-[11px] text-amber-600 font-medium">Awaiting complainant's confirmation</span>
+              )}
             </div>
           )}
         </div>
       </div>
-      {resolving && (
+      {/* Staff record what they did; the complainant then confirms resolution. */}
+      {resolving && g.status === "under_review" && (
         <div className="mt-3 p-3 border rounded-lg bg-gray-50 space-y-2">
           <textarea
             className="w-full min-h-[60px] p-2 border rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            placeholder="Resolution notes..."
-            value={notes} onChange={(e) => setNotes(e.target.value)}
+            placeholder="What action did you take? (the complainant will see this and confirm if resolved)…"
+            value={notes} onChange={(e) => setNotes(e.target.value)} maxLength={3000}
           />
           <div className="flex gap-2">
-            <Button size="sm" onClick={() => resolveMutation.mutate()} disabled={!notes || resolveMutation.isPending}>
-              Submit Resolution
+            <Button size="sm" onClick={() => setStatus.mutate({ status: "action_taken", resolutionNotes: notes })} disabled={!notes.trim() || setStatus.isPending}>
+              Mark Action Taken
             </Button>
             <Button size="sm" variant="outline" onClick={() => setResolving(false)}>Cancel</Button>
           </div>
@@ -2019,6 +2591,8 @@ function GrievanceCard({ grievance: g }: { grievance: any }) {
           <p className="text-emerald-700">{g.resolutionNotes}</p>
         </div>
       )}
+      {/* Two-way conversation with the complainant — admin is staff here. */}
+      <GrievanceThread grievanceId={g.id} isStaff={true} />
     </div>
   );
 }

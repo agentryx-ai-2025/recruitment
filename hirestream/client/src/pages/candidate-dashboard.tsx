@@ -20,6 +20,7 @@ import { PhotoAvatar } from "@/components/shared/PhotoAvatar";
 import { JOB_CATEGORIES, jobCategoryLabel } from "@/lib/reference-data";
 import { MatchBreakdownPanel } from "@/components/shared/MatchBreakdownPanel";
 import { InterviewActionsPanel } from "@/components/candidate/InterviewActionsPanel";
+import { DrivesView } from "@/components/candidate/DrivesView";
 
 async function fetchJson(url: string) {
   const res = await fetch(url);
@@ -131,6 +132,7 @@ export default function CandidateDashboard() {
     { key: "journey", label: "My Journey", icon: Route, count: null, color: "text-cyan-600 bg-cyan-100" },
     { key: "recommended", label: "Recommended", icon: Sparkles, count: recommendations.length, color: "text-amber-600 bg-amber-100" },
     { key: "saved", label: "Saved Jobs", icon: Bookmark, count: savedJobsList.length, color: "text-rose-600 bg-rose-100" },
+    { key: "drives", label: "Recruitment Drives", icon: Calendar, count: null, color: "text-indigo-600 bg-indigo-100" },
     { key: "documents", label: "Documents", icon: FileText, count: docs.length, color: "text-violet-600 bg-violet-100" },
   ];
 
@@ -209,7 +211,7 @@ export default function CandidateDashboard() {
               const first = missing[0];
               if (!first) {
                 return (
-                  <Button size="sm" onClick={() => setLocation("/profile")}
+                  <Button size="sm" onClick={() => window.open("/api/v1/candidates/profile/pdf", "_blank", "noopener")}
                     className="w-full rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold">
                     <CheckCircle className="w-3.5 h-3.5 mr-1.5" /> Review Profile
                   </Button>
@@ -312,6 +314,7 @@ export default function CandidateDashboard() {
               {activeView === "journey" && <JourneyView profile={profile} applications={applications} completion={completion} docs={docs} education={education} experience={experience} />}
               {activeView === "recommended" && <RecommendedView recommendations={recommendations} savedJobIds={savedJobIds} setActiveView={setActiveView} />}
               {activeView === "saved" && <SavedJobsView savedJobs={savedJobsList} appliedJobIds={appliedJobIds} setActiveView={setActiveView} />}
+              {activeView === "drives" && <DrivesView />}
               {activeView === "documents" && <DocumentsView docs={docs} profile={profile} intent={intent} />}
             </motion.div>
           </AnimatePresence>
@@ -1777,6 +1780,11 @@ function DocumentsView({ docs, profile, intent }: { docs: any[]; profile: any; i
                   </div>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
+                  <Button variant="outline" size="sm"
+                    onClick={() => window.open(`/api/v1/candidates/documents/${doc.id}/download?inline=1`, "_blank")}
+                    className="rounded-xl gap-1.5">
+                    <Eye className="w-4 h-4" /> Preview
+                  </Button>
                   <Button variant="outline" size="sm"
                     onClick={() => window.open(`/api/v1/candidates/documents/${doc.id}/download`, "_blank")}
                     className="rounded-xl gap-1.5">

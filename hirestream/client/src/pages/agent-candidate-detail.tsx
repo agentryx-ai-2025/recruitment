@@ -10,7 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import {
   ArrowLeft, MapPin, Mail, Phone, GraduationCap, Briefcase, FileText,
   Globe, Star, Award, Loader2, Download, CheckCircle, Shield, ShieldAlert,
-  Plane, Heart, BookOpen, Save,
+  Plane, Heart, BookOpen, Save, Eye,
 } from "lucide-react";
 import { PhotoAvatar } from "@/components/shared/PhotoAvatar";
 
@@ -157,9 +157,14 @@ export default function AgentCandidateDetailPage() {
                     </div>
                   </div>
                 </div>
-                <a href={`/api/v1/candidates/documents/${d.id}/download`} target="_blank" rel="noreferrer">
-                  <Button size="sm" variant="outline" className="gap-1"><Download className="w-3.5 h-3.5" /></Button>
-                </a>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <a href={`/api/v1/candidates/documents/${d.id}/download?inline=1`} target="_blank" rel="noreferrer">
+                    <Button size="sm" variant="outline" className="gap-1"><Eye className="w-3.5 h-3.5" /> Preview</Button>
+                  </a>
+                  <a href={`/api/v1/candidates/documents/${d.id}/download`} target="_blank" rel="noreferrer">
+                    <Button size="sm" variant="outline" className="gap-1"><Download className="w-3.5 h-3.5" /></Button>
+                  </a>
+                </div>
               </div>
             ))}
           </div>

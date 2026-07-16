@@ -1816,6 +1816,31 @@ function ReportsView() {
 // ── v1.3 OPS CONSOLE — CPU/RAM/DISK, SYSTEM, SQL SANDBOX, BACKUPS, TRENDS
 // ─────────────────────────────────────────────────────────────────────
 
+// ── Radial gauge dial for a resource (CPU / RAM / Storage) ──
+function ResourceDial({ label, pct, center, sub }: { label: string; pct: number; center: string; sub: string }) {
+  const R = 46, C = 2 * Math.PI * R;
+  const v = Math.max(0, Math.min(100, Number(pct) || 0));
+  const color = v >= 90 ? "#ef4444" : v >= 75 ? "#f59e0b" : "#10b981";
+  const tint = v >= 90 ? "text-red-600" : v >= 75 ? "text-amber-600" : "text-emerald-600";
+  return (
+    <div className="flex flex-col items-center p-4 rounded-xl bg-white border border-slate-200 shadow-sm">
+      <div className="relative w-32 h-32">
+        <svg viewBox="0 0 110 110" className="w-full h-full -rotate-90">
+          <circle cx="55" cy="55" r={R} fill="none" stroke="#f1f5f9" strokeWidth="9" />
+          <circle cx="55" cy="55" r={R} fill="none" stroke={color} strokeWidth="9" strokeLinecap="round"
+            strokeDasharray={C} strokeDashoffset={C * (1 - v / 100)}
+            style={{ transition: "stroke-dashoffset .6s ease, stroke .3s" }} />
+        </svg>
+        <div className="absolute inset-0 flex flex-col items-center justify-center">
+          <span className={`text-2xl font-extrabold tabular-nums ${tint}`}>{center}</span>
+          <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">{label}</span>
+        </div>
+      </div>
+      <p className="text-[11px] text-slate-500 mt-2 text-center leading-tight">{sub}</p>
+    </div>
+  );
+}
+
 // ── Resources View — CPU/RAM/Disk with sparklines ──
 function ResourcesView() {
   const { data: resRes, isLoading, refetch, isFetching } = useQuery({
@@ -1825,6 +1850,8 @@ function ResourcesView() {
   });
 
   const r = resRes?.data;
+  // Primary storage volume for the Storage dial (root mount, else largest).
+  const pd = r?.disk?.find((d: any) => d.mount === "/") || r?.disk?.[0] || { used_pct: 0, used_gb: 0, size_gb: 0, mount: "—" };
   const formatTime = (ts: number) => new Date(ts).toLocaleTimeString("en-IN", { hour12: false, hour: "2-digit", minute: "2-digit", second: "2-digit" });
 
   return (
@@ -1843,27 +1870,13 @@ function ResourcesView() {
           <div className="flex items-center justify-center h-32"><Loader2 className="w-6 h-6 animate-spin" /></div>
         ) : (
           <div className="space-y-5">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <div className="p-4 rounded-xl bg-blue-50 border border-blue-200">
-                <p className="text-[10px] text-blue-600 font-semibold uppercase mb-1">CPU Load</p>
-                <p className="text-2xl font-bold text-slate-900 tabular-nums">{r.cpu.currentLoad}%</p>
-                <p className="text-[11px] text-blue-600 mt-1">{r.cpu.cores} cores ({r.cpu.physicalCores} physical)</p>
-              </div>
-              <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200">
-                <p className="text-[10px] text-emerald-600 font-semibold uppercase mb-1">Memory</p>
-                <p className="text-2xl font-bold text-slate-900 tabular-nums">{r.memory.used_pct}%</p>
-                <p className="text-[11px] text-emerald-600 mt-1">{r.memory.used_gb} / {r.memory.total_gb} GB</p>
-              </div>
-              <div className="p-4 rounded-xl bg-purple-50 border border-purple-200">
-                <p className="text-[10px] text-purple-600 font-semibold uppercase mb-1">Load Avg</p>
-                <p className="text-2xl font-bold text-slate-900 tabular-nums">{r.cpu.loadAvg}</p>
-                <p className="text-[11px] text-purple-600 mt-1">{r.os.platform} · {r.os.arch}</p>
-              </div>
-              <div className="p-4 rounded-xl bg-amber-50 border border-amber-200">
-                <p className="text-[10px] text-amber-600 font-semibold uppercase mb-1">Swap Used</p>
-                <p className="text-2xl font-bold text-slate-900 tabular-nums">{r.memory.swap_used_gb} GB</p>
-                <p className="text-[11px] text-amber-600 mt-1">of {r.memory.swap_total_gb} GB</p>
-              </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <ResourceDial label="CPU Load" pct={r.cpu.currentLoad} center={`${r.cpu.currentLoad}%`}
+                sub={`${r.cpu.cores} cores (${r.cpu.physicalCores} physical) · load avg ${r.cpu.loadAvg}`} />
+              <ResourceDial label="Memory" pct={r.memory.used_pct} center={`${r.memory.used_pct}%`}
+                sub={`${r.memory.used_gb} / ${r.memory.total_gb} GB · swap ${r.memory.swap_used_gb}/${r.memory.swap_total_gb} GB`} />
+              <ResourceDial label="Storage" pct={pd.used_pct} center={`${pd.used_pct}%`}
+                sub={`${pd.used_gb} / ${pd.size_gb} GB · ${pd.mount}`} />
             </div>
 
             {r.history && r.history.length > 1 && (

@@ -174,26 +174,51 @@ router.get("/by-placement-status", async (req, res, next) => {
     const db = storage.db;
     if (!db) return res.status(500).json({ success: false, error: { code: 500, message: "Database not available" } });
 
-    const result = await db.execute(sql`
-      SELECT status, COUNT(*)::int as count
-      FROM applications
-      GROUP BY status
-      ORDER BY
-        CASE status
+    // CUMULATIVE funnel — count apps that reached AT LEAST each stage, so the
+    // funnel is always monotonic (Placed ≤ Selected ≤ … ≤ Submitted). Using the
+    // current status as "furthest stage reached" (the pipeline is forward-only).
+    // Rejected/withdrawn apps count only at Submitted (we don't track how far
+    // they got before exiting).
+    const cum = await db.execute(sql`
+      WITH ranked AS (
+        SELECT CASE status
           WHEN 'submitted' THEN 1
           WHEN 'reviewed' THEN 2
           WHEN 'shortlisted' THEN 3
           WHEN 'interview_scheduled' THEN 4
           WHEN 'selected' THEN 5
           WHEN 'placed' THEN 6
-          WHEN 'rejected' THEN 7
-          ELSE 8
-        END
+          ELSE 1
+        END AS rk
+        FROM applications
+      )
+      SELECT
+        COUNT(*) FILTER (WHERE rk >= 1)::int AS submitted,
+        COUNT(*) FILTER (WHERE rk >= 2)::int AS reviewed,
+        COUNT(*) FILTER (WHERE rk >= 3)::int AS shortlisted,
+        COUNT(*) FILTER (WHERE rk >= 4)::int AS interview_scheduled,
+        COUNT(*) FILTER (WHERE rk >= 5)::int AS selected,
+        COUNT(*) FILTER (WHERE rk >= 6)::int AS placed
+      FROM ranked
     `);
+    const row: any = cum.rows[0] ?? {};
+    const result = {
+      rows: [
+        { status: "submitted", count: Number(row.submitted ?? 0) },
+        { status: "reviewed", count: Number(row.reviewed ?? 0) },
+        { status: "shortlisted", count: Number(row.shortlisted ?? 0) },
+        { status: "interview_scheduled", count: Number(row.interview_scheduled ?? 0) },
+        { status: "selected", count: Number(row.selected ?? 0) },
+        { status: "placed", count: Number(row.placed ?? 0) },
+      ],
+    };
 
     const totalCands = await db.select({ c: count() }).from(candidates);
     const totalApps = await db.select({ c: count() }).from(applications);
-    const totalPlaced = await db.select({ c: count() }).from(placements).where(eq(placements.status, "accepted"));
+    // "Placed" = a real placement: accepted, actively deployed, or completed —
+    // same definition as the Placements metric card and the compliance views.
+    // (Counting only 'accepted' under-counted workers already active abroad.)
+    const totalPlaced = await db.select({ c: count() }).from(placements).where(sql`${placements.status} IN ('accepted','active','completed')`);
 
     res.json({
       success: true,

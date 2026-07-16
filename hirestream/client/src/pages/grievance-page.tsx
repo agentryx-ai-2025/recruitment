@@ -8,6 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { MessageSquare, Plus, Clock, CheckCircle, AlertCircle, Loader2, Inbox, ShieldCheck } from "lucide-react";
+import { GrievanceThread } from "@/components/shared/GrievanceThread";
 import { FIELD_LIMITS } from "@/lib/reference-data";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -17,6 +18,7 @@ async function fetchJson(url: string) {
   if (!res.ok) return { data: [] };
   return res.json();
 }
+
 
 export default function GrievancePage() {
   const { user } = useAuth();
@@ -276,7 +278,9 @@ export default function GrievancePage() {
             // (Admin/superadmin always sees actions via the All tab anyway,
             //  since they have full PATCH rights.)
             const iAmOwner = !!user && g.assignedTo === user.id;
-            const canAct = (iAmOwner || isAdmin) && g.status !== "resolved";
+            const iAmComplainant = !!user && g.userId === user.id;
+            const isTerminal = g.status === "resolved" || g.status === "escalated";
+            const canAct = (iAmOwner || isAdmin) && !iAmComplainant && !isTerminal;
             return (
               <div key={g.id} className="bg-white rounded-lg shadow-sm border p-5">
                 <div className="flex items-start justify-between gap-4">
@@ -306,6 +310,7 @@ export default function GrievancePage() {
                       </div>
                     </div>
                   </div>
+                  {/* Staff drive the work — Start Review → Action Taken, then wait. */}
                   {canAct && (
                     <div className="flex flex-col gap-1 shrink-0">
                       {g.status === "submitted" && (
@@ -318,20 +323,42 @@ export default function GrievancePage() {
                       {g.status === "under_review" && (
                         <Button size="sm" variant="outline" className="text-xs h-7"
                           disabled={updateStatus.isPending}
-                          onClick={() => updateStatus.mutate({ id: g.id, status: "action_taken" })}>
-                          Action Taken
+                          onClick={() => {
+                            const note = window.prompt("What action did you take? (the complainant will see this)", "");
+                            if (note !== null) updateStatus.mutate({ id: g.id, status: "action_taken", resolutionNotes: note.trim() || undefined });
+                          }}>
+                          Mark Action Taken
                         </Button>
                       )}
-                      <Button size="sm" className="bg-emerald-600 text-white text-xs h-7"
-                        disabled={updateStatus.isPending}
-                        onClick={() => {
-                          const note = window.prompt("Resolution note (visible to the submitter):", "");
-                          if (note !== null && note.trim().length > 0) {
-                            updateStatus.mutate({ id: g.id, status: "resolved", resolutionNotes: note.trim() });
-                          }
-                        }}>
-                        Resolve
-                      </Button>
+                      {g.status === "action_taken" && (
+                        <span className="text-[11px] text-amber-600 font-medium max-w-[140px] text-right">Awaiting complainant's confirmation</span>
+                      )}
+                    </div>
+                  )}
+                  {/* The COMPLAINANT closes the loop — confirm resolved, reopen, or
+                      simply close/withdraw their own grievance at any stage. */}
+                  {iAmComplainant && !isTerminal && (
+                    <div className="flex flex-col gap-1 shrink-0">
+                      {g.status === "action_taken" ? (
+                        <>
+                          <Button size="sm" className="bg-emerald-600 text-white text-xs h-7"
+                            disabled={updateStatus.isPending}
+                            onClick={() => updateStatus.mutate({ id: g.id, status: "resolved" })}>
+                            Mark Resolved
+                          </Button>
+                          <Button size="sm" variant="outline" className="text-xs h-7"
+                            disabled={updateStatus.isPending}
+                            onClick={() => updateStatus.mutate({ id: g.id, status: "under_review" })}>
+                            Reopen — not resolved
+                          </Button>
+                        </>
+                      ) : (
+                        <Button size="sm" variant="outline" className="text-xs h-7"
+                          disabled={updateStatus.isPending}
+                          onClick={() => { if (window.confirm("Close this grievance? It will be marked resolved.")) updateStatus.mutate({ id: g.id, status: "resolved" }); }}>
+                          Close grievance
+                        </Button>
+                      )}
                     </div>
                   )}
                 </div>
@@ -347,6 +374,7 @@ export default function GrievancePage() {
                     <p className="text-blue-700 mt-1">{g.adminNotes}</p>
                   </div>
                 )}
+                <GrievanceThread grievanceId={g.id} isStaff={iAmOwner || isAdmin} />
               </div>
             );
           })}

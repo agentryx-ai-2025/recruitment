@@ -274,7 +274,7 @@ export function MatchingEnginePanel() {
                 className="w-16 h-8 text-xs text-center" />
             </div>
             <Button size="sm" variant="outline" onClick={saveThreshold} className="mt-2 h-7 text-xs">Save threshold</Button>
-            <p className="text-[10px] text-slate-400 mt-2">Jobs scoring below this don't appear in "Recommended for you".</p>
+            <p className="text-[10px] text-slate-400 mt-2">Jobs scoring below this don't appear in "Jobs for You".</p>
           </div>
 
           <div>

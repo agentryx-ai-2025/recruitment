@@ -10,6 +10,7 @@ import { Masthead } from "@/components/layout/masthead";
 import { Header } from "@/components/layout/header";
 import { Footer } from "@/components/layout/footer";
 import { AnnouncementBanner } from "@/components/layout/announcement-banner";
+import { DemoSwitcher } from "@/components/demo/DemoSwitcher";
 import LandingPage from "@/pages/landing"; // critical (landing should load fast)
 import { Loader2 } from "lucide-react";
 
@@ -166,6 +167,7 @@ function App() {
         <TooltipProvider>
           <Toaster />
           <Router />
+          <DemoSwitcher />
         </TooltipProvider>
       </AuthProvider>
     </QueryClientProvider>

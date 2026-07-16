@@ -1,0 +1,526 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>HireStream — HPSEDC Overseas Placement Portal · Agentryx Project Profile</title>
+<style>
+  @page { size: A4; margin: 0; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    color: #1e293b;
+    line-height: 1.45;
+    font-size: 9.5px;
+    -webkit-font-smoothing: antialiased;
+  }
+  .page {
+    width: 210mm;
+    height: 297mm;
+    padding: 11mm 13mm 9mm 13mm;
+    page-break-after: always;
+    page-break-inside: avoid;
+    position: relative;
+    overflow: hidden;
+    background: white;
+  }
+  .page:last-child { page-break-after: auto; }
+
+  /* ── Cover ─────────────────────────────────────────────── */
+  .cover-band {
+    background: linear-gradient(135deg, #1d4ed8 0%, #4338ca 60%, #6d28d9 100%);
+    color: white;
+    padding: 14px 18px 12px 18px;
+    border-radius: 10px;
+    margin-bottom: 9px;
+    position: relative;
+    overflow: hidden;
+  }
+  .cover-band::after {
+    content: '';
+    position: absolute;
+    right: -40px; top: -40px;
+    width: 160px; height: 160px;
+    background: radial-gradient(circle, rgba(255,255,255,0.13) 0%, transparent 70%);
+  }
+  .cover-band .eyebrow {
+    font-size: 7.5px;
+    text-transform: uppercase;
+    letter-spacing: 1.6px;
+    color: #c7d2fe;
+    font-weight: 700;
+    margin-bottom: 4px;
+  }
+  .cover-band h1 {
+    font-size: 19px;
+    font-weight: 800;
+    letter-spacing: -0.4px;
+    line-height: 1.15;
+  }
+  .cover-band .subtitle {
+    font-size: 9.5px;
+    color: #ddd6fe;
+    margin-top: 4px;
+    font-weight: 500;
+  }
+  .cover-band .descriptor {
+    margin-top: 7px;
+    font-size: 9.5px;
+    color: #f3f4f6;
+    border-top: 1px solid rgba(255,255,255,0.18);
+    padding-top: 7px;
+    line-height: 1.45;
+    font-style: italic;
+  }
+  .cover-band .pills {
+    display: flex; gap: 5px; flex-wrap: wrap;
+    margin-top: 8px;
+  }
+  .cover-band .pill {
+    background: rgba(255,255,255,0.16);
+    border: 1px solid rgba(255,255,255,0.28);
+    padding: 2px 8px;
+    border-radius: 11px;
+    font-size: 7.5px;
+    font-weight: 600;
+    color: #f5f3ff;
+  }
+
+  /* ── Tricolor accent ──────────────────────────────────── */
+  .tricolor {
+    display: flex; height: 3px;
+    border-radius: 2px; overflow: hidden;
+    margin: 0 0 9px 0;
+  }
+  .tricolor .saffron { flex: 1; background: #FF9933; }
+  .tricolor .white   { flex: 1; background: #f1f5f9; }
+  .tricolor .green   { flex: 1; background: #138808; }
+
+  /* ── Front-matter card ─────────────────────────────────── */
+  .meta {
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 8px 10px;
+    margin-bottom: 9px;
+    background: #f8fafc;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 5px 14px;
+    font-size: 8.5px;
+  }
+  .meta .key {
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    font-weight: 700;
+    font-size: 7.5px;
+    margin-bottom: 1px;
+    display: block;
+  }
+  .meta .val { color: #0f172a; font-weight: 500; font-size: 8.7px; line-height: 1.35; }
+  .meta .full { grid-column: span 4; }
+  .meta .full2 { grid-column: span 2; }
+
+  /* ── Section headers ──────────────────────────────────── */
+  h2 {
+    font-size: 11.5px;
+    font-weight: 800;
+    color: #1e3a8a;
+    margin: 9px 0 5px 0;
+    padding-bottom: 3px;
+    border-bottom: 2px solid #dbeafe;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  h2 .num {
+    background: #1d4ed8;
+    color: white;
+    font-size: 8.5px;
+    padding: 1px 6px;
+    border-radius: 9px;
+    font-weight: 800;
+    min-width: 16px;
+    text-align: center;
+  }
+  h3 {
+    font-size: 10px;
+    font-weight: 700;
+    color: #0f172a;
+    margin: 6px 0 3px 0;
+  }
+  p {
+    font-size: 9.5px;
+    margin: 0 0 5px 0;
+    color: #334155;
+    text-align: justify;
+  }
+  strong { color: #0f172a; font-weight: 700; }
+  em { color: #1e3a8a; font-style: italic; }
+
+  ul, ol { padding-left: 14px; margin: 3px 0 5px 0; }
+  li {
+    font-size: 9.5px;
+    margin: 2px 0;
+    color: #334155;
+    text-align: justify;
+  }
+  li::marker { color: #1d4ed8; }
+
+  /* ── Stack chip layout ─────────────────────────────────── */
+  .stack {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 5px 9px;
+    margin-top: 4px;
+  }
+  .stack .row {
+    border-left: 2px solid #1d4ed8;
+    padding: 3px 0 3px 7px;
+  }
+  .stack .row .lbl {
+    font-size: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: #1e3a8a;
+    font-weight: 800;
+    margin-bottom: 2px;
+  }
+  .stack .row .v {
+    font-size: 8.7px;
+    color: #334155;
+    line-height: 1.4;
+  }
+
+  /* ── Capability table ──────────────────────────────────── */
+  .cap-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 4px;
+    margin-top: 4px;
+  }
+  .cap {
+    border: 1px solid #e2e8f0;
+    border-left: 3px solid #1d4ed8;
+    border-radius: 6px;
+    padding: 5px 8px;
+    background: #fdfdff;
+    font-size: 9px;
+  }
+  .cap .name {
+    font-weight: 800;
+    color: #1e3a8a;
+    margin-bottom: 1px;
+    font-size: 9.2px;
+  }
+  .cap .ev { color: #475569; line-height: 1.4; }
+
+  /* ── Hard problems cards ───────────────────────────────── */
+  .hard {
+    border: 1px solid #fed7aa;
+    background: #fff7ed;
+    border-left: 3px solid #ea580c;
+    border-radius: 6px;
+    padding: 6px 9px;
+    margin: 4px 0;
+    font-size: 9.3px;
+    color: #431407;
+  }
+  .hard .h {
+    font-weight: 800;
+    color: #9a3412;
+    margin-bottom: 2px;
+    font-size: 9.5px;
+  }
+
+  /* ── Outcome stat strip ────────────────────────────────── */
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
+    margin: 5px 0 6px 0;
+  }
+  .stat {
+    text-align: center;
+    background: linear-gradient(135deg, #eff6ff, #ede9fe);
+    border: 1px solid #c7d2fe;
+    border-radius: 7px;
+    padding: 6px 4px;
+  }
+  .stat .num { font-size: 14px; font-weight: 800; color: #1d4ed8; line-height: 1; }
+  .stat .lbl { font-size: 7.5px; color: #475569; margin-top: 2px; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; }
+
+  /* ── Footer / page-num ─────────────────────────────────── */
+  .footer {
+    position: absolute;
+    bottom: 5mm;
+    left: 13mm; right: 13mm;
+    display: flex;
+    justify-content: space-between;
+    font-size: 7.5px;
+    color: #94a3b8;
+    border-top: 1px solid #e2e8f0;
+    padding-top: 4px;
+  }
+  .footer .brand { font-weight: 700; color: #475569; }
+  .footer .brand .dot { color: #1d4ed8; }
+
+  /* ── inline tags ───────────────────────────────────────── */
+  .tag {
+    display: inline-block;
+    background: #eff6ff;
+    color: #1e40af;
+    border: 1px solid #bfdbfe;
+    border-radius: 9px;
+    padding: 1px 6px;
+    font-size: 7.5px;
+    font-weight: 600;
+    margin: 1px 2px 1px 0;
+  }
+
+  /* author note */
+  .author-note {
+    background: #f0fdfa;
+    border: 1px solid #99f6e4;
+    border-left: 3px solid #0d9488;
+    border-radius: 6px;
+    padding: 8px 11px;
+    margin-top: 6px;
+    font-size: 9px;
+  }
+  .author-note h3 {
+    color: #0f766e;
+    margin-bottom: 4px;
+    font-size: 10px;
+  }
+  .author-note ol { padding-left: 16px; }
+  .author-note li { font-size: 9px; line-height: 1.45; margin: 3px 0; }
+
+  /* compact two-col */
+  .two-col { columns: 2; column-gap: 10px; }
+  .two-col li { break-inside: avoid; }
+
+  /* refs list */
+  .refs li { font-size: 8.8px; line-height: 1.4; color: #475569; }
+  .refs li strong { color: #1e3a8a; }
+
+  .lead {
+    font-size: 10px;
+    color: #0f172a;
+    border-left: 2px solid #1d4ed8;
+    background: linear-gradient(to right, #eff6ff, transparent);
+    padding: 6px 10px;
+    border-radius: 0 6px 6px 0;
+    margin-bottom: 6px;
+    line-height: 1.5;
+  }
+</style>
+</head>
+<body>
+
+<!-- ════════════════════════ PAGE 1 ════════════════════════ -->
+<div class="page">
+
+  <div class="cover-band">
+    <div class="eyebrow">Agentryx Project Profile · v1.0 · 29 Jun 2026 · Internal</div>
+    <h1>HireStream — HPSEDC Overseas Placement Portal</h1>
+    <div class="subtitle">A multi-role, configuration-driven overseas-placement platform for the Government of Himachal Pradesh — registration to verified placement abroad.</div>
+    <div class="descriptor">A multi-role, configuration-driven overseas-placement platform that takes a Himachal Pradesh candidate from registration to verified placement abroad through KYB-licensed agencies and employers — wrapped in an embedded testing framework with a pre-merge confidence gate that calibrates release risk on every push.</div>
+    <div class="pills">
+      <span class="pill">GovTech / e-governance</span>
+      <span class="pill">Full-stack product</span>
+      <span class="pill">Multi-role workflow</span>
+      <span class="pill">Embedded testing</span>
+      <span class="pill">WCAG 2.1 AA · GIGW</span>
+      <span class="pill">v0.7.7.0 · live on staging</span>
+    </div>
+  </div>
+
+  <div class="tricolor"><div class="saffron"></div><div class="white"></div><div class="green"></div></div>
+
+  <div class="meta">
+    <div class="full"><span class="key">Client</span><span class="val">HPSEDC (Himachal Pradesh State Electronic Development Corporation) — Department of Information Technology, Government of Himachal Pradesh</span></div>
+    <div class="full2"><span class="key">Industry</span><span class="val">GovTech / e-governance · International labour mobility &amp; overseas placement</span></div>
+    <div class="full2"><span class="key">Engagement</span><span class="val">Full-stack product build + platform delivery + advisory (FRS / SOW / SRS authorship)</span></div>
+    <div class="full2"><span class="key">Duration / Status</span><span class="val">2025–2026 · in delivery · web platform live on staging at v0.7.7.0 · mobile in planning · Milestone-1 design approval cleared</span></div>
+    <div class="full2"><span class="key">Delivery Model</span><span class="val">Hybrid — managed-Linux staging, production-ready for HPSEDC on-prem cut-over</span></div>
+    <div class="full"><span class="key">Team</span><span class="val">Lean Agentryx delivery — founder / solution architect plus an integrated AI-agent fleet covering full-stack engineering, QA &amp; testing automation, DevOps, and project management</span></div>
+    <div class="full">
+      <span class="key">Tags</span>
+      <span class="tag">GovTech</span><span class="tag">e-governance</span><span class="tag">overseas placement</span><span class="tag">KYB verification</span><span class="tag">multi-role platform</span><span class="tag">workflow / BPM</span><span class="tag">audit log</span><span class="tag">configurable policy engine</span><span class="tag">embedded testing</span><span class="tag">LLM triage</span><span class="tag">confidence scoring</span><span class="tag">country lifecycle</span><span class="tag">WCAG 2.1 AA</span><span class="tag">GIGW</span><span class="tag">React</span><span class="tag">TypeScript</span><span class="tag">Express</span><span class="tag">Drizzle ORM</span><span class="tag">PostgreSQL</span><span class="tag">Jest</span><span class="tag">Playwright</span><span class="tag">Loki</span><span class="tag">PM2</span><span class="tag">React Native</span><span class="tag">Expo</span>
+    </div>
+  </div>
+
+  <h2><span class="num">1</span> Snapshot</h2>
+  <p class="lead">Himachal Pradesh has no purpose-built digital infrastructure for the lifecycle of an overseas job-seeker — verifying licensed recruitment agencies, vetting employers, matching candidates to genuine vacancies abroad, and giving the State visibility into who is being placed where. Agentryx designed and is delivering <strong>HireStream</strong> — a multi-role, configuration-driven web platform for <strong>HPSEDC</strong> that takes a Himachal resident from registration through a KYB-verified agency or employer to a placement offer outside India, with a paired Android-first mobile app, a grievance channel, and an admin oversight console. The platform is live on staging at <strong>v0.7.7.0</strong> with <strong>502 / 502 automated tests</strong> passing, follows <strong>WCAG 2.1 AA</strong> and <strong>GIGW</strong> accessibility standards, and ships with a proprietary <strong>embedded testing framework</strong> that calibrates release risk on every push.</p>
+
+  <h2><span class="num">2</span> The Challenge</h2>
+  <p>Existing overseas-placement workflows in HP are spread across paper files, ad-hoc spreadsheets, individual agency portals and word-of-mouth referrals. The State has no canonical view of: which agencies hold a valid MEA license, which employers are real legal entities (CIN / GST / PAN), how many HP residents are currently in active applications, where placements end up, or whose grievance is open with whom. The pain is concrete — fraudulent agencies, mis-sold contracts, and applicants stranded abroad — and it is a national-policy concern (overseas employment is governed by the Ministry of External Affairs and is explicitly out of scope for domestic placement).</p>
+  <p>Hard constraints set the design: an <strong>overseas-only</strong> scope (India must be rejected as a destination by the system, not by guidelines), KYB verification gated by HPSEDC review before an agency or employer can post jobs, a <strong>bilingual interface</strong> (English / Hindi), <strong>WCAG 2.1 AA + GIGW</strong> accessibility for a Government of India portal, an <strong>FRS / SOW / SRS</strong> documentation pipeline tied to a 40 / 40 / 20 milestone-payment structure, an audit-grade record of who changed what and when, and a delivery cadence that ships verifiable increments every few days rather than waterfall releases.</p>
+
+  <h2><span class="num">3</span> What We Built</h2>
+  <p>A multi-role, multi-module web platform built around <strong>five distinct dashboards</strong> — Candidate, Agency (recruitment agent), Employer, Admin and Superadmin — each persona-tuned and sharing a single backend, a single configurable workflow engine and a single audit trail.</p>
+  <p>The product covers the <strong>candidate journey</strong> end-to-end (registration, multi-step profile wizard, document upload, job search, application with status timeline, grievance filing, public no-login status check); the <strong>employer / agency journey</strong> (KYB verification flow with document uploads, post-verification profile editing with regulated-field re-verification gates, job posting subject to country validation, applicant review with bulk actions and keyboard shortcuts, drives / events for batch hiring, offers &amp; placements tracking with appointment-letter generation); and the <strong>State journey</strong> (admin oversight with role-segmented user management, country administration with an ISO 3166-1 picker, dashboards consistent with golden numbers, exportable reports, an <strong>Operator Console</strong> that toggles five system features at runtime without redeploy, and a unified grievance queue). The platform is bundled with <strong>HireStream Mobile</strong> (React Native + Expo, Android-first; planning package complete) and a sister application — the <strong>Agentryx Verify</strong> portal — that captures user feedback against the running build with reference codes, statuses and admin notes that feed back into release decisions.</p>
+
+  <div class="footer">
+    <span class="brand">AGENTRYX<span class="dot"> · </span>Project Profile</span>
+    <span>HireStream — HPSEDC Overseas Placement Portal · v1.0 · Page 1 of 4</span>
+  </div>
+</div>
+
+<!-- ════════════════════════ PAGE 2 ════════════════════════ -->
+<div class="page">
+
+  <h2><span class="num">4</span> Architecture &amp; How It Works</h2>
+  <p>A pragmatic full-stack, configuration-driven design. The web client is <strong>React + Vite</strong> with wouter for routing, TanStack Query for data, Tailwind for styling, and a lazy-loaded route bundle to keep the initial payload small. The backend is <strong>TypeScript + Express</strong>, with strict Zod request validation, role-based middleware, and a <strong>Drizzle ORM</strong> layer over PostgreSQL. The schema is intentionally normalised: candidates, employers, agencies, jobs, applications, drives, grievances, country_info, system_config, audit_log, notifications, and a <code>feedback_items</code> mirror in the Verify side-car DB.</p>
+  <p><strong>Field-level policy lives in code</strong> (the <strong>field-class split</strong> — separating CONTACT fields that edit freely from REGULATED fields that reset <code>verified = false</code> and write to audit_log on change); <strong>platform policy lives in the database</strong> (<code>system_config</code> table read through a single <code>lib/config.mjs</code> helper, so an admin can toggle synthetic monitor / LLM triage / daily digest / Loki ingestion / notifications without a deploy).</p>
+  <p>Wrapped around the application is a <strong>5-layer embedded testing framework</strong> — the Agentryx standard pattern, prototyped on HireStream. <strong>Layer 1</strong> Jest unit + integration suite (502 / 502 passing, 36 suites, real-Postgres <code>truncateAllTables()</code>-with-reseed isolation). <strong>Layer 2</strong> deep-smoke route-health + authz-matrix across roles, runnable against any environment. <strong>Layer 3</strong> synthetic monitor under PM2 cron — heartbeat against critical endpoints, JSON status files. <strong>Layer 4</strong> log mining via Loki + Promtail with an LLM-triage stage calling an OpenAI-compatible API on Mistral / Nexus for failure summarisation. <strong>Layer 5</strong> a <strong>per-PR confidence score</strong> that fuses smoke pass-rate, fuzz delta vs baseline, test counts and coverage, surfaced as a <strong>pre-merge gate</strong> with an admin <code>bypass-confidence</code> override label.</p>
+  <p><strong>Key design decisions:</strong> PostgreSQL + Drizzle (one schema, type-safe migrations, FK-cascade isolation in tests); PM2 ecosystem.config.cjs for env persistence (so DEEP_URL / SLACK_WEBHOOK_URL / MIN_INTERVAL_SECONDS survive reboots); DB-driven country lifecycle (a <code>country_info</code> table with <code>is_active</code>, ISO codes and an in-memory validator cache that is reloaded after <code>truncateAllTables()</code>); Loki filesystem-only (no Alertmanager — simpler ops on a single-node delivery); on-prem-ready but staged in the cloud so HPSEDC can take the build as-is.</p>
+
+  <h2><span class="num">5</span> Technology Stack</h2>
+  <div class="stack">
+    <div class="row"><div class="lbl">Frontend</div><div class="v">React, Vite, wouter, TanStack Query, TailwindCSS, lucide-react, framer-motion, i18next (EN / HI), react-hook-form + Zod, code-split lazy routes.</div></div>
+    <div class="row"><div class="lbl">Backend</div><div class="v">TypeScript, Node.js, Express, Drizzle ORM, Zod, bcrypt, express-session, Winston structured logging.</div></div>
+    <div class="row"><div class="lbl">Data</div><div class="v">PostgreSQL (live, test, Verify side-car), Drizzle migrations, normalised schema with <code>audit_log</code> + <code>system_config</code> tables, FK-cascade-aware test reseed.</div></div>
+    <div class="row"><div class="lbl">Integrations</div><div class="v">OpenAI-compatible LLM (Mistral via Nexus) for log triage, Slack webhook for monitor alerts, GitHub API for confidence-gate orchestration, IELTS-aware matching service, resume parser with country-normalising aliases.</div></div>
+    <div class="row"><div class="lbl">Infra &amp; Deployment</div><div class="v">PM2 (ecosystem config, three apps — <code>hirestream</code>, <code>hirestream-synthetic</code>, <code>agentryx-verify</code>), Loki + Promtail, esbuild + Vite production bundle (~697 KB), single-node Linux staging with on-prem migration path.</div></div>
+    <div class="row"><div class="lbl">Security &amp; Compliance</div><div class="v">bcrypt cost-12 password hashing, CSRF-aware session cookies, RBAC across 5 roles, audit_log on regulated-field changes, WCAG 2.1 AA + GIGW (sr-only skip link, /accessibility page with screen-reader directory), KYB document verification (CIN / GST / PAN for employers; MEA license + expiry for agencies).</div></div>
+    <div class="row"><div class="lbl">QA &amp; Testing</div><div class="v">Jest (502 / 502, 36 suites), Playwright E2E + video pipeline (Piper TTS narration, stage cards, issue badges, frame-verify), deep-smoke route-health + authz matrix, schema-fuzz with baseline-calibrated regression detection, two-gate completion rule (backend smoke + UI click both required).</div></div>
+    <div class="row"><div class="lbl">Mobile (in delivery)</div><div class="v">React Native, Expo, Android-first; planning package and 4-doc protocol (DEV_PLAN / ROADMAP / STATUS / LEARNINGS) per platform folder.</div></div>
+  </div>
+
+  <div class="footer">
+    <span class="brand">AGENTRYX<span class="dot"> · </span>Project Profile</span>
+    <span>HireStream — HPSEDC Overseas Placement Portal · v1.0 · Page 2 of 4</span>
+  </div>
+</div>
+
+<!-- ════════════════════════ PAGE 3 ════════════════════════ -->
+<div class="page">
+
+  <h2><span class="num">6</span> Capabilities &amp; Expertise Demonstrated</h2>
+  <div class="cap-grid">
+    <div class="cap">
+      <div class="name">GovTech delivery against an FRS / SOW / SRS pipeline</div>
+      <div class="ev">→ authored the design package that cleared HPSEDC's Milestone-1 (40 %) approval; release cadence pinned to a 40 / 40 / 20 payment schedule.</div>
+    </div>
+    <div class="cap">
+      <div class="name">Multi-role workflow engineering</div>
+      <div class="ev">→ 5 personas, 7 dashboards, a single shared application state-machine (submitted → reviewed → shortlisted → interview_scheduled → selected → placed → rejected), with bulk actions, keyboard shortcuts and role-segmented data isolation.</div>
+    </div>
+    <div class="cap">
+      <div class="name">KYB / regulatory verification engineering</div>
+      <div class="ev">→ field-class split (CONTACT vs REGULATED), automatic <code>verified = false</code> reset + audit-log write on regulated change, dialog UX that explains the consequence to the user before they edit.</div>
+    </div>
+    <div class="cap">
+      <div class="name">Configurable policy engine</div>
+      <div class="ev">→ DB-backed <code>system_config</code> table + Operator Console UI lets HPSEDC toggle five platform features at runtime without redeploy; the same pattern powers the country lifecycle (ISO 3166-1 picker, enable / disable, India blocked at the validator).</div>
+    </div>
+    <div class="cap">
+      <div class="name">Embedded testing &amp; release engineering</div>
+      <div class="ev">→ the 5-layer embedded framework is now Agentryx's standard pattern, prototyped here; Jest + deep-smoke + synthetic monitor + Loki + per-PR confidence gate fused into one release pipeline.</div>
+    </div>
+    <div class="cap">
+      <div class="name">LLM-augmented operations</div>
+      <div class="ev">→ on-call log mining with a Mistral-class LLM via an OpenAI-compatible API; graceful degradation when the external endpoint is unreachable.</div>
+    </div>
+    <div class="cap">
+      <div class="name">Accessibility &amp; GIGW compliance for Indian government portals</div>
+      <div class="ev">→ WCAG 2.1 AA targets, sr-only focus-visible skip link, dedicated /accessibility page listing seven supported screen readers, bilingual interface, focus indicators throughout.</div>
+    </div>
+    <div class="cap">
+      <div class="name">AI-augmented small-team delivery</div>
+      <div class="ev">→ an Agentryx founder-led delivery with an integrated AI-agent fleet replaces a conventional 5-8 person team; the project is the proof point for the <strong>Agentryx Dev Methodology</strong> (a 9-strategic-doc + 6-file-stream-template standard now reused across Agentryx engagements).</div>
+    </div>
+    <div class="cap">
+      <div class="name">Product &amp; UX engineering</div>
+      <div class="ev">→ role-aware dashboards, post-verification edit flows, an audited grievance thread, exportable reports, a sister Verify portal for live feedback capture.</div>
+    </div>
+  </div>
+
+  <h2><span class="num">7</span> Hard Problems Solved / Innovations</h2>
+
+  <div class="hard">
+    <div class="h">The "verified entity drift" problem</div>
+    A verified employer or agency could silently change CIN / GST / MEA-license values via direct API call and stay verified — a real compliance hole. Solved with a <strong>field-class split</strong> at the API layer: every PATCH handler classifies each incoming field as CONTACT or REGULATED, diffs against current values, and on any regulated change writes an audit_log entry <em>and</em> flips <code>verified = false</code> (only if the entity is currently verified). The UI catches up with a coloured banner that explains the policy before the user edits, so the consequence is visible, not surprising.
+  </div>
+
+  <div class="hard">
+    <div class="h">Calibrating release risk for a small team shipping daily</div>
+    The 5-layer embedded framework produces a <strong>per-PR confidence score</strong> (smoke pass-rate × fuzz-delta-vs-baseline × test count × coverage) backed by a <strong>calibrated baseline.json</strong> that captures <em>known acceptable</em> findings (e.g. handler-scoped authz LEAKs that the data-isolation suite separately validates as safe). The score is exposed as a GitHub-checks gate with a <code>bypass-confidence</code> admin override, so high-confidence merges land instantly while low-confidence ones force a second look.
+  </div>
+
+  <div class="hard">
+    <div class="h">Test isolation against a normalised schema with FK cascades</div>
+    <code>truncateAllTables()</code> CASCADE-wiped the <code>country_info</code> table because of an <code>updated_by → users.id</code> FK — invalidating the live country-validator cache between tests and breaking 170 previously-green tests. Solved with a post-truncate reseed + <code>loadValidCountries()</code> reload, restoring 502 / 502 passing — and along the way the audit surfaced two real product bugs (matching-service IELTS_COUNTRIES alias drift after country-naming canonicalisation; resume-parser country extraction that recognised aliases but didn't normalise output).
+  </div>
+
+  <div class="hard">
+    <div class="h">Country lifecycle as data, not as code</div>
+    Replaced a four-country hardcoded dropdown with a DB-driven <code>country_info</code> table seeded from ISO 3166-1, with searchable add-modal, completeness pips, enable / disable, and an India-blocked rule enforced at the validator (not at the UI), so the rule survives direct API calls as well as form input.
+  </div>
+
+  <div class="footer">
+    <span class="brand">AGENTRYX<span class="dot"> · </span>Project Profile</span>
+    <span>HireStream — HPSEDC Overseas Placement Portal · v1.0 · Page 3 of 4</span>
+  </div>
+</div>
+
+<!-- ════════════════════════ PAGE 4 ════════════════════════ -->
+<div class="page">
+
+  <h2><span class="num">8</span> Outcomes &amp; Impact</h2>
+
+  <div class="stats">
+    <div class="stat"><div class="num">502/502</div><div class="lbl">Jest tests passing</div></div>
+    <div class="stat"><div class="num">36</div><div class="lbl">Test suites green</div></div>
+    <div class="stat"><div class="num">v0.7.7.0</div><div class="lbl">Live on staging</div></div>
+    <div class="stat"><div class="num">5</div><div class="lbl">Personas · 7 dashboards</div></div>
+  </div>
+
+  <p><strong>Measured.</strong> Web platform live on staging at v0.7.7.0; <strong>502 / 502 Jest tests</strong> passing across 36 suites; TypeScript compile <strong>100 % clean</strong>; production bundle 696.7 KB; PM2 uptime continuous across rebuilds. <strong>8 HPSEDC test-report issues</strong> raised by the State's test team resolved and re-verified. HPSEDC <strong>Milestone-1 (40 %) approval cleared</strong> on the FRS / SOW / SRS design package. Seven Verify-portal user-feedback items closed this release window (a11y skip-link + screen-reader page; signup confirm-password; reviewer keyboard shortcuts A / P / R / W; missing offers &amp; placements tab — already shipped; mobile signup deferred to the companion app; duplicate items consolidated).</p>
+
+  <p><strong>Projected</strong> <em>(to validate in HPSEDC production rollout)</em>. Replaces a paper / spreadsheet / phone-call placement workflow estimated at <strong>days of cycle time per applicant</strong> with a same-session digital flow; gives HPSEDC its first single-source view of overseas applicants, verified agencies and live placements; the embedded confidence gate is projected to catch <strong>~70-90 % of regressions at PR time</strong> rather than UAT, based on the baseline calibration against staging.</p>
+
+  <h2><span class="num">9</span> Roadmap &amp; Evolution</h2>
+  <p><strong>Phase 1</strong> Core multi-role platform (candidate / agency / employer / admin dashboards, KYB, jobs, applications, drives) — <strong>delivered</strong>. <strong>Phase 2</strong> Country lifecycle, post-verification edit, role-segmented user management, dashboard data-consistency fixes, reviewer ergonomics — <strong>delivered (v0.7.x)</strong>. <strong>Phase 3</strong> Embedded testing framework (5 layers, confidence gate) — <strong>delivered (v0.6.x → v0.7.1.0)</strong>. <strong>Phase 4</strong> Operator Console (DB-backed <code>system_config</code> + status view) — <strong>delivered (v0.7.0.x)</strong>. <strong>Phase 5</strong> HireStream Mobile (React Native + Expo, Android-first then iOS) — <strong>in planning, package complete</strong>. <strong>Phase 6</strong> HPSEDC on-prem migration and production cut-over — <strong>dependent on State infrastructure readiness</strong>. Parallel: the <strong>Agentryx Verify</strong> portal evolves alongside HireStream as the standard embedded-feedback application across all Agentryx engagements.</p>
+
+  <h2><span class="num">10</span> Reusable IP &amp; Assets <span style="font-size:8px;font-weight:600;color:#64748b;margin-left:6px;">— internal</span></h2>
+  <ul class="two-col">
+    <li><strong>Agentryx Dev Methodology</strong> — the 9-strategic-doc + 6-file-stream-template standard, prototyped on HireStream; bootstrapping spec for every new Agentryx project.</li>
+    <li><strong>5-layer embedded testing architecture</strong> — Jest + deep-smoke + synthetic monitor + Loki/LLM-triage + per-PR confidence gate. Standing spec; reused across applications.</li>
+    <li><strong>Field-class split + audit-log pattern</strong> — CONTACT vs REGULATED enforcement; transferable for any compliance-bearing entity-edit screen.</li>
+    <li><strong>DB-driven configurable policy engine</strong> — <code>system_config</code> table + Operator Console + <code>lib/config.mjs</code> helper.</li>
+    <li><strong>Country lifecycle pattern</strong> — ISO 3166-1 picker, <code>is_active</code> toggle, in-memory validator cache, rule-as-data enforcement.</li>
+    <li><strong>Agentryx Verify portal</strong> — sister embedded-feedback application; standard companion app for every Agentryx delivery.</li>
+    <li><strong>Mobile delivery protocol</strong> — 4-doc per-platform spec (DEV_PLAN / ROADMAP / STATUS / LEARNINGS) updated each working session.</li>
+    <li><strong>Two-gate completion rule</strong> — backend smoke with exact UI payload + UI click; both required before "done".</li>
+  </ul>
+
+  <h2 style="margin-top:10px;">References / Artifacts</h2>
+  <ul class="refs">
+    <li><strong>Codebase</strong> — <code>Recruitment/hirestream</code> (web), <code>Recruitment/hirestream-mobile</code> (React Native), <code>Recruitment/agentryx-verify</code> (sister app).</li>
+    <li><strong>HPSEDC design package</strong> — <code>PMD-Final wrapup/Approval &amp; Delivery Documents/Milestone-1 (40%) Design Approval/</code>.</li>
+    <li><strong>Architecture &amp; logic</strong> — <code>HireStream_Matching_Engine.{md,html,pdf}</code>, <code>Agentryx-Verify-Roadmap/</code>.</li>
+    <li><strong>UAT response</strong> — <code>PMD-Final wrapup/Corrections &amp; Bug Fixes/HireStream_UAT_Final_Report.pdf</code>.</li>
+    <li><strong>Demo script</strong> — <code>PMD-Final wrapup/Presentation or Demo/Demo Script/HireStream_Live_Demo_Script.pdf</code>.</li>
+    <li><strong>Mobile planning package</strong> — <code>PMD-Final wrapup/MobileApps/</code>.</li>
+    <li><strong>Methodology</strong> — <code>PMD-Final wrapup/AGENTRYX_DEV_METHODOLOGY.md</code>.</li>
+    <li><strong>Live staging</strong> — <code>https://hirestream-stg.agentryx.dev</code></li>
+  </ul>
+
+  <div class="author-note">
+    <h3>Author's note — suggested refinement to the template (v1.2 → v1.3)</h3>
+    <ol>
+      <li><strong>A "Team &amp; delivery model" guidance line.</strong> v1.2 inherits the Vardhman example of "~8–13 across …" which prompts authors to list a large team by default. Agentryx is increasingly delivering with a <strong>lean human team + AI-agent fleet</strong> (this project is the prototype). A one-line author note alongside <code>team:</code> — <em>"State the actual delivery model honestly; 'founder + AI-agent fleet' is a valid and differentiating answer"</em> — would prevent authors from inflating headcount to look like a traditional consultancy. The fact that HireStream was delivered this way <strong>is</strong> the capability claim, not something to hide.</li>
+      <li><strong>Front-matter <code>live_url</code> and <code>commit_sha</code> keys.</strong> The Quality Checklist asks for evidence-led claims but the front-matter has no slot for the live URL or the verified commit at the moment of authoring. Adding two optional keys — <code>live_url:</code> and <code>commit_sha:</code> — would give an evaluator a deterministic pointer to verify the profile against the actual running build, which is especially valuable for in-delivery projects.</li>
+    </ol>
+  </div>
+
+  <div class="footer">
+    <span class="brand">AGENTRYX<span class="dot"> · </span>Project Profile</span>
+    <span>HireStream — HPSEDC Overseas Placement Portal · v1.0 · Page 4 of 4</span>
+  </div>
+</div>
+
+</body>
+</html>

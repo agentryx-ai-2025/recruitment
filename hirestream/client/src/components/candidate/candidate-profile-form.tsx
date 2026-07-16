@@ -130,8 +130,8 @@ function BasicInfoTab({ initialData, onSaved }: { initialData?: any; onSaved: ()
     <form onSubmit={form.handleSubmit((d) => mutation.mutate(d))} className="space-y-4 pt-4">
       <Hint text="Complete your basic info to get started. This helps agencies find you." />
       <div className="grid grid-cols-2 gap-4">
-        <div><Label>Full Name *</Label><Input {...form.register("fullName")} placeholder="Your full name" /></div>
-        <div><Label>Email *</Label><Input type="email" {...form.register("email")} /></div>
+        <div><Label>Full Name *</Label><Input {...form.register("fullName")} placeholder="Your full name" maxLength={100} /></div>
+        <div><Label>Email *</Label><Input type="email" {...form.register("email")} maxLength={120} /></div>
         <div>
           <Label>Phone</Label>
           <Input
@@ -142,7 +142,7 @@ function BasicInfoTab({ initialData, onSaved }: { initialData?: any; onSaved: ()
           />
           {phoneErr && <p className="text-[11px] text-red-600 mt-1">{phoneErr}</p>}
         </div>
-        <div><Label>Location</Label><Input {...form.register("location")} placeholder="City, District" /></div>
+        <div><Label>Location</Label><Input {...form.register("location")} placeholder="City, District" maxLength={120} /></div>
       </div>
       <div className="flex justify-end">
         <Button type="submit" disabled={mutation.isPending || !!phoneErr}>
@@ -252,8 +252,8 @@ function EducationTab({ onNext }: { onNext: () => void }) {
           {editingId ? (
             <div className="border rounded-lg p-4 space-y-3 bg-gray-50">
               <div className="grid grid-cols-2 gap-3">
-                <div><Label>Degree *</Label><Input value={form.degree} onChange={e => setForm({ ...form, degree: e.target.value })} placeholder="B.Tech, MBA, 12th..." /></div>
-                <div><Label>Institution *</Label><Input value={form.institution} onChange={e => setForm({ ...form, institution: e.target.value })} placeholder="IIT, University..." /></div>
+                <div><Label>Degree *</Label><Input value={form.degree} onChange={e => setForm({ ...form, degree: e.target.value })} placeholder="B.Tech, MBA, 12th..." maxLength={100} /></div>
+                <div><Label>Institution *</Label><Input value={form.institution} onChange={e => setForm({ ...form, institution: e.target.value })} placeholder="IIT, University..." maxLength={100} /></div>
                 <div>
                   <Label>Year</Label>
                   <Input type="number" min={1950} max={thisYear + 1} step={1}
@@ -390,8 +390,8 @@ function ExperienceTab({ onNext }: { onNext: () => void }) {
           {editingId ? (
             <div className="border rounded-lg p-4 space-y-3 bg-gray-50">
               <div className="grid grid-cols-2 gap-3">
-                <div><Label>Company *</Label><Input value={form.company} onChange={e => setForm({ ...form, company: e.target.value })} placeholder="TCS, Infosys..." /></div>
-                <div><Label>Role *</Label><Input value={form.role} onChange={e => setForm({ ...form, role: e.target.value })} placeholder="Developer, Nurse..." /></div>
+                <div><Label>Company *</Label><Input value={form.company} onChange={e => setForm({ ...form, company: e.target.value })} placeholder="TCS, Infosys..." maxLength={100} /></div>
+                <div><Label>Role *</Label><Input value={form.role} onChange={e => setForm({ ...form, role: e.target.value })} placeholder="Developer, Nurse..." maxLength={80} /></div>
                 <div>
                   <Label>Years</Label>
                   <Input type="number" min={0} max={70} step={1}
@@ -411,7 +411,7 @@ function ExperienceTab({ onNext }: { onNext: () => void }) {
                   </Select>
                 </div>
               </div>
-              <div><Label>Description (optional)</Label><Input value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} placeholder="Brief about your role..." /></div>
+              <div><Label>Description (optional)</Label><Input value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} placeholder="Brief about your role..." maxLength={500} /></div>
               <div className="flex gap-2">
                 <Button size="sm" onClick={() => saveMutation.mutate()} disabled={!form.company || !form.role || saveMutation.isPending}>
                   {saveMutation.isPending ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : null}
@@ -474,16 +474,16 @@ function SkillsPreferencesTab({ initialData, onSaved }: { initialData?: any; onS
       <Hint text="Skills directly affect your match score. Add all relevant skills — the more, the better matches you'll get!" />
       <div>
         <Label>Total Years of Experience</Label>
-        <Input type="number" {...form.register("experience")} placeholder="0" />
+        <Input type="number" min={0} max={60} step={1} {...form.register("experience")} placeholder="0" />
       </div>
       <div>
         <Label>Skills (comma separated) *</Label>
-        <Input {...form.register("skills")} placeholder="React, Node.js, Python, Nursing, Welding..." />
+        <Input {...form.register("skills")} placeholder="React, Node.js, Python, Nursing, Welding..." maxLength={300} />
         <p className="text-xs text-gray-400 mt-1">Skills are matched against job requirements for your match score (50% weight)</p>
       </div>
       <div>
         <Label>Preferred Countries (comma separated)</Label>
-        <Input {...form.register("preferredCountries")} placeholder="UAE, Canada, Australia, UK..." />
+        <Input {...form.register("preferredCountries")} placeholder="UAE, Canada, Australia, UK..." maxLength={300} />
         <p className="text-xs text-gray-400 mt-1">Country match adds 20% to your match score</p>
       </div>
       <div className="flex justify-end">
@@ -603,6 +603,9 @@ function DocumentsTab() {
                 </div>
               </div>
               <div className="flex items-center gap-1">
+                <Button variant="ghost" size="sm" onClick={() => window.open(`/api/v1/candidates/documents/${doc.id}/download?inline=1`, "_blank")}>
+                  Preview
+                </Button>
                 <Button variant="ghost" size="sm" onClick={() => window.open(`/api/v1/candidates/documents/${doc.id}/download`, "_blank")}>
                   Download
                 </Button>

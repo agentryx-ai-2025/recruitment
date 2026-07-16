@@ -725,6 +725,10 @@ router.get("/documents/:id/download", async (req, res, next) => {
       ? path.join(UPLOAD_DIR, rel)
       : path.join(HS_EMPLOYER_DOCS_DIR, path.basename(rel));
     try { await fs.access(filePath); } catch { return res.status(404).json({ success: false }); }
+    if (req.query.inline === "1" || req.query.preview === "1") {
+      res.setHeader("Content-Disposition", `inline; filename="${doc.fileName}"`);
+      return res.sendFile(path.resolve(filePath));
+    }
     res.download(filePath, doc.fileName);
   } catch (err) { next(err); }
 });

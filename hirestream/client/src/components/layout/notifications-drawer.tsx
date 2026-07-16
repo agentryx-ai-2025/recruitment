@@ -70,20 +70,24 @@ export function NotificationsDrawer() {
 
   const invalidate = () => qc.invalidateQueries({ queryKey: ["/api/v1/notifications"] });
 
+  const post = async (url: string, errLabel: string) => {
+    const r = await fetch(url, { method: "POST" });
+    if (!r.ok) throw new Error(errLabel);
+  };
   const dismissOne = useMutation({
-    mutationFn: async (id: string) => { await fetch(`/api/v1/notifications/${id}/dismiss`, { method: "POST" }); },
+    mutationFn: (id: string) => post(`/api/v1/notifications/${id}/dismiss`, "Couldn't dismiss notification"),
     onSuccess: invalidate,
   });
   const toggleSave = useMutation({
-    mutationFn: async (id: string) => { await fetch(`/api/v1/notifications/${id}/save`, { method: "POST" }); },
+    mutationFn: (id: string) => post(`/api/v1/notifications/${id}/save`, "Couldn't update saved notification"),
     onSuccess: invalidate,
   });
   const markAllRead = useMutation({
-    mutationFn: async () => { await fetch(`/api/v1/notifications/mark-all-read`, { method: "POST" }); },
+    mutationFn: () => post(`/api/v1/notifications/mark-all-read`, "Couldn't mark all read"),
     onSuccess: invalidate,
   });
   const dismissAll = useMutation({
-    mutationFn: async () => { await fetch(`/api/v1/notifications/dismiss-all`, { method: "POST" }); },
+    mutationFn: () => post(`/api/v1/notifications/dismiss-all`, "Couldn't dismiss all"),
     onSuccess: invalidate,
   });
 

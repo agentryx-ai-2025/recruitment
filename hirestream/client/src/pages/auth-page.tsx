@@ -17,13 +17,17 @@ import { useToast } from "@/hooks/use-toast";
 import { z } from "zod";
 import {
   User, Briefcase, Building2, Shield, Globe, Lock, Mail, Eye, EyeOff,
-  ArrowLeft, Loader2, CheckSquare, Square
+  ArrowLeft, Loader2, CheckSquare, Square, Sparkles, ChevronDown
 } from "lucide-react";
+import { DemoCastTabs, useDemoLogin, DemoResetButton } from "@/components/demo/demo-cast-ui";
 
 export default function AuthPage() {
   const { user } = useAuth();
   const [, setLocation] = useLocation();
   const { t } = useTranslation();
+  // Demo panel is collapsed by default so the real Sign-in / Create-account
+  // form is what visitors see first. "Demo Mode" pulls the cast panel down.
+  const [demoOpen, setDemoOpen] = useState(false);
 
   if (user) {
     setTimeout(() => setLocation("/"), 0);
@@ -92,8 +96,23 @@ export default function AuthPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="pb-8">
-            {/* Quick Role Login (Testing Mode) */}
-            <QuickLoginPanel />
+            {/* Demo Mode toggle — collapsed by default; pulls the cast panel down */}
+            <button
+              type="button"
+              onClick={() => setDemoOpen((o) => !o)}
+              aria-expanded={demoOpen}
+              className={`w-full flex items-center justify-center gap-2 rounded-xl border text-sm font-semibold py-2.5 transition-colors ${demoOpen ? "border-amber-300 bg-amber-100 text-amber-900 mb-3" : "border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-800 mb-5"}`}
+            >
+              <Sparkles className="w-4 h-4" />
+              {demoOpen ? "Hide demo logins" : "Demo Mode — one-click logins"}
+              <ChevronDown className={`w-4 h-4 transition-transform duration-300 ${demoOpen ? "rotate-180" : ""}`} />
+            </button>
+            {/* Collapsible cast panel (grid-rows trick → smooth height animation) */}
+            <div className={`grid transition-all duration-300 ease-out ${demoOpen ? "grid-rows-[1fr] opacity-100 mb-5" : "grid-rows-[0fr] opacity-0"}`}>
+              <div className="overflow-hidden">
+                <QuickLoginPanel />
+              </div>
+            </div>
 
             <Tabs defaultValue="login" className="w-full">
               <TabsList className="grid w-full grid-cols-2 mb-6 bg-slate-100/80 p-1 rounded-xl">
@@ -116,81 +135,22 @@ export default function AuthPage() {
   );
 }
 
-// ── Quick Role Login (testing mode) ──
+// ── Demo Panel — curated cast, one-click login (testing mode) ──
 function QuickLoginPanel() {
-  const [loading, setLoading] = useState<string | null>(null);
-  const [, setLocation] = useLocation();
-  const { toast } = useToast();
-  const [available, setAvailable] = useState(true);
-
-  const roles = [
-    { key: "candidate", label: "Job Seeker", color: "from-blue-500 to-blue-600", icon: User },
-    { key: "agent", label: "Agency", color: "from-emerald-500 to-emerald-600", icon: Briefcase },
-    { key: "employer", label: "Employer", color: "from-purple-500 to-purple-600", icon: Building2 },
-    { key: "admin", label: "Govt Officer", color: "from-rose-500 to-red-600", icon: Shield },
-  ];
-
-  const quickLogin = async (role: string) => {
-    setLoading(role);
-    try {
-      const res = await fetch("/api/v1/auth/dev-login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ role }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        if (res.status === 403) {
-          setAvailable(false);
-          toast({ title: "Quick login disabled", description: data.error?.message, variant: "destructive" });
-        } else {
-          toast({ title: "Login failed", description: data.error?.message || "Try again", variant: "destructive" });
-        }
-        return;
-      }
-      // Force full reload so auth state rehydrates
-      window.location.href = "/";
-    } catch (e: any) {
-      toast({ title: "Login failed", description: e.message, variant: "destructive" });
-    } finally {
-      setLoading(null);
-    }
-  };
-
-  if (!available) return null;
-
+  const { login, loadingUser } = useDemoLogin();
   return (
     <div className="mb-5 p-4 rounded-xl border border-amber-200 bg-gradient-to-br from-amber-50/80 to-orange-50/50">
       <div className="flex items-center gap-2 mb-3">
-        <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-500 text-white uppercase tracking-wide">Testing</span>
-        <p className="text-xs font-semibold text-amber-900">Quick role login — no credentials needed</p>
+        <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-500 text-white uppercase tracking-wide">Demo</span>
+        <p className="text-xs font-semibold text-amber-900">One-click demo login — pick a cast member</p>
       </div>
-      <div className="grid grid-cols-2 gap-2">
-        {roles.map(r => {
-          const RIcon = r.icon;
-          return (
-            <button
-              key={r.key}
-              onClick={() => quickLogin(r.key)}
-              disabled={loading !== null}
-              className={`group flex items-center gap-2.5 p-2.5 rounded-lg bg-white border border-slate-200 hover:border-slate-300 hover:shadow-md transition-all text-left disabled:opacity-50`}
-            >
-              <div className={`w-9 h-9 rounded-lg bg-gradient-to-br ${r.color} flex items-center justify-center flex-shrink-0 shadow-sm`}>
-                {loading === r.key
-                  ? <Loader2 className="w-4 h-4 text-white animate-spin" />
-                  : <RIcon className="w-4 h-4 text-white" />}
-              </div>
-              <div className="min-w-0">
-                <p className="text-xs font-semibold text-slate-900 truncate">{r.label}</p>
-                <p className="text-[10px] text-slate-500 truncate">demo_{r.key}</p>
-              </div>
-            </button>
-          );
-        })}
+      <DemoCastTabs onLogin={login} loadingUser={loadingUser} />
+      <div className="mt-3 pt-2.5 border-t border-amber-200/70 flex items-center justify-between gap-2">
+        <span className="text-[10px] text-amber-700">Tested the flow? Restore the clean state →</span>
+        <DemoResetButton />
       </div>
-      <p className="text-[10px] text-amber-700 mt-2.5">
-        Disable this panel via Super Admin → Feature Flags → <code className="bg-white/60 px-1 rounded">feature.quick_login_enabled</code> before production launch.
+      <p className="text-[10px] text-amber-700/80 mt-2">
+        Disable via Super Admin → Feature Flags → <code className="bg-white/60 px-1 rounded">feature.quick_login_enabled</code> before production launch.
       </p>
     </div>
   );
@@ -247,7 +207,7 @@ function LoginForm() {
               <FormControl>
                 <div className="relative">
                   <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                  <Input placeholder="name@example.com" className="pl-10" autoComplete="off" {...field} />
+                  <Input placeholder="name@example.com" className="pl-10" autoComplete="off" maxLength={120} {...field} />
                 </div>
               </FormControl>
               <FormMessage />
@@ -276,6 +236,7 @@ function LoginForm() {
                     type={showPassword ? "text" : "password"}
                     placeholder="Enter your password"
                     autoComplete="off"
+                    maxLength={128}
                     className="pl-10 pr-10"
                     {...field}
                   />

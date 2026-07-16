@@ -131,9 +131,9 @@ router.post("/login", validateRequest(loginSchema), (req, res, next) => {
 // non-production, OFF in production). When flag is OFF returns 403.
 router.post("/dev-login", async (req, res, next) => {
   try {
-    const { role } = req.body;
+    const { role, username } = req.body;
     const validRoles = ["candidate", "agent", "employer", "admin"];
-    if (!validRoles.includes(role)) {
+    if (!username && !validRoles.includes(role)) {
       return res.status(400).json({
         success: false,
         error: { code: 400, message: `role must be one of: ${validRoles.join(", ")}` },
@@ -162,12 +162,25 @@ router.post("/dev-login", async (req, res, next) => {
       });
     }
 
-    const demoUsername = `demo_${role}`;
+    // Resolve target: an explicit demo-cast username, or the role's default demo user.
+    const demoUsername = username ? String(username).trim() : `demo_${role}`;
+    if (/super/i.test(demoUsername)) {
+      return res.status(403).json({
+        success: false,
+        error: { code: 403, message: "Superadmin is not available via quick login." },
+      });
+    }
     const user = await storage.getUserByUsername(demoUsername);
     if (!user) {
       return res.status(404).json({
         success: false,
         error: { code: 404, message: `Demo user ${demoUsername} not found. Run: npx tsx scripts/seed.ts` },
+      });
+    }
+    if ((user as any).role === "superadmin") {
+      return res.status(403).json({
+        success: false,
+        error: { code: 403, message: "Superadmin is not available via quick login." },
       });
     }
 
@@ -183,6 +196,66 @@ router.post("/dev-login", async (req, res, next) => {
     });
   } catch (err) {
     next(err);
+  }
+});
+
+// ── Dev / Testing: is quick-login available? (drives the Demo Switcher UI) ──
+router.get("/dev-login", async (_req, res) => {
+  let enabled = process.env.NODE_ENV !== "production";
+  if (storage.db) {
+    try {
+      const { systemSettings } = await import("@shared/schema");
+      const rows = await storage.db
+        .select()
+        .from(systemSettings)
+        .where(eq(systemSettings.key, "feature.quick_login_enabled"))
+        .limit(1);
+      if (rows.length > 0) enabled = rows[0].value === true;
+    } catch {}
+  }
+  res.json({ success: true, data: { enabled } });
+});
+
+// ── Dev / Testing: RESET all data to the clean demo master set ──────
+// Runs the curated seed (TRUNCATE … CASCADE + rebuild) in a child process so a
+// presenter can wipe everything created during a test run and restore the
+// pristine demo state. Flag-gated by `feature.quick_login_enabled` (off in prod).
+router.post("/demo-reset", async (_req, res) => {
+  let enabled = process.env.NODE_ENV !== "production";
+  if (storage.db) {
+    try {
+      const { systemSettings } = await import("@shared/schema");
+      const rows = await storage.db
+        .select().from(systemSettings)
+        .where(eq(systemSettings.key, "feature.quick_login_enabled")).limit(1);
+      if (rows.length > 0) enabled = rows[0].value === true;
+    } catch {}
+  }
+  if (!enabled) {
+    return res.status(403).json({ success: false, error: { code: 403, message: "Demo reset is disabled." } });
+  }
+  try {
+    const { spawn } = await import("node:child_process");
+    const child = spawn(process.execPath, ["node_modules/tsx/dist/cli.mjs", "scripts/seed.ts"],
+      { cwd: process.cwd(), env: process.env });
+    let out = "";
+    child.stdout.on("data", (d) => { out += d.toString(); });
+    child.stderr.on("data", (d) => { out += d.toString(); });
+    child.on("error", (err) => {
+      if (!res.headersSent) res.status(500).json({ success: false, error: { code: 500, message: "Reset failed to start: " + err.message } });
+    });
+    child.on("close", (code) => {
+      if (res.headersSent) return;
+      if (code === 0) {
+        logger.info("Demo data reset to clean master set");
+        res.json({ success: true, message: "Demo data reset to the clean master set." });
+      } else {
+        logger.error(`Demo reset failed (exit ${code}): ${out.slice(-400)}`);
+        res.status(500).json({ success: false, error: { code: 500, message: "Reset failed. Check server logs.", detail: out.slice(-400) } });
+      }
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: { code: 500, message: err?.message || "Reset failed" } });
   }
 });
 

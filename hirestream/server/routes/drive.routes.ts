@@ -3,8 +3,8 @@ import { protect } from "../middleware/auth.middleware";
 import { requireRole } from "../middleware/rbac.middleware";
 import { storage } from "../storage";
 import { logger } from "../config/logger.config";
-import { recruitmentDrives, recruitmentAgents, interviews, applications, candidates, jobs, placements } from "@shared/schema";
-import { eq, and, desc, gte, count } from "drizzle-orm";
+import { recruitmentDrives, recruitmentAgents, interviews, applications, candidates, jobs, placements, driveRegistrations } from "@shared/schema";
+import { eq, and, desc, gte, count, ne, inArray } from "drizzle-orm";
 import { notify } from "../services/notification.service";
 
 const router = Router();
@@ -161,6 +161,33 @@ router.get("/my", protect, async (req, res, next) => {
   } catch (error) {
     next(error);
   }
+});
+
+// ── Candidate: upcoming APPROVED drives + my registration state ──────
+// Defined before "/:id" so the literal path isn't captured as an id.
+router.get("/upcoming", protect, async (req, res, next) => {
+  try {
+    const db = storage.db;
+    if (!db) return res.status(500).json({ success: false, error: { code: 500, message: "Database not available" } });
+    const user = req.user as any;
+    const drives = await db.select().from(recruitmentDrives)
+      .where(eq(recruitmentDrives.status, "approved"))
+      .orderBy(recruitmentDrives.date);
+    const agencyIds: string[] = Array.from(new Set(drives.map((d: any) => String(d.agencyId))));
+    const agencyMap: Record<string, string> = {};
+    if (agencyIds.length) {
+      const ag = await db.select({ id: recruitmentAgents.id, name: recruitmentAgents.agencyName }).from(recruitmentAgents).where(inArray(recruitmentAgents.id, agencyIds));
+      for (const a of ag) agencyMap[a.id] = a.name;
+    }
+    const myRegs = await db.select().from(driveRegistrations).where(eq(driveRegistrations.userId, user.id));
+    const myStatus: Record<string, string> = {};
+    for (const r of myRegs) myStatus[r.driveId] = r.status;
+    const enriched = await Promise.all(drives.map(async (d: any) => {
+      const [{ c }] = await db.select({ c: count() }).from(driveRegistrations).where(and(eq(driveRegistrations.driveId, d.id), ne(driveRegistrations.status, "cancelled")));
+      return { ...d, agencyName: agencyMap[d.agencyId] || "Recruiting Agency", registeredCount: Number(c), myStatus: myStatus[d.id] ?? null };
+    }));
+    res.json({ success: true, data: enriched });
+  } catch (error) { next(error); }
 });
 
 // ── Get Single Drive ────────────────────────────────────────────────
@@ -803,6 +830,156 @@ router.patch("/placements/:id/decline", protect, async (req, res, next) => {
   } catch (error) {
     next(error);
   }
+});
+
+// ── Candidate: register for / cancel an approved drive ──────────────
+router.post("/:id/register", protect, async (req, res, next) => {
+  try {
+    const db = storage.db;
+    if (!db) return res.status(500).json({ success: false, error: { code: 500, message: "Database not available" } });
+    const user = req.user as any;
+    if (user.role !== "candidate") return res.status(403).json({ success: false, error: { code: 403, message: "Only candidates can register for drives." } });
+    const [drive] = await db.select().from(recruitmentDrives).where(eq(recruitmentDrives.id, req.params.id)).limit(1);
+    if (!drive) return res.status(404).json({ success: false, error: { code: 404, message: "Drive not found" } });
+    if (drive.status !== "approved") return res.status(400).json({ success: false, error: { code: 400, message: "This drive is not open for registration yet." } });
+    const note = typeof req.body?.note === "string" ? req.body.note.trim().slice(0, 500) : null;
+
+    const [existing] = await db.select().from(driveRegistrations).where(and(eq(driveRegistrations.driveId, drive.id), eq(driveRegistrations.userId, user.id))).limit(1);
+    let reg;
+    if (existing) {
+      [reg] = await db.update(driveRegistrations).set({ status: "registered", note }).where(eq(driveRegistrations.id, existing.id)).returning();
+    } else {
+      [reg] = await db.insert(driveRegistrations).values({ driveId: drive.id, userId: user.id, status: "registered", note }).returning();
+    }
+    // Notify the owning agency.
+    const [agency] = await db.select().from(recruitmentAgents).where(eq(recruitmentAgents.id, drive.agencyId)).limit(1);
+    if (agency?.userId) {
+      const [cand] = await db.select({ name: candidates.fullName }).from(candidates).where(eq(candidates.userId, user.id)).limit(1);
+      notify({ userId: agency.userId, type: "system", title: `New drive registration: ${drive.title.slice(0, 60)}`, message: `${cand?.name || "A candidate"} registered for your recruitment drive.`, metadata: { driveId: drive.id } }).catch(() => {});
+    }
+    res.status(201).json({ success: true, data: reg });
+  } catch (error) { next(error); }
+});
+
+router.post("/:id/unregister", protect, async (req, res, next) => {
+  try {
+    const db = storage.db;
+    if (!db) return res.status(500).json({ success: false, error: { code: 500, message: "Database not available" } });
+    const user = req.user as any;
+    await db.update(driveRegistrations).set({ status: "cancelled" })
+      .where(and(eq(driveRegistrations.driveId, req.params.id), eq(driveRegistrations.userId, user.id)));
+    res.json({ success: true });
+  } catch (error) { next(error); }
+});
+
+// ── Agency owner / admin: registrant list for a drive ───────────────
+router.get("/:id/registrations", protect, async (req, res, next) => {
+  try {
+    const db = storage.db;
+    if (!db) return res.status(500).json({ success: false, error: { code: 500, message: "Database not available" } });
+    const user = req.user as any;
+    const [drive] = await db.select().from(recruitmentDrives).where(eq(recruitmentDrives.id, req.params.id)).limit(1);
+    if (!drive) return res.status(404).json({ success: false, error: { code: 404, message: "Drive not found" } });
+    const isAdmin = user.role === "admin" || user.role === "superadmin";
+    const [myAgency] = await db.select().from(recruitmentAgents).where(eq(recruitmentAgents.userId, user.id)).limit(1);
+    if (!isAdmin && (!myAgency || myAgency.id !== drive.agencyId)) {
+      return res.status(403).json({ success: false, error: { code: 403, message: "Not your drive" } });
+    }
+    const regs = await db.select().from(driveRegistrations)
+      .where(and(eq(driveRegistrations.driveId, drive.id), ne(driveRegistrations.status, "cancelled")))
+      .orderBy(driveRegistrations.createdAt);
+    const uids: string[] = regs.map((r: any) => String(r.userId));
+    const candMap: Record<string, any> = {};
+    if (uids.length) {
+      const cs = await db.select({ userId: candidates.userId, name: candidates.fullName, location: candidates.location, phone: candidates.phone, photoUrl: candidates.photoUrl })
+        .from(candidates).where(inArray(candidates.userId, uids));
+      for (const c of cs) candMap[c.userId!] = c;
+    }
+    res.json({ success: true, data: regs.map((r: any) => ({ ...r, candidate: candMap[r.userId] || null })) });
+  } catch (error) { next(error); }
+});
+
+// ── Agency owner / admin: act on a registrant (invite / mark attended) ─
+// Drives the job-fair lifecycle: registered → invited → attended.
+router.patch("/registrations/:id", protect, async (req, res, next) => {
+  try {
+    const db = storage.db;
+    if (!db) return res.status(500).json({ success: false, error: { code: 500, message: "Database not available" } });
+    const user = req.user as any;
+    const [reg] = await db.select().from(driveRegistrations).where(eq(driveRegistrations.id, req.params.id)).limit(1);
+    if (!reg) return res.status(404).json({ success: false, error: { code: 404, message: "Registration not found" } });
+    const [drive] = await db.select().from(recruitmentDrives).where(eq(recruitmentDrives.id, reg.driveId)).limit(1);
+    const isAdmin = user.role === "admin" || user.role === "superadmin";
+    const [myAgency] = await db.select().from(recruitmentAgents).where(eq(recruitmentAgents.userId, user.id)).limit(1);
+    if (!isAdmin && (!drive || !myAgency || myAgency.id !== drive.agencyId)) {
+      return res.status(403).json({ success: false, error: { code: 403, message: "Not your drive" } });
+    }
+    const status = String(req.body?.status ?? "");
+    if (!["registered", "invited", "attended", "cancelled"].includes(status)) {
+      return res.status(400).json({ success: false, error: { code: 400, message: "status must be: invited, attended, registered, cancelled" } });
+    }
+    const [updated] = await db.update(driveRegistrations).set({ status }).where(eq(driveRegistrations.id, reg.id)).returning();
+    // Tell the candidate when they're invited to attend.
+    if (status === "invited" && drive) {
+      const when = new Date(drive.date).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" });
+      notify({
+        userId: reg.userId, type: "system",
+        title: `You're invited to a recruitment drive`,
+        message: `Please attend "${drive.title}" on ${when} at ${drive.location}. Bring your documents.`,
+        metadata: { driveId: drive.id },
+      }).catch(() => {});
+    }
+    res.json({ success: true, data: updated });
+  } catch (error) { next(error); }
+});
+
+// ── Agency: schedule an on-the-spot interview for a drive registrant ──
+// The walk-in flow: a registrant who may not have applied yet gets an interview
+// against one of the agency's jobs. Creates (or reuses) the application so the
+// candidate flows into the normal pipeline → selection → placement.
+router.post("/:driveId/registrations/:regId/schedule-interview", protect, async (req, res, next) => {
+  try {
+    const db = storage.db;
+    if (!db) return res.status(500).json({ success: false, error: { code: 500, message: "Database not available" } });
+    const user = req.user as any;
+    const { jobId, scheduledAt, location, mode, interviewerName } = req.body;
+    if (!jobId || !scheduledAt) return res.status(400).json({ success: false, error: { code: 400, message: "jobId and scheduledAt are required" } });
+
+    const [reg] = await db.select().from(driveRegistrations).where(and(eq(driveRegistrations.id, req.params.regId), eq(driveRegistrations.driveId, req.params.driveId))).limit(1);
+    if (!reg) return res.status(404).json({ success: false, error: { code: 404, message: "Registration not found" } });
+    const [drive] = await db.select().from(recruitmentDrives).where(eq(recruitmentDrives.id, reg.driveId)).limit(1);
+    const isAdmin = user.role === "admin" || user.role === "superadmin";
+    const [myAgency] = await db.select().from(recruitmentAgents).where(eq(recruitmentAgents.userId, user.id)).limit(1);
+    if (!isAdmin && (!drive || !myAgency || myAgency.id !== drive.agencyId)) return res.status(403).json({ success: false, error: { code: 403, message: "Not your drive" } });
+
+    const [job] = await db.select().from(jobs).where(eq(jobs.id, jobId)).limit(1);
+    if (!job) return res.status(404).json({ success: false, error: { code: 404, message: "Job not found" } });
+    if (!isAdmin && job.agentId !== user.id) return res.status(403).json({ success: false, error: { code: 403, message: "You can only schedule interviews for your own job postings." } });
+
+    const [cand] = await db.select().from(candidates).where(eq(candidates.userId, reg.userId)).limit(1);
+    if (!cand) return res.status(404).json({ success: false, error: { code: 404, message: "Candidate profile not found" } });
+
+    // Reuse an existing application for this (candidate, job), else create one.
+    let app = (await db.select().from(applications).where(and(eq(applications.candidateId, cand.id), eq(applications.jobId, jobId))).limit(1))[0];
+    if (!app) {
+      [app] = await db.insert(applications).values({ candidateId: cand.id, jobId, status: "interview_scheduled", matchScore: 0 }).returning();
+    } else {
+      await db.update(applications).set({ status: "interview_scheduled" }).where(eq(applications.id, app.id));
+    }
+    const [iv] = await db.insert(interviews).values({
+      driveId: drive!.id, applicationId: app.id, scheduledAt: new Date(scheduledAt),
+      location: location || drive!.location, mode: mode || "in_person",
+      interviewerName: interviewerName ? String(interviewerName).slice(0, 200) : null, conductedBy: user.id,
+    }).returning();
+    await db.update(driveRegistrations).set({ status: "attended" }).where(eq(driveRegistrations.id, reg.id));
+
+    notify({
+      userId: reg.userId, type: "application_update", title: "Interview scheduled at the drive",
+      message: `Your interview for "${job.title}" is on ${new Date(scheduledAt).toLocaleDateString("en-IN")} at ${location || drive!.location}.`,
+      metadata: { interviewId: iv.id, applicationId: app.id, jobId },
+    }).catch(() => {});
+    res.status(201).json({ success: true, data: iv });
+  } catch (error) { next(error); }
 });
 
 export default router;

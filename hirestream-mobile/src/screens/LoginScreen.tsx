@@ -62,6 +62,20 @@ export default function LoginScreen({ onNavigateRegister, onNavigateForgot }: Pr
     if (!result.success) setError(result.error || "Login failed");
   };
 
+  // One-tap demo logins — reuse the normal login with the seeded demo password.
+  const DEMO_CAST = [
+    { u: "arjun_thakur", name: "Arjun Thakur", role: "Construction · Placed in Dubai" },
+    { u: "priya_verma", name: "Priya Verma", role: "Reg. Nurse · Germany" },
+    { u: "vikram_negi", name: "Vikram Negi", role: "Welder · Invited to a drive" },
+  ];
+  const demoLogin = async (username: string) => {
+    setError("");
+    setLoading(true);
+    const result = await login(username, "test123");
+    setLoading(false);
+    if (!result.success) setError(result.error || "Login failed");
+  };
+
   return (
     <KeyboardAvoidingView
       style={styles.container}
@@ -174,6 +188,29 @@ export default function LoginScreen({ onNavigateRegister, onNavigateForgot }: Pr
           >
             <Text style={styles.registerBtnText}>Create New Account</Text>
           </TouchableOpacity>
+
+          {/* Demo Mode — one-tap logins (testing build) */}
+          <View style={styles.demoBox}>
+            <Text style={styles.demoTitle}>⚡ Demo Mode — tap to sign in</Text>
+            {DEMO_CAST.map((c) => (
+              <TouchableOpacity
+                key={c.u}
+                style={styles.demoBtn}
+                onPress={() => demoLogin(c.u)}
+                disabled={loading}
+                activeOpacity={0.8}
+                accessibilityRole="button"
+                accessibilityLabel={`Demo login as ${c.name}`}
+              >
+                <Ionicons name="person-circle-outline" size={22} color={colors.primary} style={{ marginRight: spacing.sm }} />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.demoName}>{c.name}</Text>
+                  <Text style={styles.demoRole}>{c.role}</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
+              </TouchableOpacity>
+            ))}
+          </View>
         </View>
 
         <Text style={styles.footer}>
@@ -350,6 +387,34 @@ const styles = StyleSheet.create({
     fontSize: fontSize.md,
     fontWeight: fontWeight.semibold,
   },
+
+  // ── Demo box ──
+  demoBox: {
+    marginTop: spacing.xl,
+    paddingTop: spacing.lg,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  demoTitle: {
+    fontSize: fontSize.xs,
+    fontWeight: fontWeight.bold,
+    color: colors.textSecondary,
+    marginBottom: spacing.md,
+    letterSpacing: 0.3,
+  },
+  demoBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: colors.background,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    marginBottom: spacing.sm,
+  },
+  demoName: { fontSize: fontSize.sm, fontWeight: fontWeight.semibold, color: colors.text },
+  demoRole: { fontSize: fontSize.xs, color: colors.textSecondary, marginTop: 1 },
 
   // ── Footer ──
   footer: {

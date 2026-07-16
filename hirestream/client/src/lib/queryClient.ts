@@ -1,9 +1,20 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
+import { toast } from "@/hooks/use-toast";
 
+// Pull a clean, human message out of a failed response. The server returns
+// { success:false, error:{ code, message } } (or sometimes { message }), so we
+// surface that instead of dumping raw JSON / "400: {…}" at the user.
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
-    const text = (await res.text()) || res.statusText;
-    throw new Error(`${res.status}: ${text}`);
+    let message = res.statusText || `Request failed (${res.status})`;
+    try {
+      const body = await res.clone().json();
+      message = body?.error?.message || body?.message ||
+        (Array.isArray(body?.error?.issues) ? body.error.issues[0]?.message : undefined) || message;
+    } catch {
+      try { const t = await res.text(); if (t) message = t; } catch { /* keep statusText */ }
+    }
+    throw new Error(message);
   }
 }
 
@@ -52,6 +63,15 @@ export const queryClient = new QueryClient({
     },
     mutations: {
       retry: false,
+      // Safety net: any mutation that does NOT define its own onError surfaces a
+      // toast here instead of failing silently. Mutations with their own onError
+      // keep that behaviour (TanStack v5 overrides the default, so no double toast).
+      onError: (error: unknown) => {
+        const message = error instanceof Error && error.message
+          ? error.message
+          : "Something went wrong. Please try again.";
+        toast({ title: "Action failed", description: message, variant: "destructive" });
+      },
     },
   },
 });

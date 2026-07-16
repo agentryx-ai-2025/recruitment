@@ -40,10 +40,14 @@ router.post("/", protect, async (req, res, next) => {
     if (userRole === "agent") {
       const { getSetting } = await import("../services/settings.service");
       const requireVerified: boolean = await getSetting("agency.require_verification_to_post");
-      if (requireVerified) {
+      // Drafts are allowed while KYB is pending — only publishing is gated
+      // (mirrors the employer gate below). Fixes unverified agencies being
+      // unable to save a draft requisition.
+      const isDraftPost = req.body?.isDraft === true;
+      if (requireVerified && !isDraftPost) {
         const agentResult = await db.select().from(recruitmentAgents).where(eq(recruitmentAgents.userId, userId)).limit(1);
         if (!agentResult.length || !agentResult[0].verified) {
-          return res.status(403).json({ success: false, error: { code: 403, message: "Your agency must be verified before posting jobs." } });
+          return res.status(403).json({ success: false, error: { code: 403, message: "Your agency must be verified before publishing jobs. You can still save drafts." } });
         }
       }
       // Enforce per-agency active-jobs cap

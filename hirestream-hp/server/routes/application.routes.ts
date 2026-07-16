@@ -413,7 +413,19 @@ router.get("/recommendations/for-me", protect, async (req, res, next) => {
     // the v1 engine already honoured.
     const threshold: number = await getSetting("matching.recommendation_threshold_pct");
     const { calculateMatchBreakdown } = await import("../services/matching.service");
-    const unapplied = activeJobs.filter((job: any) => !appliedJobIds.has(job.id));
+    // UAT-03 #13: never recommend a country this candidate was rejected for.
+    // job.routes.ts already hides these from the listing; the recommendations
+    // feed must match or the destination reappears on the most prominent surface.
+    // Compared case-insensitively/trimmed to match the apply-time gate in
+    // job.routes.ts — the feed must never offer a job the apply would refuse.
+    const rejectedCountries = new Set<string>(
+      (((candidate as any).rejectedCountries as string[]) || [])
+        .filter(Boolean)
+        .map((c) => c.trim().toLowerCase()),
+    );
+    const unapplied = activeJobs.filter(
+      (job: any) => !appliedJobIds.has(job.id) && !rejectedCountries.has((job.country || "").trim().toLowerCase()),
+    );
     const scoredAll = await Promise.all(unapplied.map(async (job: any) => {
       const bd = await calculateMatchBreakdown(candidate, job);
       return { ...job, matchScore: bd.total, scoreBreakdown: bd };
