@@ -215,10 +215,28 @@ export const EDUCATION_OPTIONS: Record<string, string[]> = {
     "Nursing Council Registration", "Food Safety (FSSAI)",
     "AWS Certification", "PMP", "CCNA",
   ],
+  // Certificate course = training ATTENDED, with no authority examining you.
+  // The set is open, so this is a short list of unambiguous cases + free text —
+  // not an attempt to enumerate it.
+  //
+  // Every entry here is deliberately something NOBODY certifies you for. Earlier
+  // drafts listed First Aid, Fire Safety, Scaffolding, Forklift Operation,
+  // Industrial Safety and Food Safety — all removed, because each has a real
+  // certification counterpart (Red Cross, CISRS, forklift licence, FSSAI) and
+  // would collide with the Certification tab, recreating the very ambiguity
+  // UAT-03 #9 asked us to remove. If an authority tests you and issues an ID,
+  // it belongs under Certification.
+  //
+  // The skills themselves (carpentry, welding, Java) are NOT education — those
+  // live on the Skills & Preferences step.
+  // Kept to 5 examples on purpose: enough to show what belongs here, short
+  // enough that nobody mistakes it for the full set. Everything else is typed.
   course: [
-    "Industrial Safety", "First Aid", "Fire Safety", "Scaffolding",
-    "Forklift Operation", "Spoken English", "Computer Basics (NIELIT)",
-    "Tailoring / Stitching", "Housekeeping Training", "Food & Beverage Service",
+    "Spoken English",
+    "Basic Arabic",
+    "Computer Basics (NIELIT / CSC)",
+    "Tailoring / Stitching",
+    "Housekeeping Training",
   ],
 };
 
@@ -230,7 +248,7 @@ export const EDU_TYPE_COPY: Record<string, { field: string; institution: string;
   university:    { field: "Degree",               institution: "College name",     instPlaceholder: "University / College name" },
   diploma:       { field: "Diploma / Trade",      institution: "Institute name",   instPlaceholder: "ITI / Polytechnic name" },
   certification: { field: "Certification",        institution: "Issuing body",     instPlaceholder: "NCVT, NSDC, AWS, …" },
-  course:        { field: "Course name",          institution: "Training provider", instPlaceholder: "Institute / training centre" },
+  course:        { field: "Certificate course",   institution: "Training provider", instPlaceholder: "Institute / training centre" },
 };
 
 // v0.4.33 (Phase 3): qualification levels, ordered. Used by the job-

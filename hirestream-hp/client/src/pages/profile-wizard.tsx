@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { HP_DISTRICTS, INDIAN_STATES, DESTINATION_COUNTRIES, SKILL_CATEGORIES, ALL_SKILLS, JOB_CATEGORIES, QUALIFICATION_LEVELS, EDUCATION_OPTIONS, EDU_TYPE_COPY, EDU_OTHER, jobCategoryLabel } from "@/lib/reference-data";
+import { normalizeQualification } from "@shared/education";
 import { formatAadhaar, stripAadhaar, isValidAadhaar } from "@shared/aadhaar";
 
 async function fetchJson(url: string) {
@@ -811,6 +812,18 @@ function EducationStep({ onNext, onBack }: { onNext: () => void; onBack: () => v
 
   const records = eduRes?.data || [];
 
+  // UAT-03 #5: the whole point of a fixed list is that it can't produce a
+  // duplicate — so an option the candidate already holds must not be offered.
+  // Matched on the SHARED normaliser the server's 409 uses, so the list can
+  // never offer something the save would then reject. Compared across all
+  // types, because that's the identity rule the server enforces.
+  const takenQualifications = new Set(
+    records.map((r: any) => normalizeQualification(r.degree)).filter(Boolean),
+  );
+  const availableOptions = (EDUCATION_OPTIONS[type] ?? []).filter(
+    (o) => !takenQualifications.has(normalizeQualification(o)),
+  );
+
   return (
     <motion.div variants={staggerContainer} initial="initial" animate="animate">
       <SectionHeader icon={GraduationCap} color="from-violet-500 to-violet-600" title="Education" subtitle="Add your academic qualifications — at least one is required" />
@@ -878,7 +891,12 @@ function EducationStep({ onNext, onBack }: { onNext: () => void; onBack: () => v
                       { v: "university",    label: "Higher Education (degree)" },
                       { v: "diploma",       label: "Diploma" },
                       { v: "certification", label: "Certification" },
-                      { v: "course",        label: "Skill Course" },
+                      // UAT-03 #9 (2026-07-16): was "Skill Course". A *skill*
+                      // (carpentry, welding) isn't education and is captured on
+                      // the Skills step — the old name invited people to file it
+                      // here twice. This type is the credential: a course you
+                      // attended and completed.
+                      { v: "course",        label: "Certificate Course" },
                     ].map((opt) => (
                       <button key={opt.v} type="button"
                         onClick={() => { setType(opt.v); setDegree(""); setDegreeIsOther(false); }}
@@ -895,8 +913,8 @@ function EducationStep({ onNext, onBack }: { onNext: () => void; onBack: () => v
                   {(type === "certification" || type === "course") && (
                     <p className="text-[11px] text-violet-600/90 bg-violet-100/50 border border-violet-200/60 rounded-lg px-3 py-2">
                       {type === "certification"
-                        ? "Certification = a formal trade/professional credential — ITI trade cert, NSDC/NCVT, welder/electrician/driver licence, AWS, PMP."
-                        : "Skill Course = a short training or workshop — e.g. industrial safety, 3-month NIELIT, first-aid — not a formal certification."}
+                        ? "Certification = someone examined you and issued a credential, usually with an ID that can expire — NCVT/NSDC trade cert, welder/electrician/driver licence, nursing council registration, AWS, CCNA, PMP."
+                        : "Certificate course = training you attended and completed, with no exam body behind it — a 3-month NIELIT computer course, a first-aid or industrial-safety workshop. If an authority tested you and issued an ID, use Certification instead. The skills themselves (carpentry, welding) belong on the Skills step, not here."}
                     </p>
                   )}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -922,10 +940,10 @@ function EducationStep({ onNext, onBack }: { onNext: () => void; onBack: () => v
                           onValueChange={(v) => { if (v === EDU_OTHER) { setDegreeIsOther(true); setDegree(""); } else setDegree(v); }}
                         >
                           <SelectTrigger className="pl-11 h-12 rounded-xl border-violet-200/80 bg-white">
-                            <SelectValue placeholder="Select…" />
+                            <SelectValue placeholder={availableOptions.length ? "Select…" : "All added — use Other…"} />
                           </SelectTrigger>
                           <SelectContent>
-                            {(EDUCATION_OPTIONS[type] ?? []).map((o) => (
+                            {availableOptions.map((o) => (
                               <SelectItem key={o} value={o}>{o}</SelectItem>
                             ))}
                             <SelectItem value={EDU_OTHER}>Other (type it in)…</SelectItem>

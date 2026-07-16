@@ -12,6 +12,7 @@ import { eq, and, ne, count, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { notify } from "../services/notification.service";
 import { userOwnsCandidate } from "../lib/ownership";
+import { normalizeQualification } from "@shared/education";
 
 const router = Router();
 
@@ -349,15 +350,9 @@ router.post("/education", protect, async (req, res, next) => {
     //      common filler) so "10th", "10th Grade" and "10th  grade." collide.
     //      The picker makes new entries canonical; this catches the free-typed
     //      "Other" ones and the legacy rows.
-    const normDegree = (s: any) =>
-      String(s ?? "")
-        .trim()
-        .toLowerCase()
-        .replace(/\(.*?\)/g, " ")            // drop parenthetical qualifiers: "12th (Science)" -> "12th"
-        .replace(/\b(grade|class|std|standard|course|certificate|certification|diploma in)\b/g, " ")
-        .replace(/[^a-z0-9]+/g, " ")         // punctuation/em-dashes -> space
-        .trim()
-        .replace(/\s+/g, " ");
+    // Normaliser lives in @shared/education so the picker's "hide what's already
+    // added" filter and this 409 can never disagree.
+    const normDegree = normalizeQualification;
     const existingEdu = await db.select().from(candidateEducation).where(eq(candidateEducation.candidateId, candidateId));
     const incoming = normDegree(parsed.data.degree);
     if (incoming && existingEdu.some((e: any) => normDegree(e.degree) === incoming)) {
