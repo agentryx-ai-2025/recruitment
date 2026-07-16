@@ -15,7 +15,7 @@ import {
 import { eq, and, or, sql, isNull, lt, desc, count } from "drizzle-orm";
 import { getSetting } from "../services/settings.service";
 import { maskAadhaar } from "../lib/safeUser";
-import { computeReadiness, type Readiness } from "../services/deployment.service";
+import { computeReadiness, pickPrimaryPlacement, type Readiness } from "../services/deployment.service";
 
 const router = Router();
 router.use(protect);
@@ -575,10 +575,8 @@ async function computeReadinessFleet(db: NonNullable<typeof storage.db>) {
     byCandidate.set(r.candidate.id, entry);
   }
 
-  const PREFERRED = ["accepted", "active", "completed"];
   const fleet = Array.from(byCandidate.values()).map(({ candidate: c, placementRows: ps }) => {
-    ps.sort((a: any, b: any) => new Date(b.createdAt ?? 0).getTime() - new Date(a.createdAt ?? 0).getTime());
-    const primary = ps.find((p: any) => PREFERRED.includes(p.status)) ?? ps[0];
+    const primary = pickPrimaryPlacement(ps) ?? ps[0];
     const readiness: Readiness = computeReadiness(c, primary, {
       destinationIsEcr: ecrByCountry.get(primary.country) === true,
     });

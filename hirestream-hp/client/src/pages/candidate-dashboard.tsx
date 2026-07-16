@@ -3376,7 +3376,10 @@ function CandidateCompliancePanel({ profile }: { profile: any }) {
             <SelectContent>
               <SelectItem value="submitted">Submitted</SelectItem>
               <SelectItem value="pending">Pending</SelectItem>
-              <SelectItem value="not_required">Not required</SelectItem>
+              {/* "Not required" is a waiver only HPSEDC can grant (the server
+                  rejects it here) — it scores as done, so self-service would let
+                  a candidate waive their own PCC. Agency sets it from the
+                  compliance panel on agent-candidate-detail. */}
             </SelectContent>
           </Select>
         </div>
@@ -3653,7 +3656,11 @@ function CandidateDeploymentTracker({ placementId, onAction }: { placementId: st
       </div>
 
       <ul className="space-y-2">
-        {d.checklist.map((it: any) => {
+        {/* readiness 2026-07-16: hide steps that don't apply to this candidate.
+            An ECNR candidate was shown "PDO: Pending" / "PBBY: Pending" — ECR-only
+            steps they can never complete — which read as permanent blockers.
+            `applicable` is absent on older payloads, so default to showing. */}
+        {d.checklist.filter((it: any) => it.applicable !== false).map((it: any) => {
           const m = statusMeta[it.status] || statusMeta.pending;
           const Icon = m.icon;
           return (

@@ -16,7 +16,7 @@ import {
   candidateReferences, placements, applications, interviews, jobs,
   countryInfo, auditLog,
 } from "@shared/schema";
-import { computeReadiness, readinessSummary } from "../services/deployment.service";
+import { computeReadiness, readinessSummary, pickPrimaryPlacement } from "../services/deployment.service";
 import { eq, and, desc } from "drizzle-orm";
 import PDFDocument from "pdfkit";
 import { logger } from "../config/logger.config";
@@ -111,6 +111,21 @@ router.patch("/compliance", async (req, res, next) => {
     const set: any = {};
     for (const k of allowed) if (k in (req.body ?? {})) set[k] = req.body[k];
     if (Object.keys(set).length === 0) return res.status(400).json({ success: false, message: "No valid fields" });
+
+    // readiness 2026-07-16: "not_required" is a WAIVER — HPSEDC's decision, not
+    // the candidate's. It now scores as done in the readiness engine, so letting
+    // a candidate self-set it would let them waive their own PCC/PBBY and walk
+    // to "Compliance Cleared". Candidates may still report submitted/pending.
+    // (These columns are declared agent-managed in shared/schema.ts; the wider
+    // question of candidates self-reporting medical/PDO is flagged separately.)
+    for (const fld of ["pccStatus", "pbbyInsuranceStatus"] as const) {
+      if (set[fld] === "not_required") {
+        return res.status(403).json({
+          success: false,
+          message: "Only HPSEDC can mark this as not required. Please contact your agency.",
+        });
+      }
+    }
 
     // HTIS BUG-006 — passport expiry must be today or future. Same rule on the
     // PCC expiry since it's an identical travel-document expiry field. Null /
@@ -289,9 +304,8 @@ router.get("/readiness", async (req, res, next) => {
       .from(placements)
       .innerJoin(applications, eq(placements.applicationId, applications.id))
       .where(eq(applications.candidateId, candId));
-    const ps = rows.map((r: any) => r.p)
-      .sort((a: any, b: any) => new Date(b.createdAt ?? 0).getTime() - new Date(a.createdAt ?? 0).getTime());
-    const primaryPlacement = ps.find((p: any) => ["accepted", "active", "completed"].includes(p.status)) ?? ps[0] ?? null;
+    const ps = rows.map((r: any) => r.p);
+    const primaryPlacement = pickPrimaryPlacement(ps);
 
     // Destination ECR flag drives the conditional eMigrate/PoE step.
     let destinationIsEcr = false;

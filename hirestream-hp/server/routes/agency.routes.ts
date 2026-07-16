@@ -8,7 +8,7 @@ import { insertRecruitmentAgentSchema, recruitmentAgents, candidates, agencyRevi
   candidateEducation, candidateExperience, documents, applications, jobs,
   agencyDocuments, placements, auditLog, countryInfo } from "@shared/schema";
 import { eq, and } from "drizzle-orm";
-import { computeReadiness } from "../services/deployment.service";
+import { computeReadiness, pickPrimaryPlacement } from "../services/deployment.service";
 import { userOwnsCandidate } from "../lib/ownership";
 import { maskAadhaar } from "../lib/safeUser";
 import {
@@ -256,10 +256,8 @@ router.get("/candidates/:id", protect, async (req, res, next) => {
     // an accepted/active/completed one if present, else the most recent.
     // Computed from the RAW candidate row (compliance fields intact) — the
     // PII-masked copy below is display-only and must not feed the score.
-    const placementRows = apps.map((r: any) => r.placement).filter(Boolean)
-      .sort((a: any, b: any) => new Date(b.createdAt ?? 0).getTime() - new Date(a.createdAt ?? 0).getTime());
-    const primaryPlacement = placementRows
-      .find((p: any) => ["accepted", "active", "completed"].includes(p.status)) ?? placementRows[0] ?? null;
+    const placementRows = apps.map((r: any) => r.placement).filter(Boolean);
+    const primaryPlacement = pickPrimaryPlacement(placementRows);
     let destinationIsEcr = false;
     if (primaryPlacement?.country) {
       const [ci] = await storage.db.select({ isEcrCountry: countryInfo.isEcrCountry }).from(countryInfo)
