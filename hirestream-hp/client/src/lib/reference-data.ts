@@ -183,6 +183,56 @@ export const MAX_CUSTOM_CITY_LEN = 80;
 // (numeric 4.0–9.0) or a CEFR-level language picker.
 export const IELTS_COUNTRIES = new Set(["UK", "Australia", "New Zealand", "Canada", "Ireland", "USA"]);
 
+// ── Education vocabulary (UAT-03 #5/#8, 2026-07-16) ──────────────────
+// The Degree/Qualification field was free text, so the same qualification
+// arrived six different ways ("12th", "12th (Science)", "12th (Arts)",
+// "12th (Senior Secondary)"…) and duplicate-detection — which compares the
+// typed string — could never catch them. A picker makes the stored value
+// canonical, which is what makes dedup work at all. Variants that used to be
+// baked into the string (stream, trade, specialisation) belong in the
+// Subject/Field box next to it, not in the qualification name.
+//
+// "Other (specify)" stays available — a govt portal can't enumerate every
+// qualification in India — so the server still normalises and re-checks.
+export const EDU_OTHER = "__other__";
+
+export const EDUCATION_OPTIONS: Record<string, string[]> = {
+  school: ["5th", "8th", "10th (Matriculation)", "12th (Senior Secondary)"],
+  university: [
+    "B.A.", "B.Com.", "B.Sc.", "B.Sc. Nursing", "B.Tech / B.E.", "BBA", "BCA",
+    "B.Ed.", "LLB", "MBBS", "M.A.", "M.Com.", "M.Sc.", "M.Tech / M.E.", "MBA",
+    "MCA", "PhD",
+  ],
+  diploma: [
+    "ITI — Electrician", "ITI — Welder", "ITI — Fitter", "ITI — Plumber",
+    "ITI — Carpenter", "ITI — Mechanic (Motor Vehicle)", "ITI — Turner",
+    "Polytechnic Diploma", "GNM (Nursing)", "ANM (Nursing)",
+    "Diploma in Hotel Management", "Diploma in Geriatric Care",
+  ],
+  certification: [
+    "NCVT / NSDC Trade Certificate", "Welding Certification (3G / 6G)",
+    "Electrician Licence", "Driving Licence — LMV", "Driving Licence — HMV",
+    "Nursing Council Registration", "Food Safety (FSSAI)",
+    "AWS Certification", "PMP", "CCNA",
+  ],
+  course: [
+    "Industrial Safety", "First Aid", "Fire Safety", "Scaffolding",
+    "Forklift Operation", "Spoken English", "Computer Basics (NIELIT)",
+    "Tailoring / Stitching", "Housekeeping Training", "Food & Beverage Service",
+  ],
+};
+
+// Per-type wording. The old form called every type a "Degree / Qualification"
+// and hinted "B.Tech, MBA, …" even on a Skill Course, whose whole point is that
+// it ISN'T a degree — the type chip changed but the fields didn't follow.
+export const EDU_TYPE_COPY: Record<string, { field: string; institution: string; instPlaceholder: string }> = {
+  school:        { field: "Class / Level",        institution: "School name",      instPlaceholder: "Govt. Sr. Sec. School, …" },
+  university:    { field: "Degree",               institution: "College name",     instPlaceholder: "University / College name" },
+  diploma:       { field: "Diploma / Trade",      institution: "Institute name",   instPlaceholder: "ITI / Polytechnic name" },
+  certification: { field: "Certification",        institution: "Issuing body",     instPlaceholder: "NCVT, NSDC, AWS, …" },
+  course:        { field: "Course name",          institution: "Training provider", instPlaceholder: "Institute / training centre" },
+};
+
 // v0.4.33 (Phase 3): qualification levels, ordered. Used by the job-
 // poster dropdown and the candidate wizard so both ends speak the same
 // vocabulary (server vs2 engine relies on these exact keys).

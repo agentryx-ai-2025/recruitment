@@ -336,11 +336,32 @@ router.post("/education", protect, async (req, res, next) => {
       return res.status(400).json({ success: false, error: { code: 400, message: parsed.error.issues[0]?.message ?? "Invalid input", issues: parsed.error.issues } });
     }
     // UAT-03 Item 5: prevent duplicate education entries (e.g. two "10th Grade").
-    // Dedupe on (type, degree) case-insensitively for this candidate.
-    const norm = (s: any) => String(s ?? "").trim().toLowerCase();
+    //
+    // 2026-07-16: this was defeatable and live data defeated it. It required
+    // BOTH type and degree to match, but the seed never wrote `type`, so every
+    // pre-existing row has type=null. Comparing null against the "school" the
+    // wizard sends never matched, and an EXACT duplicate "10th (Matriculation)"
+    // was accepted (verified live). Two changes:
+    //   1. Degree is the identity — a candidate cannot hold the same
+    //      qualification twice regardless of which chip it was filed under, so a
+    //      null/absent type can no longer wave a duplicate through.
+    //   2. Compare on a normalised form (case, whitespace, punctuation and
+    //      common filler) so "10th", "10th Grade" and "10th  grade." collide.
+    //      The picker makes new entries canonical; this catches the free-typed
+    //      "Other" ones and the legacy rows.
+    const normDegree = (s: any) =>
+      String(s ?? "")
+        .trim()
+        .toLowerCase()
+        .replace(/\(.*?\)/g, " ")            // drop parenthetical qualifiers: "12th (Science)" -> "12th"
+        .replace(/\b(grade|class|std|standard|course|certificate|certification|diploma in)\b/g, " ")
+        .replace(/[^a-z0-9]+/g, " ")         // punctuation/em-dashes -> space
+        .trim()
+        .replace(/\s+/g, " ");
     const existingEdu = await db.select().from(candidateEducation).where(eq(candidateEducation.candidateId, candidateId));
-    if (existingEdu.some((e: any) => norm(e.type) === norm(parsed.data.type) && norm(e.degree) === norm(parsed.data.degree))) {
-      return res.status(409).json({ success: false, error: { code: 409, message: `"${parsed.data.degree}" is already added under this category.` } });
+    const incoming = normDegree(parsed.data.degree);
+    if (incoming && existingEdu.some((e: any) => normDegree(e.degree) === incoming)) {
+      return res.status(409).json({ success: false, error: { code: 409, message: `"${parsed.data.degree}" is already in your profile.` } });
     }
     const result = await db.insert(candidateEducation).values(parsed.data as any).returning();
     res.status(201).json({ success: true, data: result[0] });

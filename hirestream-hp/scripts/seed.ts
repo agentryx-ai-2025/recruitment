@@ -210,7 +210,18 @@ async function seed() {
       passportNumber: `P${6700001 + i}`, ecrStatus: c.ecr, profileComplete: true, openToOutreach: true,
     }).returning();
     cid[c.un] = row.id;
-    await db.insert(candidateEducation).values({ candidateId: row.id, degree: c.qual === "bachelor" ? "Bachelor's Degree" : c.qual === "diploma" ? "ITI / Diploma" : "12th (Senior Secondary)", institution: `Govt. Institute, ${c.city}`, year: 2015, percentage: "70.0" as any });
+    // UAT-03 #5 (2026-07-16): `type` was never set here, so every seeded row had
+    // type=null — which silently defeated the duplicate check on
+    // POST /candidates/education (it required type AND degree to match, and
+    // null never matched the type the wizard sends). Degrees also use the
+    // canonical EDUCATION_OPTIONS vocabulary now so the seed stops inventing
+    // spellings the picker can't produce.
+    const eduByQual = {
+      bachelor: { type: "university", degree: "B.A." },
+      diploma:  { type: "diploma",    degree: "Polytechnic Diploma" },
+    } as const;
+    const edu = (eduByQual as any)[c.qual] ?? { type: "school", degree: "12th (Senior Secondary)" };
+    await db.insert(candidateEducation).values({ candidateId: row.id, type: edu.type, degree: edu.degree, institution: `Govt. Institute, ${c.city}`, year: 2015, percentage: "70.0" as any });
     await db.insert(candidateExperience).values({ candidateId: row.id, company: "Local Employer", role: c.skills[0], years: c.exp, country: "India" });
   }
   console.log(`Candidates: ${Object.keys(cid).length} (10 hero + ${BG_CANDS.length} background + demo)`);

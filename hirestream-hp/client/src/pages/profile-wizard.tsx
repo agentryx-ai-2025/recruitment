@@ -17,7 +17,7 @@ import {
   Award, Sparkles, Shield, Star, Eye, EyeOff
 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { HP_DISTRICTS, INDIAN_STATES, DESTINATION_COUNTRIES, SKILL_CATEGORIES, ALL_SKILLS, JOB_CATEGORIES, QUALIFICATION_LEVELS, jobCategoryLabel } from "@/lib/reference-data";
+import { HP_DISTRICTS, INDIAN_STATES, DESTINATION_COUNTRIES, SKILL_CATEGORIES, ALL_SKILLS, JOB_CATEGORIES, QUALIFICATION_LEVELS, EDUCATION_OPTIONS, EDU_TYPE_COPY, EDU_OTHER, jobCategoryLabel } from "@/lib/reference-data";
 import { formatAadhaar, stripAadhaar, isValidAadhaar } from "@shared/aadhaar";
 
 async function fetchJson(url: string) {
@@ -762,6 +762,10 @@ function EducationStep({ onNext, onBack }: { onNext: () => void; onBack: () => v
   // matching engine knows what "Qualification" the candidate has.
   const [type, setType] = useState("university");
   const [degree, setDegree] = useState(""); const [institution, setInstitution] = useState("");
+  // Escape hatch from the canonical picker. Each type has its own option list,
+  // so switching type must clear both — a degree picked under "Diploma" is not
+  // a valid value under "Skill Course".
+  const [degreeIsOther, setDegreeIsOther] = useState(false);
   const [board, setBoard] = useState(""); const [subject, setSubject] = useState("");
   const [year, setYear] = useState(""); const [percentage, setPercentage] = useState("");
   // UAT-03 Item 7: affiliating university/body, distinct from `institution`
@@ -877,7 +881,7 @@ function EducationStep({ onNext, onBack }: { onNext: () => void; onBack: () => v
                       { v: "course",        label: "Skill Course" },
                     ].map((opt) => (
                       <button key={opt.v} type="button"
-                        onClick={() => setType(opt.v)}
+                        onClick={() => { setType(opt.v); setDegree(""); setDegreeIsOther(false); }}
                         className={`text-[11px] px-2.5 py-1.5 rounded-md border transition ${
                           type === opt.v
                             ? "bg-violet-600 text-white border-violet-600"
@@ -896,15 +900,42 @@ function EducationStep({ onNext, onBack }: { onNext: () => void; onBack: () => v
                     </p>
                   )}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <FormField label={type === "school" ? "Class / Level (e.g. 12th)" : "Degree / Qualification"} required icon={Award}>
-                      <Input value={degree} onChange={e => setDegree(e.target.value)}
-                        placeholder={type === "school" ? "10th, 12th, ..." : type === "diploma" ? "Polytechnic Diploma" : type === "certification" ? "AWS Solutions Architect" : "B.Tech, MBA, ..."}
-                        maxLength={100}
-                        className="pl-11 h-12 rounded-xl border-violet-200/80 bg-white" />
+                    {/* UAT-03 #5/#8: pick from a canonical list instead of typing.
+                        Stream/trade/specialisation goes in Subject/Field below —
+                        keeping it out of the qualification name is what stops
+                        "12th" and "12th (Science)" becoming two entries. */}
+                    <FormField label={EDU_TYPE_COPY[type]?.field ?? "Qualification"} required icon={Award}>
+                      {degreeIsOther ? (
+                        <div className="flex gap-2">
+                          <Input value={degree} onChange={e => setDegree(e.target.value)} autoFocus
+                            placeholder={`Type the ${(EDU_TYPE_COPY[type]?.field ?? "qualification").toLowerCase()}`}
+                            maxLength={100}
+                            className="pl-11 h-12 rounded-xl border-violet-200/80 bg-white" />
+                          <button type="button" onClick={() => { setDegreeIsOther(false); setDegree(""); }}
+                            className="shrink-0 text-[11px] px-3 rounded-xl border border-violet-200 text-violet-700 hover:bg-violet-50">
+                            Pick from list
+                          </button>
+                        </div>
+                      ) : (
+                        <Select
+                          value={degree || undefined}
+                          onValueChange={(v) => { if (v === EDU_OTHER) { setDegreeIsOther(true); setDegree(""); } else setDegree(v); }}
+                        >
+                          <SelectTrigger className="pl-11 h-12 rounded-xl border-violet-200/80 bg-white">
+                            <SelectValue placeholder="Select…" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {(EDUCATION_OPTIONS[type] ?? []).map((o) => (
+                              <SelectItem key={o} value={o}>{o}</SelectItem>
+                            ))}
+                            <SelectItem value={EDU_OTHER}>Other (type it in)…</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      )}
                     </FormField>
-                    <FormField label={type === "school" ? "School name" : "Institution"} required icon={Building}>
+                    <FormField label={EDU_TYPE_COPY[type]?.institution ?? "Institution"} required icon={Building}>
                       <Input value={institution} onChange={e => setInstitution(e.target.value)}
-                        placeholder={type === "school" ? "DAV Public School, ..." : "University / Institute name"}
+                        placeholder={EDU_TYPE_COPY[type]?.instPlaceholder ?? "Institute name"}
                         maxLength={100}
                         className="pl-11 h-12 rounded-xl border-violet-200/80 bg-white" />
                     </FormField>
