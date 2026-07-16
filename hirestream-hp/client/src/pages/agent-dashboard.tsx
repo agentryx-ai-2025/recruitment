@@ -23,6 +23,7 @@ import { Mail, Phone, GraduationCap, Award, AlertTriangle, Heart, Shield, Messag
 import { PhotoAvatar } from "@/components/shared/PhotoAvatar";
 import { ReportsBI } from "@/components/shared/ReportsBI";
 import { jobCategoryLabel } from "@/lib/reference-data";
+import { SupportInboxPanel } from "@/components/shared/SupportInboxPanel";
 
 async function fetchJson(url: string) {
   const res = await fetch(url);
@@ -85,6 +86,14 @@ export default function AgentDashboard() {
     queryKey: ["/api/v1/drives/my"],
     queryFn: () => fetchJson("/api/v1/drives/my"),
   });
+  // support 2026-07-16: unread "Ask HPSEDC" messages, for the nav badge. Polled
+  // so a message that lands while staff sit on the dashboard still surfaces.
+  const { data: supportThreadsRes } = useQuery({
+    queryKey: ["/api/v1/support/threads"],
+    queryFn: () => fetchJson("/api/v1/support/threads"),
+    refetchInterval: 20000,
+  });
+  const supportUnread: number = (supportThreadsRes?.data || []).reduce((sum: number, t: any) => sum + Number(t.unread || 0), 0);
   const { data: notifsRes } = useQuery({
     queryKey: ["/api/v1/notifications"],
     queryFn: () => fetchJson("/api/v1/notifications?limit=5"),
@@ -148,6 +157,9 @@ export default function AgentDashboard() {
     { key: "drives", label: "Drives", icon: Megaphone, count: drives.length, href: null },
     { key: "reports", label: "Reports", icon: TrendingUp, count: null, href: null },
     { key: "activity", label: "Activity", icon: Activity, count: notifications.length, href: null },
+    // support 2026-07-16: candidate "Ask HPSEDC" messages. The count is UNREAD
+    // (not total) — this is an inbox, so the badge has to mean "needs a reply".
+    { key: "messages", label: "Messages", icon: MessageSquare, count: supportUnread || null, href: null },
   ];
 
   return (
@@ -345,6 +357,7 @@ export default function AgentDashboard() {
               {activeView === "drives" && <DrivesContent drives={drives} isVerified={isVerified} />}
               {activeView === "reports" && <ReportsBI />}
               {activeView === "activity" && <ActivityContent notifications={notifications} />}
+              {activeView === "messages" && <SupportInboxPanel />}
             </motion.div>
           </AnimatePresence>
         </main>

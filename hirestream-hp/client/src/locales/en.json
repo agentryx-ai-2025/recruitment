@@ -460,13 +460,24 @@
     "offerAction": "You have a job offer — make a decision",
     "moreApplications_one": "See your {{count}} other application",
     "moreApplications_other": "See your {{count}} other applications",
-    "steps": { "applied": "Applied", "review": "Review", "interview": "Interview", "selected": "Selected" },
+    "steps": {
+      "applied": "Applied",
+      "review": "Review",
+      "interview": "Interview",
+      "selected": "Selected"
+    },
     "status": {
-      "reviewLabel": "Being reviewed", "reviewLine": "HPSEDC is reviewing your application. This can take a few days.",
-      "interviewLabel": "Interview", "interviewLine": "You have been selected for an interview.", "interviewDate": "Your interview is on {{date}}.",
-      "selectedLabel": "You are selected", "selectedLine": "Congratulations! More details will follow soon.",
-      "placedLabel": "Job confirmed", "placedLine": "Congratulations! Your overseas placement is confirmed.",
-      "closedLabel": "This application did not go ahead", "closedLine": "No problem — apply for other jobs."
+      "reviewLabel": "Being reviewed",
+      "reviewLine": "HPSEDC is reviewing your application. This can take a few days.",
+      "interviewLabel": "Interview",
+      "interviewLine": "You have been selected for an interview.",
+      "interviewDate": "Your interview is on {{date}}.",
+      "selectedLabel": "You are selected",
+      "selectedLine": "Congratulations! More details will follow soon.",
+      "placedLabel": "Job confirmed",
+      "placedLine": "Congratulations! Your overseas placement is confirmed.",
+      "closedLabel": "This application did not go ahead",
+      "closedLine": "No problem — apply for other jobs."
     }
   },
   "help": {
@@ -656,47 +667,171 @@
   },
   "choices": {
     "trades": {
-      "mason": { "label": "Mason", "sub": "Brick and stone work" },
-      "driver": { "label": "Driver", "sub": "Car, taxi, truck, bus" },
-      "welder": { "label": "Welder", "sub": "Gas and arc welding" },
-      "electrician": { "label": "Electrician", "sub": "Wiring and repair" },
-      "plumber": { "label": "Plumber", "sub": "Pipes and fittings" },
-      "cook": { "label": "Cook", "sub": "Home, hotel, or mess" },
-      "carpenter": { "label": "Carpenter", "sub": "Wood and furniture work" },
-      "painter": { "label": "Painter", "sub": "House and site painting" },
-      "security": { "label": "Security Guard", "sub": "Building or site security" },
-      "cleaner": { "label": "Cleaner", "sub": "Housekeeping and cleaning" },
-      "caregiver": { "label": "Care Giver", "sub": "Care for elders or sick" },
-      "factory": { "label": "Factory Worker", "sub": "Machine and line work" },
-      "helper": { "label": "Construction Helper", "sub": "Site helper work" },
-      "tailor": { "label": "Tailor", "sub": "Stitching and garments" },
-      "steward": { "label": "Hotel Steward", "sub": "Waiter and hotel service" },
-      "agriculture": { "label": "Farm Worker", "sub": "Farming and orchard work" },
-      "delivery": { "label": "Delivery Worker", "sub": "Parcel and food delivery" },
-      "other": { "label": "Other Work", "sub": "Tell us what you do" }
+      "mason": {
+        "label": "Mason",
+        "sub": "Brick and stone work"
+      },
+      "driver": {
+        "label": "Driver",
+        "sub": "Car, taxi, truck, bus"
+      },
+      "welder": {
+        "label": "Welder",
+        "sub": "Gas and arc welding"
+      },
+      "electrician": {
+        "label": "Electrician",
+        "sub": "Wiring and repair"
+      },
+      "plumber": {
+        "label": "Plumber",
+        "sub": "Pipes and fittings"
+      },
+      "cook": {
+        "label": "Cook",
+        "sub": "Home, hotel, or mess"
+      },
+      "carpenter": {
+        "label": "Carpenter",
+        "sub": "Wood and furniture work"
+      },
+      "painter": {
+        "label": "Painter",
+        "sub": "House and site painting"
+      },
+      "security": {
+        "label": "Security Guard",
+        "sub": "Building or site security"
+      },
+      "cleaner": {
+        "label": "Cleaner",
+        "sub": "Housekeeping and cleaning"
+      },
+      "caregiver": {
+        "label": "Care Giver",
+        "sub": "Care for elders or sick"
+      },
+      "factory": {
+        "label": "Factory Worker",
+        "sub": "Machine and line work"
+      },
+      "helper": {
+        "label": "Construction Helper",
+        "sub": "Site helper work"
+      },
+      "tailor": {
+        "label": "Tailor",
+        "sub": "Stitching and garments"
+      },
+      "steward": {
+        "label": "Hotel Steward",
+        "sub": "Waiter and hotel service"
+      },
+      "agriculture": {
+        "label": "Farm Worker",
+        "sub": "Farming and orchard work"
+      },
+      "delivery": {
+        "label": "Delivery Worker",
+        "sub": "Parcel and food delivery"
+      },
+      "other": {
+        "label": "Other Work",
+        "sub": "Tell us what you do"
+      }
     },
     "edu": {
-      "none": { "label": "No schooling", "sub": "That is okay" },
-      "primary": { "label": "5th class", "sub": "Primary school" },
-      "middle": { "label": "8th class", "sub": "Middle school" },
-      "matric": { "label": "10th class", "sub": "Matric" },
-      "senior": { "label": "12th class", "sub": "Plus two" },
-      "iti": { "label": "ITI / Trade training", "sub": "Trade certificate" },
-      "diploma": { "label": "Diploma", "sub": "Polytechnic" },
-      "graduate": { "label": "College degree", "sub": "BA, B.Com, B.Sc…" }
+      "none": {
+        "label": "No schooling",
+        "sub": "That is okay"
+      },
+      "primary": {
+        "label": "5th class",
+        "sub": "Primary school"
+      },
+      "middle": {
+        "label": "8th class",
+        "sub": "Middle school"
+      },
+      "matric": {
+        "label": "10th class",
+        "sub": "Matric"
+      },
+      "senior": {
+        "label": "12th class",
+        "sub": "Plus two"
+      },
+      "iti": {
+        "label": "ITI / Trade training",
+        "sub": "Trade certificate"
+      },
+      "diploma": {
+        "label": "Diploma",
+        "sub": "Polytechnic"
+      },
+      "graduate": {
+        "label": "College degree",
+        "sub": "BA, B.Com, B.Sc…"
+      }
     },
-    "prof": { "elementary": "Little", "intermediate": "Good", "professional": "Very good" },
-    "countries": { "UAE": "UAE", "Saudi Arabia": "Saudi Arabia", "Qatar": "Qatar", "Kuwait": "Kuwait", "Oman": "Oman", "Bahrain": "Bahrain", "UK": "UK", "Germany": "Germany", "Canada": "Canada", "Australia": "Australia", "Ireland": "Ireland", "New Zealand": "New Zealand", "Singapore": "Singapore", "Japan": "Japan", "USA": "USA" },
-    "langs": { "Hindi": "Hindi", "English": "English", "Punjabi": "Punjabi", "Pahari": "Pahari", "Nepali": "Nepali", "Urdu": "Urdu", "Arabic": "Arabic" },
+    "prof": {
+      "elementary": "Little",
+      "intermediate": "Good",
+      "professional": "Very good"
+    },
+    "countries": {
+      "UAE": "UAE",
+      "Saudi Arabia": "Saudi Arabia",
+      "Qatar": "Qatar",
+      "Kuwait": "Kuwait",
+      "Oman": "Oman",
+      "Bahrain": "Bahrain",
+      "UK": "UK",
+      "Germany": "Germany",
+      "Canada": "Canada",
+      "Australia": "Australia",
+      "Ireland": "Ireland",
+      "New Zealand": "New Zealand",
+      "Singapore": "Singapore",
+      "Japan": "Japan",
+      "USA": "USA"
+    },
+    "langs": {
+      "Hindi": "Hindi",
+      "English": "English",
+      "Punjabi": "Punjabi",
+      "Pahari": "Pahari",
+      "Nepali": "Nepali",
+      "Urdu": "Urdu",
+      "Arabic": "Arabic"
+    },
     "proEdu": {
-      "senior": { "label": "12th class", "sub": "Plus two / senior secondary" },
-      "diploma": { "label": "Diploma / ITI", "sub": "Polytechnic, GNM, trade" },
-      "degree": { "label": "University degree", "sub": "Bachelor's, Master's, PhD" }
+      "senior": {
+        "label": "12th class",
+        "sub": "Plus two / senior secondary"
+      },
+      "diploma": {
+        "label": "Diploma / ITI",
+        "sub": "Polytechnic, GNM, trade"
+      },
+      "degree": {
+        "label": "University degree",
+        "sub": "Bachelor's, Master's, PhD"
+      }
     },
     "degree": {
-      "bachelor": { "label": "Bachelor's", "sub": "BA, B.Sc, B.Tech, B.Sc Nursing…" },
-      "master": { "label": "Master's", "sub": "MA, M.Sc, M.Tech, MBA…" },
-      "doctorate": { "label": "PhD", "sub": "Doctorate / research degree" }
+      "bachelor": {
+        "label": "Bachelor's",
+        "sub": "BA, B.Sc, B.Tech, B.Sc Nursing…"
+      },
+      "master": {
+        "label": "Master's",
+        "sub": "MA, M.Sc, M.Tech, MBA…"
+      },
+      "doctorate": {
+        "label": "PhD",
+        "sub": "Doctorate / research degree"
+      }
     },
     "field": {
       "nursing": "Nursing / Healthcare",
@@ -746,11 +881,26 @@
     "replace": "Replace",
     "cancel": "Cancel",
     "slots": {
-      "identity_proof": { "label": "Aadhaar / ID card", "sub": "Front side is enough" },
-      "passport": { "label": "Passport", "sub": "The photo page" },
-      "educational_certificate": { "label": "Education certificate", "sub": "10th / 12th / degree" },
-      "experience_certificate": { "label": "Work experience letter", "sub": "If you have one" },
-      "other": { "label": "Other document", "sub": "Anything else useful" }
+      "identity_proof": {
+        "label": "Aadhaar / ID card",
+        "sub": "Front side is enough"
+      },
+      "passport": {
+        "label": "Passport",
+        "sub": "The photo page"
+      },
+      "educational_certificate": {
+        "label": "Education certificate",
+        "sub": "10th / 12th / degree"
+      },
+      "experience_certificate": {
+        "label": "Work experience letter",
+        "sub": "If you have one"
+      },
+      "other": {
+        "label": "Other document",
+        "sub": "Anything else useful"
+      }
     },
     "uploaded": "Uploaded",
     "add": "Add",
@@ -910,7 +1060,8 @@
     "emptyActive": "You're all caught up",
     "emptyActiveDesc": "New notifications will land here.",
     "emptySaved": "Nothing saved yet",
-    "emptySavedDesc": "Hit 🔖 on a notification to keep it here for later."
+    "emptySavedDesc": "Hit 🔖 on a notification to keep it here for later.",
+    "open": "Open"
   },
   "notFound": {
     "title": "Page not found",
