@@ -159,7 +159,7 @@ export default function AgentDashboard() {
     { key: "activity", label: "Activity", icon: Activity, count: notifications.length, href: null },
     // support 2026-07-16: candidate "Ask HPSEDC" messages. The count is UNREAD
     // (not total) — this is an inbox, so the badge has to mean "needs a reply".
-    { key: "messages", label: "Messages", icon: MessageSquare, count: supportUnread || null, href: null },
+    { key: "messages", label: "Messages", icon: MessageSquare, count: supportUnread || null, href: null, alert: true },
   ];
 
   return (
@@ -218,9 +218,13 @@ export default function AgentDashboard() {
                   <item.icon className="w-4 h-4 flex-shrink-0" />
                   <span className="flex-1 text-left truncate">{item.label}</span>
                   {item.count !== null && item.count > 0 && (
-                    <span className={`text-[11px] font-semibold tabular-nums ${
-                      activeView === item.key ? "text-blue-600" : "text-slate-400"
-                    }`}>{item.count}</span>
+                    // An unread inbox is an action, not a tally — red bubble so it
+                    // doesn't read like "My Jobs 20".
+                    (item as any).alert
+                      ? <span className="text-[11px] font-bold tabular-nums text-white bg-red-500 rounded-full px-1.5 py-0.5 min-w-[18px] text-center">{item.count}</span>
+                      : <span className={`text-[11px] font-semibold tabular-nums ${
+                          activeView === item.key ? "text-blue-600" : "text-slate-400"
+                        }`}>{item.count}</span>
                   )}
                 </>
               );

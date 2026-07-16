@@ -115,6 +115,14 @@ export default function CandidateDashboard() {
   const { data: jobsRes, isError: jobsError, refetch: refetchJobs } = useQuery({ queryKey: ["/api/v1/jobs"], queryFn: () => fetchJson("/api/v1/jobs") });
   const { data: recsRes, isError: recsError, refetch: refetchRecs } = useQuery({ queryKey: ["/api/v1/applications/recommendations/for-me"], queryFn: () => fetchJson("/api/v1/applications/recommendations/for-me") });
   const { data: savedRes, isError: savedError, refetch: refetchSaved } = useQuery({ queryKey: ["/api/v1/jobs/saved/my"], queryFn: () => fetchJson("/api/v1/jobs/saved/my") });
+  // support 2026-07-16: unread HPSEDC replies, for the Messages bubble. Polled so
+  // a reply that lands while the candidate sits on the dashboard still surfaces.
+  const { data: supportUnreadRes } = useQuery({
+    queryKey: ["/api/v1/support/messages/unread"],
+    queryFn: () => fetchJson("/api/v1/support/messages/unread"),
+    refetchInterval: 20000,
+  });
+  const supportUnread: number = Number(supportUnreadRes?.data?.unread ?? 0);
 
   // audit 2026-07-06 (C7): with retry disabled a transient failure was
   // permanent-and-silent; surface it with a retry banner instead.
@@ -197,7 +205,12 @@ export default function CandidateDashboard() {
     { key: "recommended", label: "Jobs for You", icon: Sparkles, count: recommendations.length, color: "text-amber-600 bg-amber-100" },
     { key: "saved", label: "Saved Jobs", icon: Bookmark, count: savedJobsList.length, color: "text-rose-600 bg-rose-100" },
     { key: "drives", label: "Recruitment Drives", icon: Calendar, count: null, color: "text-indigo-600 bg-indigo-100" },
-    { key: "documents", label: "Documents", icon: FileText, count: docs.length, color: "text-violet-600 bg-violet-100" },
+    { key: "documents", label: "Documents", icon: FileText, count: docs.length, color: "text-violet-600 bg-violet-100", route: "/documents" },
+    // support 2026-07-16: the SIMPLE view had an "Ask HPSEDC" button but the FULL
+    // view had no way in at all — a candidate on the full dashboard couldn't
+    // reach their own message thread. `alert` renders the count as a red bubble
+    // rather than a neutral tally: an unanswered reply is an action, not a stat.
+    { key: "messages", label: "Messages", icon: MessageCircleQuestion, count: supportUnread || null, color: "text-blue-600 bg-blue-100", route: "/help", alert: true },
   ];
   const navItemsMinimal = [
     { key: "overview", label: t("minDash.navHome"), icon: Home, count: null, color: "text-blue-600 bg-blue-100" },
@@ -222,7 +235,7 @@ export default function CandidateDashboard() {
           // Big 2-col tiles — 4 items fit without scrolling, phone-friendly.
           <div className="grid grid-cols-2 gap-2">
             {navItems.map(item => (
-              <button key={item.key} onClick={() => item.key === "documents" ? setLocation("/documents") : setActiveView(item.key)}
+              <button key={item.key} onClick={() => (item as any).route ? setLocation((item as any).route) : setActiveView(item.key)}
                 className={`relative flex flex-col items-center justify-center gap-1.5 rounded-2xl border min-h-[76px] font-semibold transition-all ${
                   activeView === item.key ? "bg-blue-600 border-blue-600 text-white shadow" : "bg-white border-slate-200 text-slate-700"}`}>
                 {(item as any).dot && <span className="absolute top-2 right-2 w-2.5 h-2.5 rounded-full bg-red-500" />}
@@ -233,7 +246,7 @@ export default function CandidateDashboard() {
         ) : (
         <div className="flex gap-1 overflow-x-auto bg-white rounded-xl border border-slate-200 p-1">
           {navItems.map(item => (
-            <button key={item.key} onClick={() => setActiveView(item.key)}
+            <button key={item.key} onClick={() => (item as any).route ? setLocation((item as any).route) : setActiveView(item.key)}
               className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs whitespace-nowrap font-medium transition-all ${
                 activeView === item.key ? "bg-blue-50 text-blue-700" : "text-slate-500"
               }`}>
@@ -340,7 +353,7 @@ export default function CandidateDashboard() {
           <nav className="bg-white rounded-xl border border-slate-200 p-1.5 shadow-sm">
             {navItems.map(item => (
               minimal ? (
-                <button key={item.key} onClick={() => item.key === "documents" ? setLocation("/documents") : setActiveView(item.key)}
+                <button key={item.key} onClick={() => (item as any).route ? setLocation((item as any).route) : setActiveView(item.key)}
                   className={`w-full flex items-center gap-3 px-2.5 my-0.5 rounded-xl min-h-[60px] text-[17px] font-semibold transition-all ${
                     activeView === item.key ? "bg-blue-600 text-white shadow" : "text-slate-700 hover:bg-slate-50"}`}>
                   <span className={`w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 ${activeView === item.key ? "bg-white/20 text-white" : item.color}`}>
@@ -349,17 +362,21 @@ export default function CandidateDashboard() {
                   <span className="flex-1 text-left">{item.label}</span>
                   {(item as any).dot && <span className="w-3 h-3 rounded-full bg-red-500 flex-shrink-0" />}
                   {item.count !== null && item.count > 0 && (
-                    <span className={`text-sm font-bold tabular-nums ${activeView === item.key ? "text-white" : "text-slate-400"}`}>{item.count}</span>
+                    (item as any).alert
+                      ? <span className="text-[11px] font-bold tabular-nums text-white bg-red-500 rounded-full px-1.5 py-0.5 min-w-[18px] text-center">{item.count}</span>
+                      : <span className={`text-sm font-bold tabular-nums ${activeView === item.key ? "text-white" : "text-slate-400"}`}>{item.count}</span>
                   )}
                 </button>
               ) : (
-                <button key={item.key} onClick={() => setActiveView(item.key)}
+                <button key={item.key} onClick={() => (item as any).route ? setLocation((item as any).route) : setActiveView(item.key)}
                   className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-all ${
                     activeView === item.key ? "bg-blue-50 text-blue-700 font-semibold" : "text-slate-600 hover:bg-slate-50"}`}>
                   <item.icon className="w-4 h-4 flex-shrink-0" />
                   <span className="flex-1 text-left truncate">{item.label}</span>
                   {item.count !== null && item.count > 0 && (
-                    <span className={`text-[11px] font-semibold tabular-nums ${activeView === item.key ? "text-blue-600" : "text-slate-400"}`}>{item.count}</span>
+                    (item as any).alert
+                      ? <span className="text-[11px] font-bold tabular-nums text-white bg-red-500 rounded-full px-1.5 py-0.5 min-w-[18px] text-center">{item.count}</span>
+                      : <span className={`text-[11px] font-semibold tabular-nums ${activeView === item.key ? "text-blue-600" : "text-slate-400"}`}>{item.count}</span>
                   )}
                 </button>
               )
